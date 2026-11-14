@@ -1,22 +1,19 @@
 // Ported from LiveKit, pkg/rtc/signalling/signalhandler.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust. The participant is the `LocalParticipant` of this
-// package (`localparticipant.rs`) until `types.LocalParticipant` is ported. It is held
-// weakly, since the participant holds its handler: a request for a participant that is gone
-// is dropped. `NewSignalHandler` returns the handler in an `Arc`, not as the interface. A
-// request is logged by its `Debug`, where the original logs it through `logger.Proto`, which
-// leaves out what the protocol marks as sensitive. The test at the end is new: the original
-// has none.
+// Changes: translated from Go to Rust. The participant is held weakly, since the participant
+// holds its handler: a request for a participant that is gone is dropped. `NewSignalHandler`
+// returns the handler in an `Arc`, not as the interface. A request is logged by its `Debug`,
+// where the original logs it through `logger.Proto`, which leaves out what the protocol
+// marks as sensitive. The test at the end is new: the original has none.
 
 use std::sync::{Arc, Weak};
 
 use super::errors::Error;
 use super::interfaces::ParticipantSignalHandler;
-use super::localparticipant::LocalParticipant;
 use crate::protocol::livekit::{self, signal_request};
 use crate::protocol::logger::Logger;
 use crate::routing::Message;
-use crate::rtc::types::ParticipantCloseReason;
+use crate::rtc::types::{LocalParticipant, ParticipantCloseReason};
 use crate::{debugw, warnw};
 
 pub struct SignalHandlerParams {
@@ -86,7 +83,7 @@ impl ParticipantSignalHandler for SignalHandler {
 
             Some(signal_request::Message::TrackSetting(track_setting)) => {
                 for sid in livekit::strings_as_ids::<livekit::TrackId>(&track_setting.track_sids) {
-                    participant.update_subscribed_track_settings(sid, track_setting);
+                    participant.update_subscribed_track_settings(&sid, track_setting);
                 }
             }
 
@@ -215,7 +212,8 @@ impl ParticipantSignalHandler for SignalHandler {
 mod tests {
     use super::*;
     use crate::protocol::logger;
-    use crate::rtc::signalling::FakeLocalParticipant;
+    use crate::rtc;
+    use crate::rtc::types::FakeLocalParticipant;
 
     fn request(message: signal_request::Message) -> Message {
         livekit::SignalRequest {
@@ -373,7 +371,7 @@ mod tests {
         );
 
         // what the participant makes of a request is logged, not returned
-        participant.handle_sync_state_returns(Err("out of sync".into()));
+        participant.handle_sync_state_returns(Err(rtc::Error::InternalError));
         assert_eq!(
             Ok(()),
             handler.handle_message(request(signal_request::Message::SyncState(

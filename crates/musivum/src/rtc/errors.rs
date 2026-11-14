@@ -2,7 +2,9 @@
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust; the errors are one enum, the one of the package:
 // errors that other files of `pkg/rtc` define are added to it when those files are ported.
-// The test at the end is new: the original has none.
+// New: a variant for each other package whose errors the interfaces of `pkg/rtc/types` pass
+// on, where the original returns that package's `error` as it is. The test at the end is
+// new: the original has none.
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
@@ -47,6 +49,21 @@ pub enum Error {
 
     #[error("participant is not given permission to subscribe to metrics")]
     NoSubscribeMetricsPermission,
+
+    // errors of other packages that the methods of `types/interfaces.go` pass on: of the
+    // sink a participant's messages are written to, of the signal handler and the limits on
+    // a participant's metadata, of the down track a subscription makes, of the peer
+    // connection, and what `PerformRpc` answers on its error channel
+    #[error(transparent)]
+    Routing(#[from] crate::routing::Error),
+    #[error(transparent)]
+    Signalling(#[from] crate::rtc::signalling::Error),
+    #[error(transparent)]
+    Sfu(#[from] crate::sfu::Error),
+    #[error(transparent)]
+    Webrtc(#[from] crate::webrtc::Error),
+    #[error(transparent)]
+    DataChannelRpc(#[from] crate::protocol::utils::DataChannelRpcError),
 }
 
 #[cfg(test)]

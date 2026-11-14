@@ -1,10 +1,9 @@
 // Ported from LiveKit, pkg/rtc/signalling/signallerasync.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust. The participant is the `LocalParticipant` of this
-// package (`localparticipant.rs`) until `types.LocalParticipant` is ported. It is held
-// weakly, since the participant holds its signaller: a participant that is gone is one that
-// is disconnected. `NewSignallerAsync` returns the signaller in an `Arc`, not as the
-// interface. The embedded base is a field, and its methods are handed on to it one by one.
+// Changes: translated from Go to Rust. The participant is held weakly, since the participant
+// holds its signaller: a participant that is gone is one that is disconnected.
+// `NewSignallerAsync` returns the signaller in an `Arc`, not as the interface. The embedded
+// base is a field, and its methods are handed on to it one by one.
 // `OnHandshakeOpened` goes to the base and is not kept in the params here as well. Go's
 // `%T` of what a response carries is the table in `signal_response_type`. A message is
 // moved into the sink: what is logged of it after the write is taken before. `psrpc.Canceled`
@@ -18,13 +17,12 @@
 use std::sync::{Arc, Weak};
 
 use super::interfaces::ParticipantSignaller;
-use super::localparticipant::LocalParticipant;
 use super::signallerasyncbase::{SignallerAsyncBase, SignallerAsyncBaseParams};
 use crate::protocol::livekit::signal_response;
 use crate::protocol::logger::{Level, Logger};
 use crate::protocol::utils::error_is_one_of;
 use crate::routing::{self, Message, MessageSink};
-use crate::rtc::types::SignallingCloseReason;
+use crate::rtc::types::{LocalParticipant, SignallingCloseReason};
 use crate::{debugw, infow, warnw};
 
 pub struct SignallerAsyncParams {
@@ -251,7 +249,7 @@ mod tests {
     use crate::protocol::livekit;
     use crate::protocol::logger;
     use crate::routing::FakeMessageSink;
-    use crate::rtc::signalling::FakeLocalParticipant;
+    use crate::rtc::types::FakeLocalParticipant;
 
     fn response(message: signal_response::Message) -> Message {
         livekit::SignalResponse {

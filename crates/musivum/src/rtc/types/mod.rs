@@ -1,6 +1,6 @@
-//! LiveKit's `pkg/rtc/types`: the interfaces the parts of `pkg/rtc` meet through. The
-//! interfaces are not ported yet; the protocol versions, the traffic statistics, the record
-//! of a connection's ICE candidates and a few types of `interfaces.go` are.
+//! LiveKit's `pkg/rtc/types`: the interfaces the parts of `pkg/rtc` meet through
+//! (`interfaces.rs`, whose header has the rules their signatures follow), the protocol
+//! versions, the traffic statistics and the record of a connection's ICE candidates.
 
 mod ice;
 mod interfaces;

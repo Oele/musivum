@@ -5,12 +5,11 @@
 //! to the participant's signal connection, and [`ParticipantSignalHandler`] reads what the
 //! client sends and calls the participant.
 //!
-//! [`LocalParticipant`] is written new: the part of `types.LocalParticipant`, which is not
-//! ported yet, that this package calls.
+//! The participant the handler and the signaller are given is a
+//! [`types::LocalParticipant`](crate::rtc::types::LocalParticipant).
 
 mod errors;
 mod interfaces;
-mod localparticipant;
 mod signalhandler;
 mod signalhandlerunimplemented;
 mod signallerasync;
@@ -23,7 +22,6 @@ mod signallingunimplemented;
 
 pub use errors::*;
 pub use interfaces::*;
-pub use localparticipant::*;
 pub use signalhandler::*;
 pub use signalhandlerunimplemented::*;
 pub use signallerasync::*;
