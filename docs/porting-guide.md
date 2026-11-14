@@ -190,6 +190,8 @@ lazily is not needed, since the macros do not evaluate values when the level is 
 - When a ported test passes, check that it can fail: change something in the code under test
   that the test is about, see it fail, change it back. A test that cannot fail is a
   translation mistake in the test.
+- An assertion on allocations per call (`testing.AllocsPerRun`) is left out, with a comment
+  at its place: counting them needs `unsafe`. The rest of such a test is kept.
 - If something of the original cannot be ported as it is (a test that needs pion's
   internals, a helper that has no counterpart) say so in a comment at that place and in the
   report. Do not leave it out silently and do not write a different test under the same

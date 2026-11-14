@@ -37,12 +37,26 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/bwe/bwe.go`, `null_bwe.go` | `sfu/bwe/bwe.rs`, `null_bwe.rs` | none upstream | Two tests added. `Bwe` and `BweListener` are traits; `NullBwe` does not implement `Bwe` (upstream's has no `Type()` either) and is held by the estimators for the calls they do not define. |
 | `pkg/sfu/audio/audiolevel.go` | `sfu/audio/audiolevel.rs` | 1 / 1 | |
 | `pkg/sfu/packettrailer/packet_trailer.go` | `sfu/packettrailer/packet_trailer.rs` | 1 / 1 | |
+| `pkg/sfu/rtpextension/dependencydescriptor/` (five files) | `sfu/rtpextension/dependencydescriptor/` (same names) | 7 / 8 | `TestDependencyDescriptorMarshalAllocs` counts allocations and is left out (see the guide); two benchmarks left out. Also compared with 143 lines of output of the original for the same inputs (`reference_test.rs`): identical except where Go tells a nil slice from an empty one, see below. |
 | `pkg/sfu/rtpextension/playoutdelay/playoutdelay.go` | `sfu/rtpextension/playoutdelay/playoutdelay.rs` | 1 / 1 | |
 | `pkg/sfu/rtpextension/abscapturetime/abscapturetime.go` | `sfu/rtpextension/abscapturetime/abscapturetime.rs` | none upstream | One test added. |
 | `pkg/sfu/datachannel/bitrate.go` | `sfu/datachannel/bitrate.rs` | 6 / 6 | |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
 with the same pseudo-random inputs (34,021 lines of output, identical).
+
+## Where the port cannot be the original
+
+- **Nil against empty in the dependency descriptor.** Go's writer takes a nil `FrameDiffs`
+  or `DecodeTargetIndications` as "as the template has it" and an empty one as "none". A
+  `Vec` has no nil. In the port `frame_diffs` is always taken as given (which is how the
+  forwarding path behaves upstream, where the parser's storage is never nil) and an empty
+  `decode_target_indications` is taken as nil. A descriptor made by hand with nil frame
+  diffs is therefore written differently (`08005a10` where Go writes `08005a`); the cases
+  are pinned in `reference_test.rs`.
+- **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
+  files) are left out: counting allocations needs an allocator of the test binary's own,
+  which needs `unsafe`, and the workspace forbids it.
 
 ## Noted on the way
 
@@ -99,5 +113,14 @@ What looked wrong or fragile upstream and was ported as it is:
   fails the whole marshal (pion skips it); when unmarshalling a truncated packet, a large
   delta with one byte left is read as a small one (pion: "packet too short"; read, not
   tested).
+- `dependencydescriptor/dependencydescriptorwriter.go`, `findBestTemplate`: the search for a
+  cheaper template runs over templates of other layers and can pick one (a frame of
+  temporal layer 1 is written with a template of layer 2 and reads back as layer 2), and
+  for a frame of the structure's last layer only that layer's first template is tried. The
+  writer writes the extension's structure, not the descriptor's attached one, when both are
+  set. Marshalling without a structure or without frame dependencies panics (a nil
+  dereference upstream; the selector there wraps the call in `recover()`).
+- `dependencydescriptor/dependencydescriptorreader.go`: a reused descriptor keeps its
+  attached structure and active decode targets from the packet before.
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
