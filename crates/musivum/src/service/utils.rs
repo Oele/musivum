@@ -14,8 +14,7 @@
 // router, the node the room is on (on one node: this node), or none where the original's
 // router is not a `routing.Router`; it returns the grants it changed as a copy, where the
 // original changes the grants in the request's context; its result has public fields, so
-// that a server can call it. `selector.LimitsReached`, of `pkg/routing/selector` which is not
-// ported, is `limits_reached` here. `form_value` and `Values` are new: what Go's `r.FormValue`
+// that a server can call it. `form_value` and `Values` are new: what Go's `r.FormValue`
 // and `url.ParseQuery` do with a URL's query. The errors of the file are in errors.rs.
 
 use std::collections::HashMap;
@@ -36,6 +35,7 @@ use crate::protocol::auth::ClaimGrants;
 use crate::protocol::livekit;
 use crate::protocol::livekit::client_info::{Capability, Sdk};
 use crate::protocol::logger::{self, Logger};
+use crate::routing::selector;
 use crate::rtc;
 use crate::warnw;
 
@@ -376,7 +376,7 @@ pub fn validate_connect_request(
     // limits of the node the room is on, which for one node are this node's
     if let Some(found_node) = node {
         res.region = found_node.region.clone();
-        if limits_reached(limit_config, found_node.stats.as_ref()) {
+        if selector::limits_reached(limit_config, found_node.stats.as_ref()) {
             return (
                 res,
                 StatusCode::SERVICE_UNAVAILABLE,
@@ -434,32 +434,6 @@ pub fn validate_connect_request(
     res.grants = Some(claims);
     res.token_expires_at = get_token_expires_at(&r.extensions);
     (res, StatusCode::OK, Ok(()))
-}
-
-// selector.LimitsReached, of pkg/routing/selector/utils.go (not ported).
-// TODO: check remote node configured limit, instead of this node's config
-fn limits_reached(limit_config: &LimitConfig, node_stats: Option<&livekit::NodeStats>) -> bool {
-    let Some(node_stats) = node_stats else {
-        return false;
-    };
-
-    if limit_config.num_tracks > 0
-        && limit_config.num_tracks
-            <= node_stats
-                .num_tracks_in
-                .wrapping_add(node_stats.num_tracks_out)
-    {
-        return true;
-    }
-
-    let rate = node_stats.rates.first().cloned().unwrap_or_default();
-    if limit_config.bytes_per_sec > 0.0
-        && limit_config.bytes_per_sec <= rate.bytes_in + rate.bytes_out
-    {
-        return true;
-    }
-
-    false
 }
 
 pub fn is_rtc_path(path: &str) -> bool {

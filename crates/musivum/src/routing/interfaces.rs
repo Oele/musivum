@@ -1,7 +1,8 @@
 // Ported from LiveKit, pkg/routing/interfaces.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust. Not here: `Router`, `MessageRouter` and
-// `CreateRouter`, which are for the nodes of a cluster. A message is a `Message` and
+// Changes: translated from Go to Rust. The context parameters are dropped. `CreateRouter`
+// makes the local router only: it takes neither the Redis client nor the keepalive pub/sub,
+// which are for the nodes of a cluster (`RedisRouter` is not ported). A message is a `Message` and
 // `ReadChan()` gives a `ReadChan` (`message.rs`). The null sink and source are made as
 // `Arc`s; the channel of the null source, which is only ever closed, is its writing end,
 // dropped to close it. `MessageSink` has `Any` as a supertrait, so that a test gets its fake
@@ -24,10 +25,13 @@ use tokio::sync::mpsc;
 
 use super::errors::Error;
 use super::message::{Message, ReadChan, make_chan};
+use super::{LocalNode, LocalRouter, NodeStatsConfig, RoomManagerClient, SignalClient};
 use crate::go::atomic;
 use crate::go::time::Time;
+use crate::infow;
 use crate::protocol::auth::ClaimGrants;
 use crate::protocol::livekit;
+use crate::protocol::logger;
 use crate::utils::client_info_without_address;
 
 // MessageSink is an abstraction for writing protobuf messages and having them read by a MessageSource,
@@ -129,6 +133,30 @@ impl MessageSource for NullMessageSource {
 
 // ------------------------------------------------
 
+// Router allows multiple nodes to coordinate the participant session
+#[cfg_attr(test, musivum_fakes::fake)]
+pub trait Router: MessageRouter {
+    fn register_node(&self) -> Result<(), Error>;
+    fn unregister_node(&self) -> Result<(), Error>;
+    fn remove_dead_nodes(&self) -> Result<(), Error>;
+
+    fn list_nodes(&self) -> Result<Vec<livekit::Node>, Error>;
+
+    fn get_node_for_room(&self, room_name: &livekit::RoomName) -> Result<livekit::Node, Error>;
+    fn set_node_for_room(
+        &self,
+        room_name: &livekit::RoomName,
+        node_id: &livekit::NodeId,
+    ) -> Result<(), Error>;
+    fn clear_room_state(&self, room_name: &livekit::RoomName) -> Result<(), Error>;
+
+    fn get_region(&self) -> String;
+
+    fn start(&self) -> Result<(), Error>;
+    fn drain(&self);
+    fn stop(&self);
+}
+
 #[derive(Clone, Default)]
 pub struct StartParticipantSignalResults {
     pub connection_id: livekit::ConnectionId,
@@ -136,6 +164,32 @@ pub struct StartParticipantSignalResults {
     pub response_source: Option<Arc<dyn MessageSource>>,
     pub node_id: livekit::NodeId,
     pub node_selection_reason: String,
+}
+
+#[cfg_attr(test, musivum_fakes::fake)]
+pub trait MessageRouter: Send + Sync {
+    // CreateRoom starts an rtc room
+    fn create_room(&self, req: &livekit::CreateRoomRequest) -> Result<livekit::Room, Error>;
+
+    // StartParticipantSignal participant signal connection is ready to start
+    fn start_participant_signal(
+        &self,
+        room_name: &livekit::RoomName,
+        pi: ParticipantInit,
+    ) -> Result<StartParticipantSignalResults, Error>;
+}
+
+pub fn create_router(
+    node: Arc<dyn LocalNode>,
+    signal_client: Arc<dyn SignalClient>,
+    room_manager_client: Arc<dyn RoomManagerClient>,
+    node_stats_config: NodeStatsConfig,
+) -> Arc<dyn Router> {
+    let lr = LocalRouter::new(node, signal_client, room_manager_client, node_stats_config);
+
+    // local routing and store
+    infow!(logger::get_logger(), "using single-node routing");
+    lr
 }
 
 // ------------------------------------------------
