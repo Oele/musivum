@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, LazyLock};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
+use musivum_protocol::Timestamp;
 use parking_lot::Mutex;
 
 /// A length of time in nanoseconds, which may be negative. Go's `time.Duration`.
@@ -350,6 +351,22 @@ pub fn until(t: Time) -> Duration {
     t.sub(Time::now())
 }
 
+/// Go's `timestamppb.New(t)` (`google.golang.org/protobuf/types/known/timestamppb`): the time
+/// as the protocol's messages carry it, a `musivum_protocol::Timestamp`. The zero [`Time`]
+/// gives the Unix epoch, as `timestamppb.New(time.Unix(0, 0))` does; Go's
+/// `timestamppb.New(time.Time{})` gives the year 1, which [`Time`] cannot tell from the epoch.
+pub fn timestamppb_new(t: Time) -> Timestamp {
+    Timestamp {
+        seconds: t.unix_secs(),
+        nanos: t.nanosecond() as i32,
+    }
+}
+
+/// Go's `ts.AsTime()` of a `*timestamppb.Timestamp`.
+pub fn timestamppb_as_time(ts: &Timestamp) -> Time {
+    Time::unix(ts.seconds, ts.nanos as i64)
+}
+
 /// Go's `time.Sleep`, for code that runs on the runtime.
 pub async fn sleep(d: Duration) {
     tokio::time::sleep(d.to_std()).await;
@@ -484,6 +501,21 @@ mod tests {
         assert!(!now().is_zero());
         assert_eq!(t.unix_nano(), 10_000_000_500);
         assert_eq!(t.unix_secs(), 10);
+    }
+
+    #[test]
+    fn times_convert_to_the_timestamp_of_the_protocol_and_back() {
+        let t = Time::unix(1_700_000_000, 123_456_789);
+        let ts = timestamppb_new(t);
+        assert_eq!((ts.seconds, ts.nanos), (1_700_000_000, 123_456_789));
+        assert_eq!(timestamppb_as_time(&ts), t);
+
+        // before the epoch the seconds round down and the nanoseconds stay positive, as in Go
+        let ts = timestamppb_new(Time::from_unix_nano(-1));
+        assert_eq!((ts.seconds, ts.nanos), (-1, 999_999_999));
+        assert_eq!(timestamppb_as_time(&ts), Time::from_unix_nano(-1));
+
+        assert_eq!(timestamppb_new(Time::ZERO), Timestamp::default());
     }
 
     #[test]

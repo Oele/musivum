@@ -17,6 +17,10 @@ pub mod logger {
 
 pub use prost::Message;
 
+/// `google.protobuf.Timestamp` as the messages have it in their fields: Go's
+/// `timestamppb.Timestamp`.
+pub use pbjson_types::Timestamp;
+
 #[cfg(test)]
 mod tests {
     use super::Message;
