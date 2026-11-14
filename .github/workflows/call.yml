@@ -1,0 +1,42 @@
+# The scripted call of tests/call against musivum: two participants with LiveKit's
+# JavaScript SDK in headless Chrome, joining, publishing simulcast video and audio,
+# subscribing, switching layers, sending data, muting and leaving. It passes when the
+# clients observe what they observe against LiveKit (20 checks).
+#
+# By hand and once a week for now, until it has shown that it is not flaky on GitHub's
+# runners; then it can run on every push to main as well.
+name: call
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 4 * * 1"   # Mondays, 04:17 UTC
+
+permissions:
+  contents: read
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      CARGO_TERM_COLOR: always
+      CARGO_INCREMENTAL: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.99.1
+      - uses: Swatinem/rust-cache@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # run.sh builds musivum-server in release mode, installs the call's Node packages,
+      # finds Chrome (the runner has it) and runs the call on loopback ports 39500 to 39511.
+      - run: tests/call/run.sh musivum
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: call-musivum
+          path: |
+            tests/call/out/musivum.json
+            tests/call/out/musivum-server.log
+          if-no-files-found: ignore

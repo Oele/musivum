@@ -1,0 +1,41 @@
+# What scripts/check.sh does, on every push to main and every pull request: formatting,
+# clippy with warnings as errors, and all tests of the workspace (most of them LiveKit's own,
+# ported; some connect real peer connections over the loopback interface).
+#
+# The browser call against LiveKit's JavaScript SDK runs in call.yml; the degraded-network
+# and load comparisons with LiveKit (tests/netem, tests/load) are not run in CI: they need
+# LiveKit's server and a quiet machine.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:   # and by hand, from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TERM_COLOR: always
+      # Smaller and faster builds on a runner: no incremental state, line tables only.
+      CARGO_INCREMENTAL: "0"
+      CARGO_PROFILE_DEV_DEBUG: line-tables-only
+    steps:
+      - uses: actions/checkout@v4
+      # A fixed version, the one the tree is known to pass with: each new clippy brings
+      # lints that would otherwise fail a pull request for code it did not touch. Raise it
+      # together with whatever the new version asks for.
+      - uses: dtolnay/rust-toolchain@1.99.1
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: scripts/check.sh

@@ -97,8 +97,10 @@ embedding program needs them.
 
 ## Working on it
 
-- `cargo test --workspace`; before a commit also `cargo fmt --all --check` and
-  `cargo clippy --workspace --all-targets -- -D warnings`.
+- `scripts/check.sh` runs what has to pass: `cargo fmt --all --check`,
+  `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`. CI
+  runs it on every push and pull request (`.github/workflows/check.yml`), and the browser
+  call against musivum by hand and weekly (`call.yml`).
 - `tests/call` runs the scripted browser call against `musivum` or `reference` (LiveKit at
   the pinned version); `tests/netem` and `tests/load` are the degraded network and the load
   test. They need Node, Chrome, and for the reference `livekit-server` and LiveKit's `lk`.
