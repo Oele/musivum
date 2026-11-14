@@ -29,8 +29,8 @@
 //   `on_ice_config_changed`) and finds no relay candidate here. Comments at the places.
 // - `AddICECandidate` takes the target as the enum: the original's arm for an unknown target
 //   cannot be reached and is a comment. The participant converts the request's `i32`.
-// - `PingTimeoutSeconds` (participant.go) and `connectionDetailsFields` (room.go), which are
-//   not ported yet, are written out here for this file's use.
+// - `PingTimeoutSeconds` (participant.go), which is not ported yet, is written out here for
+//   this file's use.
 // - `GetDataTrackTransport` hands out the transport as `types::DataTrackTransport`: Go's
 //   `*PCTransport` is one by having the method, and the `impl` that says so is at the end of
 //   this file, the one place that needs it.
@@ -68,12 +68,13 @@ use crate::go::time::{self, Duration, Time};
 use crate::mediatransportutil::twcc;
 use crate::protocol::livekit;
 use crate::protocol::logger::{Level, Logger};
+use crate::rtc::connection_details_fields;
 use crate::rtc::transport::{self, NegotiationState};
 use crate::rtc::types;
 use crate::rtc::{
     BytesTrackStats, ClientInfo, DATA_TRACK_DATA_CHANNEL, Error, LOSSY_DATA_CHANNEL,
     MediaLossProxy, MediaLossProxyParams, PcTransport, RELIABLE_DATA_CHANNEL, RtcpFeedbackConfig,
-    TransportParams, WebRtcConfig, logger_with_pc_target, maybe_truncate_ip,
+    TransportParams, WebRtcConfig, logger_with_pc_target,
 };
 use crate::sfu;
 use crate::sfu::datachannel;
@@ -1506,67 +1507,6 @@ fn is_deadline_exceeded(err: &Error) -> bool {
         cause(err),
         Error::DeadlineExceeded | Error::DataChannelWriter(datachannel::Error::DeadlineExceeded)
     )
-}
-
-// `connectionDetailsFields` of room.go, which is not ported yet: the fields this file logs
-// a short connection with.
-fn connection_details_fields(
-    infos: &[types::IceConnectionInfo],
-) -> Vec<(String, Box<dyn fmt::Debug>)> {
-    let mut fields: Vec<(String, Box<dyn fmt::Debug>)> = Vec::new();
-    let mut connection_type = types::IceConnectionType::Unknown;
-    for info in infos {
-        let mut candidates = Vec::with_capacity(info.remote.len() + info.local.len());
-        for c in &info.local {
-            let mut c_str = "[local]".to_string();
-            if c.selected_order != 0 {
-                c_str += &format!("[selected:{}]", c.selected_order);
-            } else if c.filtered {
-                c_str += "[filtered]";
-            }
-            if c.trickle {
-                c_str += "[trickle]";
-            }
-            c_str += &format!(" {}", c.candidate);
-            candidates.push(c_str);
-        }
-        for c in &info.remote {
-            let mut c_str = "[remote]".to_string();
-            if c.selected_order != 0 {
-                c_str += &format!("[selected:{}]", c.selected_order);
-            } else if c.filtered {
-                c_str += "[filtered]";
-            }
-            if c.trickle {
-                c_str += "[trickle]";
-            }
-            c_str += &format!(
-                " {} {} {}:{}",
-                c.candidate.protocol,
-                c.candidate.typ,
-                maybe_truncate_ip(&c.candidate.address),
-                c.candidate.port
-            );
-            if !c.candidate.related_address.is_empty() {
-                let related_addr = maybe_truncate_ip(&c.candidate.related_address);
-                if !related_addr.is_empty() {
-                    c_str += &format!("  related {}:{}", related_addr, c.candidate.related_port);
-                }
-            }
-            candidates.push(c_str);
-        }
-        if !candidates.is_empty() {
-            fields.push((
-                format!("{}Candidates", info.transport.as_str_name().to_lowercase()),
-                Box::new(candidates),
-            ));
-        }
-        if info.r#type != types::IceConnectionType::Unknown {
-            connection_type = info.r#type;
-        }
-    }
-    fields.push(("connectionType".to_string(), Box::new(connection_type)));
-    fields
 }
 
 // `logger.Infow(msg, fields...)` with fields made at run time.
