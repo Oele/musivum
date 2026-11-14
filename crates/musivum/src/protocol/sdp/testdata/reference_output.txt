@@ -1,0 +1,253 @@
+REF offer marshal_gives_the_text_back: true
+REF offer fingerprint: "A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78" "sha-256" err=nil
+REF offer dtls_role: client
+REF offer ice_credential: "wkc6" "OYm3bO7I9gDROYhr4XKvhXNz" err=nil
+REF offer ip: "127.0.0.1"
+REF offer bundle_mid: "0" true
+REF offer media 0 mid: "0"
+REF offer media 0 stream_id: "" false
+REF offer media 0 media_stream_track: ""
+REF offer media 0 simulcast_rids: [] false
+REF offer media 0 codecs: 8 err=nil
+REF offer media 0 codec 0: 111 "opus" 48000 "2" "minptime=10;stereo=1;useinbandfec=1" ["transport-cc"]
+REF offer media 0 codec 1: 63 "red" 48000 "2" "111/111" []
+REF offer media 0 codec 2: 9 "G722" 8000 "" "" []
+REF offer media 0 codec 3: 0 "PCMU" 8000 "" "" []
+REF offer media 0 codec 4: 8 "PCMA" 8000 "" "" []
+REF offer media 0 codec 5: 13 "CN" 8000 "" "" []
+REF offer media 0 codec 6: 110 "telephone-event" 48000 "" "" []
+REF offer media 0 codec 7: 126 "telephone-event" 8000 "" "" []
+REF offer media 1 mid: "6"
+REF offer media 1 stream_id: "" false
+REF offer media 1 media_stream_track: ""
+REF offer media 1 simulcast_rids: [] false
+REF offer media 1 codecs: 0 err=strconv.ParseUint: parsing "webrtc-datachannel": invalid syntax
+REF offer media 2 mid: "7"
+REF offer media 2 stream_id: "a3dd41b2-fdd9-4270-ac78-524add8f4aa6" true
+REF offer media 2 media_stream_track: "a3dd41b2-fdd9-4270-ac78-524add8f4aa6"
+REF offer media 2 simulcast_rids: ["q" "h" "f"] true
+REF offer media 2 codecs: 9 err=nil
+REF offer media 2 codec 0: 96 "VP8" 90000 "" "x-google-start-bitrate=1000" ["goog-remb" "transport-cc" "ccm fir" "nack" "nack pli"]
+REF offer media 2 codec 1: 97 "rtx" 90000 "" "apt=96" []
+REF offer media 2 codec 2: 45 "AV1" 90000 "" "level-idx=5;profile=0;tier=0" ["goog-remb" "transport-cc" "ccm fir" "nack" "nack pli"]
+REF offer media 2 codec 3: 46 "rtx" 90000 "" "apt=45" []
+REF offer media 2 codec 4: 98 "VP9" 90000 "" "profile-id=0" ["goog-remb" "transport-cc" "ccm fir" "nack" "nack pli"]
+REF offer media 2 codec 5: 99 "rtx" 90000 "" "apt=98" []
+REF offer media 2 codec 6: 118 "red" 90000 "" "" []
+REF offer media 2 codec 7: 119 "rtx" 90000 "" "apt=118" []
+REF offer media 2 codec 8: 120 "ulpfec" 90000 "" "" []
+REF offer fragment: err=nil
+REF offer fragment marshal: "a=group:BUNDLE 0 6 7\r\nm=audio 50071 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\na=mid:0\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=ice-options:trickle\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n" err=nil
+REF offer fragment mid: "0"
+REF offer fragment candidates: ["2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50"]
+REF offer fragment ice_credential: "wkc6" "OYm3bO7I9gDROYhr4XKvhXNz" err=nil
+REF offer fragment unmarshal: err=nil
+REF offer fragment unmarshal marshal: "a=group:BUNDLE 0 6 7\r\nm=audio 50071 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\na=mid:0\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=ice-options:trickle\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into offer: err=nil
+REF offer fragment patch into offer gives: "v=0\r\no=- 517039026838008818 4 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=extmap-allow-mixed\r\na=msid-semantic:  WMS\r\na=group:BUNDLE 0 6 7\r\nm=audio 50071 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\nc=IN IP4 127.0.0.1\r\na=rtpmap:111 opus/48000/2\r\na=rtpmap:63 red/48000/2\r\na=rtpmap:9 G722/8000\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=rtpmap:13 CN/8000\r\na=rtpmap:110 telephone-event/48000\r\na=rtpmap:126 telephone-event/8000\r\na=fmtp:111 minptime=10;stereo=1;useinbandfec=1\r\na=fmtp:63 111/111\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=rtcp-fb:111 transport-cc\r\na=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=setup:actpass\r\na=mid:0\r\na=recvonly\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtcp-xr:rcvr-rtt=all\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=setup:actpass\r\na=mid:6\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=sctp-port:5000\r\na=max-message-size:262144\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 97 45 46 98 99 118 119 120\r\nc=IN IP4 0.0.0.0\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:97 rtx/90000\r\na=rtpmap:45 AV1/90000\r\na=rtpmap:46 rtx/90000\r\na=rtpmap:98 VP9/90000\r\na=rtpmap:99 rtx/90000\r\na=rtpmap:118 red/90000\r\na=rtpmap:119 rtx/90000\r\na=rtpmap:120 ulpfec/90000\r\na=fmtp:97 apt=96\r\na=fmtp:45 level-idx=5;profile=0;tier=0\r\na=fmtp:46 apt=45\r\na=fmtp:98 profile-id=0\r\na=fmtp:99 apt=98\r\na=fmtp:119 apt=118\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=rtcp-fb:96 goog-remb\r\na=rtcp-fb:96 transport-cc\r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtcp-fb:45 goog-remb\r\na=rtcp-fb:45 transport-cc\r\na=rtcp-fb:45 ccm fir\r\na=rtcp-fb:45 nack\r\na=rtcp-fb:45 nack pli\r\na=rtcp-fb:98 goog-remb\r\na=rtcp-fb:98 transport-cc\r\na=rtcp-fb:98 ccm fir\r\na=rtcp-fb:98 nack\r\na=rtcp-fb:98 nack pli\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:12 https://aomediacodec.github.io/av1-rtp-spec/#dependency-descriptor-rtp-header-extension\r\na=extmap:9 http://www.webrtc.org/experiments/rtp-hdrext/video-layers-allocation00\r\na=setup:actpass\r\na=mid:7\r\na=msid:77184053-944f-476d-8901-12668b0d91e0 a3dd41b2-fdd9-4270-ac78-524add8f4aa6\r\na=sendonly\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rid:q send\r\na=rid:h send\r\na=rid:f send\r\na=simulcast:send q;h;f\r\na=rtcp-xr:rcvr-rtt=all\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into answer: err=nil
+REF offer fragment patch into answer gives: "v=0\r\no=- 6168788673778009511 1794630741 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\na=msid-semantic:WMS *\r\na=fingerprint:sha-256 51:47:88:4A:A3:11:EB:DB:AF:A7:43:3E:21:B7:B2:A9:B2:CA:96:02:14:E5:C4:69:47:58:D7:E2:D5:84:FB:AA\r\na=extmap-allow-mixed\r\na=group:BUNDLE 0 6 7\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 63 0 8\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:0\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1\r\na=rtpmap:63 red/48000/2\r\na=fmtp:63 111/111\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\na=sendonly\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:6\r\na=sendrecv\r\na=sctp-port:5000\r\na=max-message-size:65535\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 45 98 99 46 97\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:7\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:96 VP8/90000\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=rtcp-fb:96 transport-cc\r\na=rtcp-fb:96 goog-remb\r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtpmap:45 AV1/90000\r\na=fmtp:45 level-idx=5;profile=0;tier=0\r\na=rtcp-fb:45 transport-cc\r\na=rtcp-fb:45 goog-remb\r\na=rtcp-fb:45 ccm fir\r\na=rtcp-fb:45 nack\r\na=rtcp-fb:45 nack pli\r\na=rtpmap:98 VP9/90000\r\na=fmtp:98 profile-id=0\r\na=rtcp-fb:98 transport-cc\r\na=rtcp-fb:98 goog-remb\r\na=rtcp-fb:98 ccm fir\r\na=rtcp-fb:98 nack\r\na=rtcp-fb:98 nack pli\r\na=rtpmap:99 rtx/90000\r\na=fmtp:99 apt=98\r\na=rtpmap:46 rtx/90000\r\na=fmtp:46 apt=45\r\na=rtpmap:97 rtx/90000\r\na=fmtp:97 apt=96\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:12 https://aomediacodec.github.io/av1-rtp-spec/#dependency-descriptor-rtp-header-extension\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=rid:q recv\r\na=rid:h recv\r\na=rid:f recv\r\na=simulcast:recv q;h;f\r\na=recvonly\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into nothing: err=nil
+REF offer fragment patch into nothing gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=mid:0\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into properties: err=could not find media mid
+REF offer fragment patch into conflicts: err=nil
+REF offer fragment patch into conflicts gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=fingerprint:sha-256 AA\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=group:LS 0 1\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0 8 101\r\nc=IN IP4 127.0.0.1\r\na=mid:0\r\na=fingerprint:sha-256 BB\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=msid:onlystream\r\na=setup:holdconn\r\na=simulcast:recv q;h\r\na=rtpmap:101 telephone-event/8000\r\na=fmtp:101 0-16; x=1\r\na=rtcp-fb:* nack\r\na=rtcp-fb:101 nack\r\na=rtcp-fb:101 nack pli\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:1\r\na=setup:passive\r\na=rtpmap:96 VP8/90000\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into password: err=nil
+REF offer fragment patch into password gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=fingerprint:sha-256 AA BB\r\na=ice-lite\r\na=ice-options:trickle\r\na=group:bundle 1 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 300 96\r\na=mid:0\r\na=ice-ufrag:wkc6\r\na=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz\r\na=ssrc:1234 msid:stream track\r\na=msid:s t extra\r\na=simulcast:send q;h;f extra\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\nm=video 9 UDP/TLS/RTP/SAVPF 096 98\r\nc=IN IP6 ::1\r\na=mid:1\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:98 VP9/90000\r\na=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50\r\n"
+REF offer fragment patch into payloads: err=could not find media mid
+REF answer marshal_gives_the_text_back: true
+REF answer fingerprint: "51:47:88:4A:A3:11:EB:DB:AF:A7:43:3E:21:B7:B2:A9:B2:CA:96:02:14:E5:C4:69:47:58:D7:E2:D5:84:FB:AA" "sha-256" err=nil
+REF answer dtls_role: client
+REF answer ice_credential: "RqqUoTPyOuaSNAKz" "EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm" err=nil
+REF answer ip: "0.0.0.0"
+REF answer bundle_mid: "0" true
+REF answer media 0 mid: "0"
+REF answer media 0 stream_id: "" false
+REF answer media 0 media_stream_track: ""
+REF answer media 0 simulcast_rids: [] false
+REF answer media 0 codecs: 4 err=nil
+REF answer media 0 codec 0: 111 "opus" 48000 "2" "minptime=10;useinbandfec=1" []
+REF answer media 0 codec 1: 63 "red" 48000 "2" "111/111" []
+REF answer media 0 codec 2: 0 "PCMU" 8000 "" "" []
+REF answer media 0 codec 3: 8 "PCMA" 8000 "" "" []
+REF answer media 1 mid: "6"
+REF answer media 1 stream_id: "" false
+REF answer media 1 media_stream_track: ""
+REF answer media 1 simulcast_rids: [] false
+REF answer media 1 codecs: 0 err=strconv.ParseUint: parsing "webrtc-datachannel": invalid syntax
+REF answer media 2 mid: "7"
+REF answer media 2 stream_id: "" false
+REF answer media 2 media_stream_track: ""
+REF answer media 2 simulcast_rids: [] false
+REF answer media 2 codecs: 6 err=nil
+REF answer media 2 codec 0: 96 "VP8" 90000 "" "x-google-start-bitrate=1000" ["transport-cc" "goog-remb" "ccm fir" "nack" "nack pli"]
+REF answer media 2 codec 1: 45 "AV1" 90000 "" "level-idx=5;profile=0;tier=0" ["transport-cc" "goog-remb" "ccm fir" "nack" "nack pli"]
+REF answer media 2 codec 2: 98 "VP9" 90000 "" "profile-id=0" ["transport-cc" "goog-remb" "ccm fir" "nack" "nack pli"]
+REF answer media 2 codec 3: 99 "rtx" 90000 "" "apt=98" []
+REF answer media 2 codec 4: 46 "rtx" 90000 "" "apt=45" []
+REF answer media 2 codec 5: 97 "rtx" 90000 "" "apt=96" []
+REF answer fragment: err=nil
+REF answer fragment marshal: "a=group:BUNDLE 0 6 7\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 63 0 8\r\na=mid:0\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=end-of-candidates\r\n" err=nil
+REF answer fragment mid: "0"
+REF answer fragment candidates: ["375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz" "375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz" "2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz" "2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz"]
+REF answer fragment ice_credential: "RqqUoTPyOuaSNAKz" "EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm" err=nil
+REF answer fragment unmarshal: err=nil
+REF answer fragment unmarshal marshal: "a=group:BUNDLE 0 6 7\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 63 0 8\r\na=mid:0\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into offer: err=nil
+REF answer fragment patch into offer gives: "v=0\r\no=- 517039026838008818 4 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=extmap-allow-mixed\r\na=msid-semantic:  WMS\r\na=group:BUNDLE 0 6 7\r\nm=audio 50071 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126\r\nc=IN IP4 127.0.0.1\r\na=rtpmap:111 opus/48000/2\r\na=rtpmap:63 red/48000/2\r\na=rtpmap:9 G722/8000\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=rtpmap:13 CN/8000\r\na=rtpmap:110 telephone-event/48000\r\na=rtpmap:126 telephone-event/8000\r\na=fmtp:111 minptime=10;stereo=1;useinbandfec=1\r\na=fmtp:63 111/111\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=rtcp-fb:111 transport-cc\r\na=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=setup:actpass\r\na=mid:0\r\na=recvonly\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtcp-xr:rcvr-rtt=all\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=setup:actpass\r\na=mid:6\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=sctp-port:5000\r\na=max-message-size:262144\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 97 45 46 98 99 118 119 120\r\nc=IN IP4 0.0.0.0\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:97 rtx/90000\r\na=rtpmap:45 AV1/90000\r\na=rtpmap:46 rtx/90000\r\na=rtpmap:98 VP9/90000\r\na=rtpmap:99 rtx/90000\r\na=rtpmap:118 red/90000\r\na=rtpmap:119 rtx/90000\r\na=rtpmap:120 ulpfec/90000\r\na=fmtp:97 apt=96\r\na=fmtp:45 level-idx=5;profile=0;tier=0\r\na=fmtp:46 apt=45\r\na=fmtp:98 profile-id=0\r\na=fmtp:99 apt=98\r\na=fmtp:119 apt=118\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=rtcp:9 IN IP4 0.0.0.0\r\na=rtcp-fb:96 goog-remb\r\na=rtcp-fb:96 transport-cc\r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtcp-fb:45 goog-remb\r\na=rtcp-fb:45 transport-cc\r\na=rtcp-fb:45 ccm fir\r\na=rtcp-fb:45 nack\r\na=rtcp-fb:45 nack pli\r\na=rtcp-fb:98 goog-remb\r\na=rtcp-fb:98 transport-cc\r\na=rtcp-fb:98 ccm fir\r\na=rtcp-fb:98 nack\r\na=rtcp-fb:98 nack pli\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:12 https://aomediacodec.github.io/av1-rtp-spec/#dependency-descriptor-rtp-header-extension\r\na=extmap:9 http://www.webrtc.org/experiments/rtp-hdrext/video-layers-allocation00\r\na=setup:actpass\r\na=mid:7\r\na=msid:77184053-944f-476d-8901-12668b0d91e0 a3dd41b2-fdd9-4270-ac78-524add8f4aa6\r\na=sendonly\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78\r\na=ice-options:trickle\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rid:q send\r\na=rid:h send\r\na=rid:f send\r\na=simulcast:send q;h;f\r\na=rtcp-xr:rcvr-rtt=all\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into answer: err=nil
+REF answer fragment patch into answer gives: "v=0\r\no=- 6168788673778009511 1794630741 IN IP4 0.0.0.0\r\ns=-\r\nt=0 0\r\na=msid-semantic:WMS *\r\na=fingerprint:sha-256 51:47:88:4A:A3:11:EB:DB:AF:A7:43:3E:21:B7:B2:A9:B2:CA:96:02:14:E5:C4:69:47:58:D7:E2:D5:84:FB:AA\r\na=extmap-allow-mixed\r\na=group:BUNDLE 0 6 7\r\nm=audio 9 UDP/TLS/RTP/SAVPF 111 63 0 8\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:0\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:111 opus/48000/2\r\na=fmtp:111 minptime=10;useinbandfec=1\r\na=rtpmap:63 red/48000/2\r\na=fmtp:63 111/111\r\na=rtpmap:0 PCMU/8000\r\na=rtpmap:8 PCMA/8000\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level\r\na=sendonly\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:6\r\na=sendrecv\r\na=sctp-port:5000\r\na=max-message-size:65535\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=video 9 UDP/TLS/RTP/SAVPF 96 45 98 99 46 97\r\nc=IN IP4 0.0.0.0\r\na=setup:active\r\na=mid:7\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=rtcp-mux\r\na=rtcp-rsize\r\na=rtpmap:96 VP8/90000\r\na=fmtp:96 x-google-start-bitrate=1000\r\na=rtcp-fb:96 transport-cc\r\na=rtcp-fb:96 goog-remb\r\na=rtcp-fb:96 ccm fir\r\na=rtcp-fb:96 nack\r\na=rtcp-fb:96 nack pli\r\na=rtpmap:45 AV1/90000\r\na=fmtp:45 level-idx=5;profile=0;tier=0\r\na=rtcp-fb:45 transport-cc\r\na=rtcp-fb:45 goog-remb\r\na=rtcp-fb:45 ccm fir\r\na=rtcp-fb:45 nack\r\na=rtcp-fb:45 nack pli\r\na=rtpmap:98 VP9/90000\r\na=fmtp:98 profile-id=0\r\na=rtcp-fb:98 transport-cc\r\na=rtcp-fb:98 goog-remb\r\na=rtcp-fb:98 ccm fir\r\na=rtcp-fb:98 nack\r\na=rtcp-fb:98 nack pli\r\na=rtpmap:99 rtx/90000\r\na=fmtp:99 apt=98\r\na=rtpmap:46 rtx/90000\r\na=fmtp:46 apt=45\r\na=rtpmap:97 rtx/90000\r\na=fmtp:97 apt=96\r\na=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time\r\na=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01\r\na=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid\r\na=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id\r\na=extmap:12 https://aomediacodec.github.io/av1-rtp-spec/#dependency-descriptor-rtp-header-extension\r\na=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id\r\na=rid:q recv\r\na=rid:h recv\r\na=rid:f recv\r\na=simulcast:recv q;h;f\r\na=recvonly\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into nothing: err=nil
+REF answer fragment patch into nothing gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=mid:0\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into properties: err=could not find media mid
+REF answer fragment patch into conflicts: err=nil
+REF answer fragment patch into conflicts gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=fingerprint:sha-256 AA\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=group:LS 0 1\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0 8 101\r\nc=IN IP4 127.0.0.1\r\na=mid:0\r\na=fingerprint:sha-256 BB\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=msid:onlystream\r\na=setup:holdconn\r\na=simulcast:recv q;h\r\na=rtpmap:101 telephone-event/8000\r\na=fmtp:101 0-16; x=1\r\na=rtcp-fb:* nack\r\na=rtcp-fb:101 nack\r\na=rtcp-fb:101 nack pli\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:1\r\na=setup:passive\r\na=rtpmap:96 VP8/90000\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into password: err=nil
+REF answer fragment patch into password gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=fingerprint:sha-256 AA BB\r\na=ice-lite\r\na=ice-options:trickle\r\na=group:bundle 1 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 300 96\r\na=mid:0\r\na=ice-ufrag:RqqUoTPyOuaSNAKz\r\na=ice-pwd:EnaQwRhQvjAiKRCkbdOdOwrnHTvxOgsm\r\na=ssrc:1234 msid:stream track\r\na=msid:s t extra\r\na=simulcast:send q;h;f extra\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\nm=video 9 UDP/TLS/RTP/SAVPF 096 98\r\nc=IN IP6 ::1\r\na=mid:1\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:98 VP9/90000\r\na=candidate:375738803 1 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:375738803 2 tcp 1671430143 127.0.0.1 39501 typ host tcptype passive ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 1 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\na=candidate:2878742611 2 udp 2130706431 127.0.0.1 39502 typ host ufrag RqqUoTPyOuaSNAKz\r\n"
+REF answer fragment patch into payloads: err=could not find media mid
+REF nothing marshal_gives_the_text_back: true
+REF nothing fingerprint: "" "" err=SetRemoteDescription called with no fingerprint
+REF nothing dtls_role: client
+REF nothing ice_credential: "" "" err=SetRemoteDescription called with no ice-ufrag
+REF nothing ip: ""
+REF nothing bundle_mid: "" false
+REF nothing media 0 mid: "0"
+REF nothing media 0 stream_id: "" false
+REF nothing media 0 media_stream_track: ""
+REF nothing media 0 simulcast_rids: [] false
+REF nothing media 0 codecs: 1 err=nil
+REF nothing media 0 codec 0: 0 "PCMU" 8000 "" "" []
+REF nothing fragment: err=could not get bundle mid
+REF properties marshal_gives_the_text_back: true
+REF properties fingerprint: "" "" err=SetRemoteDescription called with an invalid fingerprint
+REF properties dtls_role: client
+REF properties ice_credential: "" "" err=SetRemoteDescription called with no ice-pwd
+REF properties ip: ""
+REF properties bundle_mid: "" false
+REF properties media 0 mid: ""
+REF properties media 0 stream_id: "" true
+REF properties media 0 media_stream_track: ""
+REF properties media 0 simulcast_rids: [] false
+REF properties media 0 codecs: 3 err=nil
+REF properties media 0 codec 0: 0 "PCMU" 8000 "" "" []
+REF properties media 0 codec 1: 8 "PCMA" 8000 "" "" []
+REF properties media 0 codec 2: 9 "G722" 8000 "" "" []
+REF properties fragment: err=could not get bundle mid
+REF conflicts marshal_gives_the_text_back: true
+REF conflicts fingerprint: "" "" err=SetRemoteDescription called with multiple conflicting fingerprint
+REF conflicts dtls_role: server
+REF conflicts ice_credential: "" "" err=SetRemoteDescription called with multiple conflicting ice-ufrag values
+REF conflicts ip: "127.0.0.1"
+REF conflicts bundle_mid: "" false
+REF conflicts media 0 mid: "0"
+REF conflicts media 0 stream_id: "onlystream" true
+REF conflicts media 0 media_stream_track: ""
+REF conflicts media 0 simulcast_rids: [] false
+REF conflicts media 0 codecs: 3 err=nil
+REF conflicts media 0 codec 0: 0 "PCMU" 8000 "" "" ["nack"]
+REF conflicts media 0 codec 1: 8 "PCMA" 8000 "" "" ["nack"]
+REF conflicts media 0 codec 2: 101 "telephone-event" 8000 "" "0-16; x=1" ["nack" "nack pli"]
+REF conflicts media 1 mid: "1"
+REF conflicts media 1 stream_id: "" false
+REF conflicts media 1 media_stream_track: ""
+REF conflicts media 1 simulcast_rids: [] false
+REF conflicts media 1 codecs: 1 err=nil
+REF conflicts media 1 codec 0: 96 "VP8" 90000 "" "" []
+REF conflicts fragment: err=could not get bundle mid
+REF password marshal_gives_the_text_back: true
+REF password fingerprint: "" "" err=SetRemoteDescription called with an invalid fingerprint
+REF password dtls_role: client
+REF password ice_credential: "" "" err=SetRemoteDescription called with multiple conflicting ice-pwd values
+REF password ip: "::1"
+REF password bundle_mid: "1" true
+REF password media 0 mid: "0"
+REF password media 0 stream_id: "t" true
+REF password media 0 media_stream_track: "track"
+REF password media 0 simulcast_rids: [] false
+REF password media 0 codecs: 0 err=strconv.ParseUint: parsing "300": value out of range
+REF password media 1 mid: "1"
+REF password media 1 stream_id: "" false
+REF password media 1 media_stream_track: ""
+REF password media 1 simulcast_rids: [] false
+REF password media 1 codecs: 2 err=nil
+REF password media 1 codec 0: 96 "VP8" 90000 "" "" []
+REF password media 1 codec 1: 98 "VP9" 90000 "" "" []
+REF password fragment: err=nil
+REF password fragment marshal: "a=group:bundle 1 0\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=ice-lite\r\na=ice-options:trickle\r\nm=video 9 UDP/TLS/RTP/SAVPF 096 98\r\na=mid:1\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\na=end-of-candidates\r\n" err=nil
+REF password fragment mid: "1"
+REF password fragment candidates: ["1 1 udp 1 127.0.0.1 9 typ host"]
+REF password fragment ice_credential: "a" "b" err=nil
+REF password fragment unmarshal: err=nil
+REF password fragment unmarshal marshal: "a=group:bundle 1 0\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=ice-lite\r\na=ice-options:trickle\r\nm=video 9 UDP/TLS/RTP/SAVPF 096 98\r\na=mid:1\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\n"
+REF password fragment patch into offer: err=could not find media mid
+REF password fragment patch into answer: err=could not find media mid
+REF password fragment patch into nothing: err=could not find media mid
+REF password fragment patch into properties: err=could not find media mid
+REF password fragment patch into conflicts: err=nil
+REF password fragment patch into conflicts gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=fingerprint:sha-256 AA\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=group:LS 0 1\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0 8 101\r\nc=IN IP4 127.0.0.1\r\na=mid:0\r\na=fingerprint:sha-256 BB\r\na=ice-ufrag:c\r\na=ice-pwd:b\r\na=msid:onlystream\r\na=setup:holdconn\r\na=simulcast:recv q;h\r\na=rtpmap:101 telephone-event/8000\r\na=fmtp:101 0-16; x=1\r\na=rtcp-fb:* nack\r\na=rtcp-fb:101 nack\r\na=rtcp-fb:101 nack pli\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\nm=video 9 UDP/TLS/RTP/SAVPF 96\r\na=mid:1\r\na=setup:passive\r\na=rtpmap:96 VP8/90000\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\n"
+REF password fragment patch into password: err=nil
+REF password fragment patch into password gives: "v=0\r\no=- 1 1 IN IP4 127.0.0.1\r\ns=-\r\nt=0 0\r\na=ice-ufrag:a\r\na=ice-pwd:b\r\na=fingerprint:sha-256 AA BB\r\na=ice-lite\r\na=ice-options:trickle\r\na=group:bundle 1 0\r\nm=audio 9 UDP/TLS/RTP/SAVPF 300 96\r\na=mid:0\r\na=ice-ufrag:a\r\na=ice-pwd:c\r\na=ssrc:1234 msid:stream track\r\na=msid:s t extra\r\na=simulcast:send q;h;f extra\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\nm=video 9 UDP/TLS/RTP/SAVPF 096 98\r\nc=IN IP6 ::1\r\na=mid:1\r\na=rtpmap:96 VP8/90000\r\na=rtpmap:98 VP9/90000\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\n"
+REF password fragment patch into payloads: err=could not find media mid
+REF payloads marshal_gives_the_text_back: true
+REF payloads fingerprint: "" "" err=SetRemoteDescription called with no fingerprint
+REF payloads dtls_role: client
+REF payloads ice_credential: "" "" err=SetRemoteDescription called with no ice-pwd
+REF payloads ip: "127.0.0.1"
+REF payloads bundle_mid: "audio" true
+REF payloads media 0 mid: ""
+REF payloads media 0 stream_id: "" false
+REF payloads media 0 media_stream_track: "track"
+REF payloads media 0 simulcast_rids: ["q,h" "~f"] true
+REF payloads media 0 codecs: 0 err=payload type not found
+REF payloads media 1 mid: "video"
+REF payloads media 1 stream_id: "track3" true
+REF payloads media 1 media_stream_track: "track3"
+REF payloads media 1 simulcast_rids: [] false
+REF payloads media 1 codecs: 3 err=nil
+REF payloads media 1 codec 0: 0 "PCMU" 8000 "2" "" ["nack"]
+REF payloads media 1 codec 1: 8 "PCMA" 8000 "" "x=y" ["nack"]
+REF payloads media 1 codec 2: 9 "G722" 8000 "" "" ["nack" "nack"]
+REF payloads media 2 mid: "more"
+REF payloads media 2 stream_id: "" false
+REF payloads media 2 media_stream_track: ""
+REF payloads media 2 simulcast_rids: [] false
+REF payloads media 2 codecs: 0 err=strconv.ParseUint: parsing "+97": invalid syntax
+REF payloads fragment: err=could not find bundle media: audio
+REF text 0 unmarshal: err=nil
+REF text 0 marshal: "a=ice-ufrag:u\r\na=ice-pwd:p\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=mid:0\r\na=ice-ufrag:v\r\n"
+REF text 0 mid: "0"
+REF text 0 candidates: []
+REF text 0 ice_credential: "" "" err=SetRemoteDescription called with multiple conflicting ice-ufrag values
+REF text 1 unmarshal: err=nil
+REF text 1 marshal: "a=ice-ufrag:u\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=ice-pwd:q\r\na=ice-lite\r\na=candidate:\r\na=candidate:1 1 udp 1 127.0.0.1 9 typ host\r\n"
+REF text 1 mid: ""
+REF text 1 candidates: ["" "1 1 udp 1 127.0.0.1 9 typ host"]
+REF text 1 ice_credential: "u" "q" err=nil
+REF text 2 unmarshal: err=nil
+REF text 2 marshal: "a=ice-pwd:p\r\nm=x\r\n"
+REF text 2 mid: ""
+REF text 2 candidates: []
+REF text 2 ice_credential: "" "" err=SetRemoteDescription called with no ice-ufrag
+REF text 3 unmarshal: err=nil
+REF text 3 marshal: "a=group:bundle 0 1\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=mid:0\r\na=ice-options:trickle\r\na=end-of-candidates\r\n"
+REF text 3 mid: "0"
+REF text 3 candidates: []
+REF text 3 ice_credential: "" "" err=SetRemoteDescription called with no ice-ufrag
+REF text 4 unmarshal: err=nil
+REF text 4 marshal: "a=group:LS 1\r\nm=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=ice-pwd:p\r\n"
+REF text 4 mid: ""
+REF text 4 candidates: []
+REF text 4 ice_credential: "" "" err=SetRemoteDescription called with no ice-ufrag
+REF text 5 unmarshal: err=bundle media mismatch, expected: 1, got: 
+REF text 6 unmarshal: err=nil
+REF text 6 marshal: "m=é\r\na=mid:é\r\na=ice-ufrag:é:è\r\na=ice-pwd:p\r\n"
+REF text 6 mid: "é"
+REF text 6 candidates: []
+REF text 6 ice_credential: "é:è" "p" err=nil
+REF text 7 unmarshal: err=nil
+REF text 7 marshal: "m=audio 9 UDP/TLS/RTP/SAVPF 0\r\na=mid:0\r\n"
+REF text 7 mid: "0"
+REF text 7 candidates: []
+REF text 7 ice_credential: "" "" err=SetRemoteDescription called with no ice-ufrag
+REF text 8 unmarshal: err=invalid attribute
+REF text 9 unmarshal: err=invalid media section

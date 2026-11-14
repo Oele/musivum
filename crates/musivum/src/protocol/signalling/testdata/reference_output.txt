@@ -1,0 +1,62 @@
+REF offer to_proto: type="offer" sdp_len=3150 sdp_equal=true id=7 mid_to_track_id=[0=TR_a 7=TR_b]
+REF offer from_proto: type="offer" sdp_equal=true id=7 mid_to_track_id=[0=TR_a 7=TR_b]
+REF answer to_proto: type="answer" sdp_len=2678 sdp_equal=true id=7 mid_to_track_id=[0=TR_a 7=TR_b]
+REF answer from_proto: type="answer" sdp_equal=true id=7 mid_to_track_id=[0=TR_a 7=TR_b]
+REF to_proto empty: nil=true
+REF type 0: proto="offer" back="offer" id=0 mid_to_track_id=[]
+REF type 1: proto="pranswer" back="pranswer" id=0 mid_to_track_id=[]
+REF type 2: proto="answer" back="answer" id=0 mid_to_track_id=[]
+REF type 3: proto="rollback" back="rollback" id=0 mid_to_track_id=[]
+REF type 4: proto="unknown" back="unknown" id=0 mid_to_track_id=[]
+REF type from "OFFER": back="unknown"
+REF type from "": back="unknown"
+REF type from "unknown": back="unknown"
+REF type from "Unspecified": back="unknown"
+REF type from "answer ": back="unknown"
+REF to_proto_trickle 0: {"candidate":"candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 ufrag wkc6 network-id 4 network-cost 50","sdpMid":"0","sdpMLineIndex":0,"usernameFragment":"wkc6"} target=1 final=true
+REF to_proto_trickle 0 and back: equal=true err=false
+REF to_proto_trickle 1: {"candidate":"candidate:1 1 udp 1 127.0.0.1 9 typ host","sdpMid":null,"sdpMLineIndex":null,"usernameFragment":null} target=0 final=false
+REF to_proto_trickle 1 and back: equal=true err=false
+REF to_proto_trickle 2: {"candidate":"","sdpMid":null,"sdpMLineIndex":null,"usernameFragment":null} target=0 final=true
+REF to_proto_trickle 2 and back: equal=true err=false
+REF to_proto_trickle 3: {"candidate":"\u003ca\u0026b\u003e\u2028\u2029\"\\\u0001\b\f\n\r\té😀/","sdpMid":"","sdpMLineIndex":65535,"usernameFragment":""} target=1 final=false
+REF to_proto_trickle 3 and back: equal=true err=false
+REF from_proto_trickle 0: candidate="candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 ufrag wkc6 network-id 4 network-cost 50" mid="0" index=3 ufrag="wkc6" err=false
+REF from_proto_trickle 1: candidate="candidate:1 1 udp 1 127.0.0.1 9 typ host" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 2: candidate="candidate:1 1 udp 1 127.0.0.1 9 typ host" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 3: candidate="" mid="1" index=nil ufrag=nil err=false
+REF from_proto_trickle 4: candidate="" mid=nil index=0 ufrag=nil err=false
+REF from_proto_trickle 5: candidate="c" mid="a" index=nil ufrag=nil err=false
+REF from_proto_trickle 6: candidate="" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 7: candidate="" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 8: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 9: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 10: candidate="c" mid=nil index=65535 ufrag=nil err=false
+REF from_proto_trickle 11: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 12: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 13: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 14: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 15: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 16: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 17: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 18: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 19: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 20: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 21: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 22: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 23: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 24: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_trickle 25: candidate="c" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 26: candidate="c" mid="x" index=2 ufrag="u" err=false
+REF from_proto_trickle 27: candidate="second" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 28: candidate="folded" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 29: candidate="exact" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 30: candidate="kept" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 31: candidate="" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 32: candidate="a\u{e9}\u{a}\"\\/\u{2028}\u{1f600}" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 33: candidate="c" mid=nil index=nil ufrag=nil err=false
+REF from_proto_trickle 34: candidate="" mid=nil index=nil ufrag=nil err=true
+REF from_proto_ice_servers none: len=0
+REF from_proto_ice_servers 0: urls=["stun:127.0.0.1:3478"] username="" credential=""
+REF from_proto_ice_servers 1: urls=["turn:127.0.0.1:3478?transport=udp" "turns:127.0.0.1:5349?transport=tcp"] username="user" credential="secret"
+REF from_proto_ice_servers 2: urls=[] username="" credential=""

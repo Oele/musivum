@@ -1,0 +1,100 @@
+v=0
+o=- 517039026838008818 4 IN IP4 127.0.0.1
+s=-
+t=0 0
+a=extmap-allow-mixed
+a=msid-semantic:  WMS
+a=group:BUNDLE 0 6 7
+m=audio 50071 UDP/TLS/RTP/SAVPF 111 63 9 0 8 13 110 126
+c=IN IP4 127.0.0.1
+a=rtpmap:111 opus/48000/2
+a=rtpmap:63 red/48000/2
+a=rtpmap:9 G722/8000
+a=rtpmap:0 PCMU/8000
+a=rtpmap:8 PCMA/8000
+a=rtpmap:13 CN/8000
+a=rtpmap:110 telephone-event/48000
+a=rtpmap:126 telephone-event/8000
+a=fmtp:111 minptime=10;stereo=1;useinbandfec=1
+a=fmtp:63 111/111
+a=rtcp:9 IN IP4 0.0.0.0
+a=rtcp-fb:111 transport-cc
+a=extmap:1 urn:ietf:params:rtp-hdrext:ssrc-audio-level
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=setup:actpass
+a=mid:0
+a=recvonly
+a=ice-ufrag:wkc6
+a=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz
+a=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78
+a=candidate:2353504611 1 udp 2122194687 127.0.0.1 50071 typ host generation 0 network-id 4 network-cost 50
+a=ice-options:trickle
+a=rtcp-mux
+a=rtcp-rsize
+a=rtcp-xr:rcvr-rtt=all
+m=application 9 UDP/DTLS/SCTP webrtc-datachannel
+c=IN IP4 0.0.0.0
+a=setup:actpass
+a=mid:6
+a=ice-ufrag:wkc6
+a=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz
+a=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78
+a=ice-options:trickle
+a=sctp-port:5000
+a=max-message-size:262144
+m=video 9 UDP/TLS/RTP/SAVPF 96 97 45 46 98 99 118 119 120
+c=IN IP4 0.0.0.0
+a=rtpmap:96 VP8/90000
+a=rtpmap:97 rtx/90000
+a=rtpmap:45 AV1/90000
+a=rtpmap:46 rtx/90000
+a=rtpmap:98 VP9/90000
+a=rtpmap:99 rtx/90000
+a=rtpmap:118 red/90000
+a=rtpmap:119 rtx/90000
+a=rtpmap:120 ulpfec/90000
+a=fmtp:97 apt=96
+a=fmtp:45 level-idx=5;profile=0;tier=0
+a=fmtp:46 apt=45
+a=fmtp:98 profile-id=0
+a=fmtp:99 apt=98
+a=fmtp:119 apt=118
+a=fmtp:96 x-google-start-bitrate=1000
+a=rtcp:9 IN IP4 0.0.0.0
+a=rtcp-fb:96 goog-remb
+a=rtcp-fb:96 transport-cc
+a=rtcp-fb:96 ccm fir
+a=rtcp-fb:96 nack
+a=rtcp-fb:96 nack pli
+a=rtcp-fb:45 goog-remb
+a=rtcp-fb:45 transport-cc
+a=rtcp-fb:45 ccm fir
+a=rtcp-fb:45 nack
+a=rtcp-fb:45 nack pli
+a=rtcp-fb:98 goog-remb
+a=rtcp-fb:98 transport-cc
+a=rtcp-fb:98 ccm fir
+a=rtcp-fb:98 nack
+a=rtcp-fb:98 nack pli
+a=extmap:2 http://www.webrtc.org/experiments/rtp-hdrext/abs-send-time
+a=extmap:3 http://www.ietf.org/id/draft-holmer-rmcat-transport-wide-cc-extensions-01
+a=extmap:4 urn:ietf:params:rtp-hdrext:sdes:mid
+a=extmap:10 urn:ietf:params:rtp-hdrext:sdes:rtp-stream-id
+a=extmap:11 urn:ietf:params:rtp-hdrext:sdes:repaired-rtp-stream-id
+a=extmap:12 https://aomediacodec.github.io/av1-rtp-spec/#dependency-descriptor-rtp-header-extension
+a=extmap:9 http://www.webrtc.org/experiments/rtp-hdrext/video-layers-allocation00
+a=setup:actpass
+a=mid:7
+a=msid:77184053-944f-476d-8901-12668b0d91e0 a3dd41b2-fdd9-4270-ac78-524add8f4aa6
+a=sendonly
+a=ice-ufrag:wkc6
+a=ice-pwd:OYm3bO7I9gDROYhr4XKvhXNz
+a=fingerprint:sha-256 A9:5C:F9:3E:BE:31:EE:C1:0A:D2:D1:D6:F9:09:52:2A:4F:13:A0:13:DE:9C:1A:41:94:D5:DF:1B:76:9E:99:78
+a=ice-options:trickle
+a=rtcp-mux
+a=rtcp-rsize
+a=rid:q send
+a=rid:h send
+a=rid:f send
+a=simulcast:send q;h;f
+a=rtcp-xr:rcvr-rtt=all

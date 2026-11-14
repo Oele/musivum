@@ -124,6 +124,8 @@ pub use rtc::peer_connection::transport::RTCDtlsRole as DtlsRole;
 pub use rtc::peer_connection::transport::RTCIceCandidate as IceCandidate;
 /// pion's `ICECandidateInit`.
 pub use rtc::peer_connection::transport::RTCIceCandidateInit as IceCandidateInit;
+/// pion's `ICEServer`; the credential is a string, and there is no type of credential.
+pub use rtc::peer_connection::transport::RTCIceServer as IceServer;
 /// pion's `RTPTransceiverDirection`.
 pub use rtc::rtp_transceiver::RTCRtpTransceiverDirection as RtpTransceiverDirection;
 /// pion's `StatsReport`, as `rtc` has it.
