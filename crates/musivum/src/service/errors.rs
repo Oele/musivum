@@ -1,7 +1,8 @@
 // Ported from LiveKit, pkg/service/errors.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust; the errors are one enum, the one of the package, which
-// also has the errors that auth.go, roomallocator.go, utils.go and wsprotocol.go define, and
+// also has the errors that auth.go, roomallocator.go, utils.go, wsprotocol.go and
+// rtcservice.go define, and
 // a variant for each kind of error from elsewhere that the ported files pass on. An error
 // that the original wraps with a detail (`fmt.Errorf("%w: ...", ErrX, ...)`) is a variant of
 // its own with the same text. Upstream these errors are psrpc errors with a code;
@@ -15,7 +16,7 @@ use std::io;
 
 use http::StatusCode;
 
-use crate::rtc;
+use crate::{routing, rtc};
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
@@ -142,6 +143,32 @@ pub enum Error {
     /// An error of the protocol's `auth` that the room manager passes on (`ToJWT`).
     #[error(transparent)]
     Auth(#[from] crate::protocol::auth::Error),
+
+    // rtcservice.go: errJoinRequestTooLarge, and the errors it makes where it returns them
+    #[error("join_request is required")]
+    JoinRequestRequired,
+    #[error("cannot decode attributes")]
+    CannotDecodeAttributes,
+    #[error("cannot base64 decode wrapped join request")]
+    CannotBase64DecodeWrappedJoinRequest,
+    #[error("cannot unmarshal wrapped join request")]
+    CannotUnmarshalWrappedJoinRequest,
+    #[error("join request too large")]
+    JoinRequestTooLarge,
+    #[error("cannot unmarshal join request")]
+    CannotUnmarshalJoinRequest,
+    #[error("cannot read decompressed join request")]
+    CannotReadDecompressedJoinRequest,
+    #[error("timed out while waiting for signal response")]
+    SignalResponseTimedOut,
+    #[error("connection closed by media")]
+    ConnectionClosedByMedia,
+    /// `fmt.Errorf("unexpected message type: %T", msg)`, with the Go type of the message.
+    #[error("unexpected message type: {0}")]
+    UnexpectedMessageType(String),
+    /// gorilla/websocket's `HandshakeError`: why a request could not be upgraded.
+    #[error("{0}")]
+    Handshake(String),
 }
 
 impl Error {
@@ -176,6 +203,10 @@ impl Error {
             }
             // psrpc.FailedPrecondition
             Error::RemoteUnmuteNoteEnabled => StatusCode::PRECONDITION_FAILED,
+            // psrpc.ErrRequestTimedOut, a psrpc.DeadlineExceeded
+            Error::Routing(routing::Error::RequestTimedOut) => StatusCode::SERVICE_UNAVAILABLE,
+            // an error of the room manager, passed back as psrpc passes it
+            Error::Routing(routing::Error::Service(err)) => return err.to_http(),
             _ => return None,
         })
     }

@@ -20,6 +20,9 @@
 //! - [`RoomManager`] (`roommanager.rs`): the rooms of the node, the sessions of their
 //!   participants and the room-side operations of the room API; [`SignalServer`]
 //!   (`signal.rs`): where a session started through the router reaches the room manager.
+//! - [`RtcService`] (`rtcservice.rs`): the signalling endpoint a client connects to (`/rtc`,
+//!   `/rtc/v1` and their `validate`), which hands a server an [`RtcUpgrade`] to run on the
+//!   upgraded socket.
 //!
 //! [`useragent`] is written new: it stands in for the user agent parser the original uses.
 
@@ -29,6 +32,7 @@ mod interfaces;
 mod localstore;
 mod roomallocator;
 mod roommanager;
+mod rtcservice;
 mod signal;
 pub mod useragent;
 mod utils;
@@ -40,6 +44,7 @@ pub use interfaces::*;
 pub use localstore::*;
 pub use roomallocator::*;
 pub use roommanager::*;
+pub use rtcservice::*;
 pub use signal::*;
 pub use utils::*;
 pub use wsprotocol::*;
