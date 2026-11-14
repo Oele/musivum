@@ -78,8 +78,22 @@ and `create-join-token` work as LiveKit's do.
 
 The crate `musivum` is the server without an HTTP server of its own: its endpoints are
 functions over the `http` crate's types, with a small async trait for the WebSocket.
-`musivum-server` builds the binary from it with axum. An API to start musivum inside another
-program's process and mount its endpoints on that program's router is being added.
+`musivum-server` builds the binary from it with axum, and offers `musivum_server::embed` for
+a program that wants musivum inside its own process:
+
+```rust
+let lk = Embedded::start(Config::new(&yaml, true)?, EmbedOptions::default()).await?;
+let app = axum::Router::new().nest("/livekit", lk.router());   // /rtc, /rtc/v1, the room API
+lk.create_room(CreateRoomRequest { name, empty_timeout: 300, ..Default::default() }).await?;
+let mut events = lk.events();                                   // the webhook events, in process
+// ...
+lk.shutdown(std::time::Duration::from_secs(5)).await;
+```
+
+It starts everything `livekit-server` starts (media, TURN, the room manager, webhooks) on the
+caller's runtime, without an HTTP listener of its own; the module's documentation says what
+it runs on threads of its own. Calls, events and the advertised TURN port are as the
+embedding program needs them.
 
 ## Working on it
 
@@ -88,6 +102,8 @@ program's process and mount its endpoints on that program's router is being adde
 - `tests/call` runs the scripted browser call against `musivum` or `reference` (LiveKit at
   the pinned version); `tests/netem` and `tests/load` are the degraded network and the load
   test. They need Node, Chrome, and for the reference `livekit-server` and LiveKit's `lk`.
+- `tests/embed` builds musivum as a program that uses rustls with aws-lc-rs would, so a
+  workspace build also builds aws-lc-sys, which needs cmake and a C compiler.
 - `docs/PORTING.md` is the design: what is taken from LiveKit, what it stands on, how it is
   checked. `docs/porting-guide.md` is how a Go file becomes a Rust file here,
   `docs/port-map.md` the survey of LiveKit's source, `docs/port-status.md` what is done,
