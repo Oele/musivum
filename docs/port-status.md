@@ -511,4 +511,6 @@ candidate lines without pion's `ufrag` attribute.
 
 ## In progress, not on `main`
 
-IPv6 and more listeners in the connection layer; the Prometheus endpoint.
+IPv6 and more listeners in the connection layer; the Prometheus endpoint; LiveKit's embedded
+TURN server (ported from pion/turn, with a relay-only variant of the browser call as its
+proof).
