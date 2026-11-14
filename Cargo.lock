@@ -938,6 +938,7 @@ dependencies = [
  "hmac 0.13.0",
  "musivum-fakes",
  "musivum-protocol",
+ "nix",
  "parking_lot",
  "pbjson-types",
  "rand",

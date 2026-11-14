@@ -34,6 +34,11 @@ tokio = { version = "1.54.1", features = ["rt", "rt-multi-thread", "time", "sync
 tokio-util = "0.7.20"
 tracing = "0.1.44"
 
+# Interface addresses and socket options without `unsafe` (mediatransportutil/rtcconfig). The
+# WebRTC library brings this crate in already, with these features.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31.3", default-features = false, features = ["net", "socket"] }
+
 [dev-dependencies]
 musivum-fakes = { version = "0.0.0", path = "../musivum-fakes" }
 tokio = { version = "1.54.1", features = ["test-util", "rt-multi-thread", "macros"] }
