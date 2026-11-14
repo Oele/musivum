@@ -1,0 +1,5 @@
+# Everything cargo runs for this repository (test binaries, `cargo run`) goes through
+# scripts/capped-run.sh, which limits its memory and, for tests, its running time. A test
+# that loops while allocating must not be able to take the machine down with it.
+[target.'cfg(unix)']
+runner = "scripts/capped-run.sh"
