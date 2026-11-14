@@ -1,0 +1,719 @@
+# New for musivum: the commands that testdata/reference_output_test.go runs on LiveKit's
+# selectors and reference_test.rs on the port. One command a line:
+#
+#   new null|simulcast|vp9|dd      a new selector
+#   from simulcast|vp9|dd          New...FromOther of the selector there is
+#   start 0|1                      SetEnableStartAtDesiredQuality
+#   max S T, seen S T, target S T, current S T, req S
+#   maxspatial S, maxtemporal T, seenspatial S, seentemporal T
+#   tls none|null|vp8              SetTemporalLayerSelector
+#   rollback
+#   pkt L S T K M F                Select of a packet of layer S/T as layer L; K: key frame,
+#                                  M: marker, F: the VP9 flags among UBEP, "." for none of
+#                                  them, "-" for a packet without VP9 header
+#   tpkt T K M F                   SelectTemporal of a packet of temporal layer T; F: of the
+#                                  VP8 header K (key frame), S and Y, "." for none, "-" for
+#                                  a packet without VP8 header
+#
+# Every command gives one line of output, named by the number of its line here.
+
+# simulcast: from nothing, latching on to the first key frame and stepping up
+new simulcast
+max 2 2
+seen 2 2
+target 2 2
+req 2
+pkt 0 0 0 0 0 -
+pkt 1 1 1 0 0 -
+pkt 0 0 1 1 0 -
+pkt 0 0 0 0 1 -
+pkt 1 1 0 0 0 -
+pkt 1 1 2 1 0 -
+pkt 0 0 0 0 0 -
+pkt 2 2 0 1 1 -
+pkt 2 2 0 0 0 -
+pkt 1 1 0 1 0 -
+rollback
+pkt 2 2 0 0 0 -
+pkt 1 1 0 0 1 -
+
+# simulcast: stepping down needs a key frame
+new simulcast
+max 2 2
+seen 2 2
+current 2 1
+target 0 1
+req 0
+pkt 2 2 0 0 0 -
+pkt 1 1 0 0 0 -
+pkt 1 1 0 1 0 -
+pkt 2 2 0 1 0 -
+pkt 0 0 2 1 1 -
+pkt 1 1 0 1 0 -
+pkt 0 0 0 0 0 -
+
+# simulcast: overshoot dialed back at a key frame at or below the maximum
+new simulcast
+max 1 2
+seen 2 2
+current 2 2
+target 2 2
+req 1
+pkt 2 2 0 0 0 -
+pkt 2 2 0 1 0 -
+pkt 1 1 1 1 0 -
+pkt 2 2 0 1 0 -
+pkt 0 0 0 1 1 -
+rollback
+maxspatial 0
+pkt 0 0 0 1 0 -
+
+# simulcast: the target follows the layer that is latched when it is the highest seen
+new simulcast
+max 2 2
+seen 1 2
+target 2 2
+req 2
+pkt 1 1 0 1 0 -
+seenspatial 2
+target 2 2
+pkt 2 2 1 1 0 -
+maxtemporal 1
+seentemporal 1
+
+# simulcast: starting at the desired quality
+new simulcast
+start 1
+max 2 2
+seen 2 2
+target 2 2
+req 2
+pkt 0 0 0 1 0 -
+pkt 1 1 0 1 0 -
+pkt 2 2 1 0 0 -
+pkt 2 2 1 1 0 -
+target 0 2
+pkt 1 1 0 1 0 -
+current -1 -1
+target 1 2
+pkt 0 0 0 1 0 -
+start 0
+pkt 0 0 0 1 0 -
+
+# a selector made from another keeps its layers
+new null
+max 2 3
+seen 1 1
+target 1 1
+req 1
+pkt 0 0 0 1 0 -
+from simulcast
+pkt 0 0 0 1 0 -
+from vp9
+pkt 0 0 0 0 0 B
+pkt 0 1 1 1 0 UB
+from dd
+pkt 0 0 0 1 0 -
+from simulcast
+pkt 1 1 0 1 0 -
+from simulcast
+rollback
+
+# vp9: starting, scaling up at the start of a frame
+new vp9
+max 2 2
+seen 2 2
+target 2 2
+req 2
+pkt 0 0 0 0 0 -
+pkt 0 1 1 0 0 B
+pkt 0 0 0 1 0 B
+pkt 0 0 0 1 0 .
+pkt 0 0 0 1 1 E
+pkt 0 1 0 1 0 BP
+pkt 0 1 0 1 0 B
+pkt 0 1 0 1 1 E
+pkt 0 2 0 1 0 .
+pkt 0 2 0 1 1 EP
+pkt 0 0 1 0 0 B
+pkt 0 0 1 0 0 UB
+pkt 0 0 2 0 0 U
+pkt 0 0 2 0 0 UBE
+pkt 0 1 2 0 0 BE
+pkt 0 2 2 0 0 BE
+pkt 0 2 2 0 1 EP
+
+# vp9: scaling down at the end of a frame
+target 0 0
+pkt 0 0 0 0 0 B
+pkt 0 1 0 0 0 B
+pkt 0 2 2 0 0 E
+pkt 0 1 0 0 0 BE
+pkt 0 0 1 0 0 BE
+pkt 0 0 0 0 0 BEP
+rollback
+pkt 0 0 0 0 0 BE
+target 1 1
+pkt 0 1 1 0 0 UB
+pkt 0 1 0 0 0 E
+target -1 -1
+pkt 0 0 0 0 0 BE
+current -1 -1
+target 1 0
+pkt 0 2 1 1 0 B
+pkt 0 0 0 0 0 E
+
+# temporal layers of VP8 under the simulcast selector
+new simulcast
+max 2 3
+seen 2 3
+current 1 0
+target 1 2
+tpkt 0 0 0 .
+tls vp8
+tpkt 1 0 0 -
+tpkt 1 0 0 S
+tpkt 2 0 0 SY
+tpkt 1 0 0 Y
+tpkt 1 0 1 SY
+tpkt 3 0 0 SY
+tpkt 2 0 0 SY
+tpkt 2 0 1 .
+target 1 0
+tpkt 2 0 0 SY
+tpkt 2 0 1 .
+tpkt 1 0 0 SY
+target 1 3
+tpkt 3 1 0 K
+tpkt 4 1 0 KS
+tpkt 0 0 0 KS
+target 1 1
+tls null
+tpkt 3 0 0 .
+tls none
+tpkt 3 0 0 SY
+rollback
+
+# random walks, made once by a script and kept as they are
+
+# simulcast
+new simulcast
+max 2 2
+seen 2 2
+target 2 2
+req 2
+maxspatial 2
+pkt 1 1 2 0 0 -
+pkt 0 0 1 0 1 -
+pkt 2 2 2 0 0 -
+pkt 0 0 0 0 0 -
+pkt 0 0 1 0 0 -
+pkt 1 1 1 0 0 -
+pkt 2 2 1 0 0 -
+pkt 2 2 2 1 1 -
+pkt 0 0 1 0 0 -
+pkt 0 0 1 1 1 -
+pkt 0 0 0 1 1 -
+pkt 1 1 1 0 0 -
+current -1 -1
+pkt 2 2 1 0 0 -
+pkt 1 1 0 0 0 -
+pkt 2 2 2 0 0 -
+pkt 1 1 2 0 1 -
+pkt 1 1 2 0 1 -
+target 2 1
+start 1
+pkt 1 1 0 0 0 -
+pkt 1 1 1 1 0 -
+seenspatial 0
+pkt 1 1 0 1 1 -
+pkt 2 2 0 0 0 -
+pkt 2 2 1 0 0 -
+pkt 1 1 0 0 1 -
+pkt 0 0 1 0 1 -
+pkt 0 0 1 1 0 -
+pkt 1 1 1 0 0 -
+pkt 0 0 1 1 1 -
+pkt 0 0 2 0 0 -
+pkt 2 2 2 0 1 -
+pkt 0 0 1 1 1 -
+pkt 1 1 0 0 0 -
+start 0
+pkt 1 1 2 0 1 -
+rollback
+target 1 1
+pkt 1 1 1 0 0 -
+pkt 1 1 0 0 0 -
+pkt 2 2 2 0 0 -
+pkt 1 1 1 1 0 -
+pkt 2 2 2 0 1 -
+pkt 0 0 2 1 1 -
+pkt 0 0 2 0 0 -
+pkt 0 0 1 1 0 -
+seenspatial 2
+pkt 0 0 1 1 0 -
+seenspatial 1
+pkt 1 1 1 0 1 -
+pkt 1 1 1 0 0 -
+pkt 0 0 0 1 0 -
+seenspatial 0
+pkt 0 0 2 0 0 -
+pkt 0 0 0 0 0 -
+pkt 2 2 1 0 0 -
+pkt 0 0 0 1 1 -
+pkt 1 1 0 0 0 -
+pkt 1 1 2 0 0 -
+pkt 1 1 0 0 0 -
+pkt 1 1 2 0 1 -
+pkt 1 1 1 0 0 -
+pkt 1 1 1 0 1 -
+pkt 2 2 2 0 0 -
+pkt 2 2 2 0 1 -
+seenspatial 0
+maxspatial 1
+pkt 1 1 0 1 0 -
+pkt 0 0 2 0 0 -
+seenspatial 2
+pkt 2 2 2 0 0 -
+pkt 0 0 0 0 1 -
+pkt 1 1 1 0 0 -
+rollback
+target 2 0
+pkt 0 0 1 0 0 -
+pkt 0 0 0 0 1 -
+maxspatial 2
+pkt 1 1 2 0 0 -
+pkt 1 1 0 0 0 -
+pkt 2 2 2 0 1 -
+pkt 0 0 2 0 0 -
+seenspatial 1
+pkt 0 0 1 0 0 -
+seenspatial 1
+seenspatial 2
+target -1 -1
+pkt 2 2 1 1 1 -
+pkt 1 1 2 0 1 -
+pkt 0 0 1 0 1 -
+pkt 1 1 0 1 0 -
+pkt 0 0 0 0 0 -
+maxspatial 2
+pkt 1 1 2 0 0 -
+target 2 0
+maxspatial 2
+pkt 1 1 0 0 0 -
+pkt 2 2 2 1 1 -
+pkt 1 1 2 0 1 -
+pkt 1 1 1 1 0 -
+pkt 1 1 0 0 0 -
+pkt 1 1 1 0 0 -
+pkt 1 1 0 1 0 -
+pkt 1 1 2 1 1 -
+pkt 1 1 0 1 0 -
+pkt 2 2 2 0 0 -
+pkt 1 1 1 0 1 -
+pkt 1 1 1 0 1 -
+pkt 0 0 1 1 0 -
+pkt 1 1 2 0 0 -
+target 2 1
+pkt 2 2 0 0 0 -
+pkt 0 0 2 1 1 -
+pkt 1 1 1 1 0 -
+pkt 0 0 1 0 1 -
+pkt 1 1 0 1 0 -
+pkt 0 0 2 1 0 -
+pkt 1 1 1 0 1 -
+start 1
+target 2 1
+pkt 2 2 2 0 0 -
+pkt 1 1 0 0 1 -
+pkt 1 1 2 0 0 -
+pkt 0 0 2 0 0 -
+pkt 2 2 1 0 0 -
+pkt 1 1 0 0 0 -
+pkt 0 0 0 1 0 -
+pkt 1 1 1 0 1 -
+pkt 0 0 1 0 0 -
+pkt 2 2 0 0 1 -
+pkt 2 2 2 0 1 -
+pkt 0 0 1 0 0 -
+pkt 2 2 1 0 0 -
+pkt 2 2 0 1 0 -
+pkt 1 1 0 1 0 -
+pkt 1 1 2 0 0 -
+pkt 0 0 1 0 0 -
+pkt 0 0 0 0 0 -
+pkt 2 2 0 1 0 -
+pkt 2 2 0 1 1 -
+pkt 1 1 2 0 1 -
+target 2 2
+pkt 1 1 1 1 0 -
+rollback
+pkt 2 2 2 1 0 -
+pkt 0 0 1 0 0 -
+pkt 2 2 1 0 0 -
+rollback
+pkt 2 2 0 1 0 -
+rollback
+pkt 0 0 2 1 0 -
+pkt 0 0 1 1 1 -
+pkt 1 1 1 0 1 -
+pkt 0 0 1 0 0 -
+pkt 2 2 2 1 0 -
+maxspatial 0
+pkt 0 0 1 0 1 -
+pkt 0 0 1 0 1 -
+
+# vp9
+new vp9
+max 2 2
+seen 2 2
+target 2 2
+req 2
+pkt 0 1 2 0 0 UEP
+pkt 0 1 0 1 0 UBP
+pkt 0 0 2 0 0 UEP
+pkt 0 2 0 0 1 .
+target 1 1
+pkt 0 1 1 0 1 BEP
+pkt 0 1 0 0 0 B
+pkt 0 0 0 0 0 UP
+pkt 0 0 0 0 0 B
+pkt 0 0 0 0 0 UEP
+rollback
+pkt 0 2 2 0 0 B
+pkt 0 1 0 0 0 BP
+pkt 0 2 0 0 0 UBEP
+pkt 0 1 0 0 0 UBEP
+pkt 0 0 0 0 0 EP
+pkt 0 2 0 0 0 U
+pkt 0 0 1 1 0 UP
+pkt 0 1 2 1 1 UE
+pkt 0 0 0 0 1 UE
+pkt 0 2 0 0 0 BEP
+pkt 0 1 2 0 0 U
+pkt 0 0 0 0 0 .
+pkt 0 1 0 0 1 UBEP
+pkt 0 0 2 0 0 UBEP
+pkt 0 1 2 0 1 U
+pkt 0 1 1 0 0 P
+pkt 0 1 1 1 0 EP
+pkt 0 0 0 0 0 .
+pkt 0 1 2 0 0 EP
+target -1 -1
+pkt 0 1 1 0 0 BP
+pkt 0 2 2 0 1 UEP
+pkt 0 2 1 0 0 UB
+target 1 2
+pkt 0 1 1 1 1 P
+pkt 0 2 1 0 0 UBE
+pkt 0 1 2 0 0 B
+current -1 -1
+pkt 0 2 0 0 0 EP
+pkt 0 2 2 0 1 UB
+pkt 0 0 2 0 0 .
+pkt 0 1 2 0 0 BE
+pkt 0 0 2 0 0 .
+pkt 0 0 1 0 1 P
+pkt 0 1 1 0 0 BP
+target 2 1
+pkt 0 2 0 0 1 U
+pkt 0 1 2 0 0 UBP
+pkt 0 2 1 0 0 UBP
+pkt 0 0 2 0 0 UP
+pkt 0 2 2 0 0 UBEP
+pkt 0 0 1 0 0 BE
+pkt 0 2 0 0 0 .
+pkt 0 2 1 0 1 UBE
+pkt 0 1 1 0 0 U
+pkt 0 0 1 0 1 U
+pkt 0 2 1 1 0 E
+current -1 -1
+target 0 0
+pkt 0 2 1 0 0 UEP
+pkt 0 0 2 0 0 UE
+pkt 0 0 2 0 1 -
+pkt 0 2 2 0 0 UB
+pkt 0 2 0 0 0 BE
+pkt 0 2 0 0 1 UEP
+pkt 0 1 1 0 0 UBE
+pkt 0 2 2 0 0 EP
+pkt 0 2 0 0 0 BE
+pkt 0 0 2 0 0 P
+pkt 0 1 2 0 1 UB
+pkt 0 0 0 0 0 UEP
+pkt 0 2 2 0 0 BE
+pkt 0 1 0 0 0 B
+pkt 0 1 2 0 0 UP
+pkt 0 0 2 0 1 UEP
+pkt 0 0 2 0 0 EP
+pkt 0 2 1 0 0 BE
+pkt 0 2 0 0 0 UBEP
+pkt 0 1 0 0 0 UBP
+pkt 0 1 0 0 0 EP
+pkt 0 1 1 0 0 .
+pkt 0 0 1 1 1 BEP
+pkt 0 0 2 1 0 .
+pkt 0 1 0 1 1 UB
+pkt 0 1 0 0 0 BEP
+pkt 0 1 0 0 1 UBE
+target -1 -1
+pkt 0 2 1 0 0 E
+current -1 -1
+pkt 0 0 2 1 0 UBE
+pkt 0 2 0 0 0 E
+pkt 0 1 1 0 0 BE
+pkt 0 2 0 0 0 UE
+pkt 0 0 0 0 0 P
+pkt 0 1 2 0 0 EP
+pkt 0 1 1 0 0 UBP
+pkt 0 1 2 0 0 BEP
+target 1 2
+pkt 0 2 0 1 1 UBEP
+pkt 0 0 1 0 0 UBE
+pkt 0 2 2 0 0 UBE
+pkt 0 2 2 1 0 E
+pkt 0 1 2 0 1 .
+rollback
+pkt 0 0 1 0 0 BEP
+pkt 0 1 2 0 1 BP
+pkt 0 2 1 0 0 B
+pkt 0 1 2 0 0 UBP
+pkt 0 0 1 0 0 E
+pkt 0 1 2 0 0 -
+target 1 0
+pkt 0 2 0 0 0 .
+pkt 0 2 0 0 0 EP
+pkt 0 1 2 0 0 E
+pkt 0 0 1 0 0 BEP
+pkt 0 2 2 0 0 BEP
+pkt 0 2 0 0 0 -
+pkt 0 0 0 0 0 BEP
+pkt 0 2 1 0 0 UBP
+pkt 0 0 2 0 0 EP
+pkt 0 2 0 0 0 B
+pkt 0 0 2 1 0 BP
+pkt 0 1 2 0 0 P
+pkt 0 1 2 0 0 B
+pkt 0 0 1 0 1 UBP
+pkt 0 2 2 0 0 BP
+pkt 0 1 1 0 0 B
+pkt 0 2 0 0 1 UB
+pkt 0 0 1 1 0 UB
+pkt 0 1 2 1 0 BE
+pkt 0 2 2 0 0 U
+pkt 0 0 1 0 1 -
+pkt 0 1 1 0 0 UE
+pkt 0 2 1 0 0 UBEP
+pkt 0 1 1 1 0 UB
+pkt 0 2 1 0 0 UEP
+rollback
+target 0 0
+target 1 1
+pkt 0 2 0 0 0 UBP
+pkt 0 2 2 0 1 .
+pkt 0 0 1 1 0 BP
+pkt 0 2 1 0 0 EP
+pkt 0 1 1 0 0 UEP
+target 0 2
+pkt 0 1 0 0 0 UB
+pkt 0 1 2 0 0 B
+pkt 0 1 2 0 0 UBP
+pkt 0 0 2 0 0 UEP
+pkt 0 0 1 0 1 .
+pkt 0 2 0 0 0 UB
+pkt 0 0 1 0 0 BE
+pkt 0 0 1 0 0 B
+target 0 0
+pkt 0 2 2 0 0 UBEP
+pkt 0 1 2 0 0 UE
+pkt 0 2 1 0 0 UP
+pkt 0 1 1 0 0 UBE
+rollback
+pkt 0 1 0 0 0 BE
+pkt 0 1 1 0 0 BP
+pkt 0 1 0 0 0 EP
+pkt 0 1 0 0 0 UE
+target 0 2
+pkt 0 1 2 0 1 .
+pkt 0 0 1 0 0 UEP
+pkt 0 1 1 0 0 BE
+pkt 0 0 1 0 1 UP
+pkt 0 0 2 0 0 UE
+pkt 0 2 2 0 0 UE
+pkt 0 0 0 0 0 EP
+pkt 0 0 2 0 0 UEP
+pkt 0 2 1 0 1 UEP
+pkt 0 2 0 0 0 E
+pkt 0 2 0 0 0 EP
+pkt 0 0 1 0 1 UBEP
+pkt 0 0 1 0 0 UBEP
+pkt 0 1 1 0 1 UP
+pkt 0 1 2 0 0 P
+pkt 0 1 0 0 0 UE
+pkt 0 0 2 0 1 U
+target 2 0
+pkt 0 2 1 0 0 B
+pkt 0 0 1 0 0 E
+pkt 0 2 1 0 0 U
+pkt 0 2 0 0 0 UBE
+pkt 0 0 1 0 0 UP
+pkt 0 0 2 0 0 EP
+pkt 0 1 1 1 0 U
+pkt 0 2 1 1 0 EP
+pkt 0 1 1 0 1 UBP
+pkt 0 1 1 1 0 BP
+pkt 0 0 2 0 0 -
+pkt 0 2 1 0 1 UBEP
+pkt 0 1 2 0 0 UEP
+pkt 0 2 1 0 0 P
+pkt 0 0 2 0 0 UEP
+pkt 0 2 2 1 0 .
+pkt 0 2 0 0 1 BE
+pkt 0 2 2 1 0 BP
+pkt 0 2 2 1 1 BP
+pkt 0 0 1 0 0 UBEP
+pkt 0 0 1 0 0 B
+pkt 0 1 0 0 0 UBEP
+pkt 0 2 1 0 0 BE
+pkt 0 1 2 0 0 BP
+target -1 -1
+pkt 0 1 0 0 0 BE
+pkt 0 2 0 1 0 -
+pkt 0 2 2 0 0 BE
+pkt 0 2 1 0 1 UEP
+pkt 0 0 2 0 0 UB
+pkt 0 2 1 0 0 P
+pkt 0 0 2 1 0 B
+pkt 0 2 1 0 1 U
+pkt 0 1 2 0 0 UBE
+pkt 0 2 0 0 0 UE
+pkt 0 2 0 0 0 BE
+target 0 1
+
+# temporal layers of VP8
+new simulcast
+tls vp8
+max 2 3
+seen 2 3
+current 0 0
+target 0 3
+tpkt 1 0 1 SY
+tpkt 2 0 1 SY
+tpkt 3 0 0 SY
+tpkt 0 0 1 S
+target 0 0
+tpkt 0 0 0 S
+tpkt 2 0 1 -
+tpkt 0 0 1 SY
+tpkt 1 0 0 S
+target 0 1
+target 0 3
+tpkt 3 0 0 -
+tpkt 0 0 1 Y
+tpkt 0 1 0 KSY
+tpkt 0 0 0 SY
+target 0 2
+tpkt 3 1 1 KSY
+tpkt 3 0 1 S
+tpkt 0 0 1 S
+tpkt 3 0 0 Y
+tpkt 0 1 1 KY
+tls vp8
+tpkt 1 0 0 SY
+tpkt 3 0 0 S
+tpkt 3 0 0 SY
+tpkt 3 0 1 SY
+tpkt 3 0 1 SY
+tpkt 0 0 1 SY
+tpkt 1 0 0 -
+tpkt 3 0 0 S
+tpkt 0 0 0 S
+tpkt 1 0 0 SY
+tpkt 2 0 0 Y
+tpkt 1 1 0 K
+tpkt 3 1 0 KSY
+tpkt 0 0 1 SY
+tpkt 2 0 0 .
+tpkt 1 0 1 Y
+tpkt 1 0 0 SY
+tpkt 1 0 0 Y
+tpkt 3 1 1 K
+tpkt 1 0 1 Y
+tls vp8
+tpkt 2 0 0 Y
+tpkt 0 0 0 Y
+target 0 0
+target 0 2
+tpkt 0 0 0 SY
+tpkt 3 0 0 SY
+tpkt 3 0 0 SY
+tpkt 1 0 1 .
+tpkt 1 1 0 K
+tpkt 1 0 0 S
+tpkt 0 0 1 S
+tpkt 1 0 0 .
+tpkt 3 1 0 KSY
+tpkt 1 0 0 SY
+tpkt 1 0 0 .
+tpkt 2 0 0 S
+tpkt 3 0 0 SY
+target 0 2
+tpkt 2 0 0 SY
+tpkt 1 0 1 SY
+tpkt 0 0 1 Y
+tpkt 2 0 1 SY
+tpkt 1 0 1 SY
+tpkt 2 0 0 SY
+tpkt 3 0 0 S
+tpkt 2 0 0 .
+tpkt 3 0 1 Y
+tpkt 1 0 1 SY
+tpkt 0 0 1 SY
+tpkt 3 0 0 S
+tpkt 3 0 0 Y
+tpkt 3 1 0 KSY
+tpkt 1 1 0 KS
+tpkt 2 0 0 SY
+tpkt 2 0 0 SY
+tpkt 2 0 0 SY
+target 0 2
+tpkt 0 0 1 SY
+tpkt 1 0 1 SY
+tpkt 2 0 1 .
+tpkt 1 0 0 Y
+tpkt 3 0 0 Y
+tpkt 2 1 0 KSY
+tpkt 0 0 0 S
+tpkt 2 0 1 SY
+tpkt 1 0 0 SY
+target 0 3
+target 0 0
+tpkt 2 0 0 S
+tpkt 0 0 1 Y
+target 0 0
+tpkt 0 1 1 K
+tpkt 3 0 0 Y
+tpkt 0 0 0 Y
+tpkt 0 0 0 SY
+tpkt 2 0 0 SY
+tpkt 0 0 0 Y
+tpkt 2 0 0 S
+tpkt 0 0 0 S
+tpkt 0 1 0 K
+tpkt 2 0 0 SY
+tpkt 0 1 1 KY
+target 0 3
+tpkt 1 0 1 Y
+tpkt 0 0 1 .
+tpkt 0 0 0 -
+tpkt 2 0 0 Y
+tpkt 1 1 0 KSY
+tpkt 1 0 0 Y
+tpkt 0 0 1 Y
+target 0 2
+tpkt 1 0 0 SY
+tpkt 1 0 0 SY
+tpkt 0 1 1 KY
+target 0 3
+tpkt 2 0 1 SY
+tpkt 1 0 0 SY

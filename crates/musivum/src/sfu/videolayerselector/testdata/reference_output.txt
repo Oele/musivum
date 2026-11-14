@@ -1,0 +1,675 @@
+REF 21: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 22: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 23: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 24: target | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 25: req | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 26: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 27: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 28: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=0/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 29: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=0/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 30: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=0/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 31: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 32: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 33: pkt sel=true rel=false sw=true res=false m=true dd=0/0 | kind=simulcast cur=2/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 34: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 35: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 36: rollback | kind=simulcast cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 37: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 38: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 41: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 42: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 43: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 44: current | kind=simulcast cur=2/1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=false/-1 over=true
+REF 45: target | kind=simulcast cur=2/1 tgt=0/1 max=2/2 seen=2/2 req=-1 sync=false/-1 over=true
+REF 46: req | kind=simulcast cur=2/1 tgt=0/1 max=2/2 seen=2/2 req=0 sync=false/0 over=true
+REF 47: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/1 tgt=0/1 max=2/2 seen=2/2 req=0 sync=false/0 over=true
+REF 48: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/1 tgt=0/1 max=2/2 seen=2/2 req=0 sync=false/0 over=true
+REF 49: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=1/0 tgt=0/1 max=2/2 seen=2/2 req=0 sync=false/0 over=true
+REF 50: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/0 tgt=0/1 max=2/2 seen=2/2 req=0 sync=false/0 over=true
+REF 51: pkt sel=true rel=false sw=true res=false m=true dd=0/0 | kind=simulcast cur=0/2 tgt=0/1 max=2/2 seen=2/2 req=0 sync=true/0 over=true
+REF 52: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=0/2 tgt=0/1 max=2/2 seen=2/2 req=0 sync=true/0 over=true
+REF 53: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=0/2 tgt=0/1 max=2/2 seen=2/2 req=0 sync=true/0 over=true
+REF 56: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 57: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=1/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 58: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=1/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 59: current | kind=simulcast cur=2/2 tgt=-1/-1 max=1/2 seen=2/2 req=-1 sync=false/-1 over=true
+REF 60: target | kind=simulcast cur=2/2 tgt=2/2 max=1/2 seen=2/2 req=-1 sync=false/-1 over=true
+REF 61: req | kind=simulcast cur=2/2 tgt=2/2 max=1/2 seen=2/2 req=1 sync=false/1 over=true
+REF 62: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=1/2 seen=2/2 req=1 sync=false/1 over=true
+REF 63: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=1/2 seen=2/2 req=1 sync=false/1 over=true
+REF 64: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=1/2 tgt=1/2 max=1/2 seen=2/2 req=1 sync=true/1 over=true
+REF 65: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/2 tgt=1/2 max=1/2 seen=2/2 req=1 sync=true/1 over=true
+REF 66: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/2 tgt=1/2 max=1/2 seen=2/2 req=1 sync=true/1 over=true
+REF 67: rollback | kind=simulcast cur=2/2 tgt=2/2 max=1/2 seen=2/2 req=1 sync=false/1 over=true
+REF 68: maxspatial | kind=simulcast cur=2/2 tgt=2/2 max=0/2 seen=2/2 req=1 sync=false/1 over=true
+REF 69: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=0/2 tgt=0/2 max=0/2 seen=2/2 req=1 sync=false/1 over=true
+REF 72: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 73: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 74: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=1/2 req=-1 sync=true/-1 over=true
+REF 75: target | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=1/2 req=-1 sync=true/-1 over=true
+REF 76: req | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 77: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=1/0 tgt=1/2 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 78: seenspatial | kind=simulcast cur=1/0 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 79: target | kind=simulcast cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 80: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=2/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 81: maxtemporal | kind=simulcast cur=2/1 tgt=2/2 max=2/1 seen=2/2 req=2 sync=true/2 over=true
+REF 82: seentemporal | kind=simulcast cur=2/1 tgt=2/2 max=2/1 seen=2/1 req=2 sync=true/2 over=true
+REF 85: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 86: start | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 87: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 88: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 89: target | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 90: req | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 91: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 92: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 93: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 94: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=2/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 95: target | kind=simulcast cur=2/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 96: pkt sel=true rel=false sw=true res=false m=false dd=0/0 | kind=simulcast cur=1/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 97: current | kind=simulcast cur=-1/-1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 98: target | kind=simulcast cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 99: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 100: start | kind=simulcast cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 101: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=0/0 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 104: new | kind=null cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 105: max | kind=null cur=-1/-1 tgt=-1/-1 max=2/3 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 106: seen | kind=null cur=-1/-1 tgt=-1/-1 max=2/3 seen=1/1 req=-1 sync=true/-1 over=false
+REF 107: target | kind=null cur=-1/-1 tgt=1/1 max=2/3 seen=1/1 req=-1 sync=true/-1 over=false
+REF 108: req | kind=null cur=-1/-1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 109: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=null cur=-1/-1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 110: from | kind=simulcast cur=-1/-1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=true
+REF 111: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=0/0 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=true
+REF 112: from | kind=vp9 cur=0/0 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 113: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 114: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=true/1 over=false
+REF 115: from | kind=dd cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 116: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=dd cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=false
+REF 117: from | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=true/1 over=true
+REF 118: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=true/1 over=true
+REF 119: from | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=1/1 req=1 sync=true/1 over=true
+REF 120: rollback | kind=simulcast cur=0/0 tgt=1/1 max=2/3 seen=1/1 req=1 sync=false/1 over=true
+REF 123: new | kind=vp9 cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 124: max | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 125: seen | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=false
+REF 126: target | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=-1 sync=true/-1 over=false
+REF 127: req | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 128: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 129: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 130: pkt sel=false rel=true sw=true res=true m=false dd=0/0 | kind=vp9 cur=0/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 131: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 132: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 133: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 134: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 135: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 136: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 137: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 138: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 139: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 140: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 141: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 142: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 143: pkt sel=true rel=true sw=true res=false m=true dd=0/0 | kind=vp9 cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 144: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 147: target | kind=vp9 cur=2/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 148: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 149: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 150: pkt sel=true rel=true sw=true res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 151: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 152: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 153: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 154: rollback | kind=vp9 cur=2/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 155: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 156: target | kind=vp9 cur=0/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 157: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 158: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 159: target | kind=vp9 cur=1/1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 160: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 161: current | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 162: target | kind=vp9 cur=-1/-1 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 163: pkt sel=false rel=true sw=true res=true m=false dd=0/0 | kind=vp9 cur=2/1 tgt=1/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 164: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 167: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 168: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/3 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 169: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/3 seen=2/3 req=-1 sync=true/-1 over=true
+REF 170: current | kind=simulcast cur=1/0 tgt=-1/-1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 171: target | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 172: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 173: tls | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 174: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 175: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 176: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 177: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 178: tpkt this=1 | kind=simulcast cur=1/1 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 179: tpkt this=1 | kind=simulcast cur=1/1 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 180: tpkt this=2 | kind=simulcast cur=1/2 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 181: tpkt this=2 | kind=simulcast cur=1/2 tgt=1/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 182: target | kind=simulcast cur=1/2 tgt=1/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 183: tpkt this=2 | kind=simulcast cur=1/2 tgt=1/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 184: tpkt this=2 | kind=simulcast cur=1/0 tgt=1/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 185: tpkt this=0 | kind=simulcast cur=1/0 tgt=1/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 186: target | kind=simulcast cur=1/0 tgt=1/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 187: tpkt this=3 | kind=simulcast cur=1/3 tgt=1/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 188: tpkt this=3 | kind=simulcast cur=1/3 tgt=1/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 189: tpkt this=3 | kind=simulcast cur=1/3 tgt=1/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 190: target | kind=simulcast cur=1/3 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 191: tls | kind=simulcast cur=1/3 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 192: tpkt this=1 | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 193: tls | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 194: tpkt this=1 | kind=simulcast cur=1/1 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 195: rollback | kind=simulcast cur=-1/-1 tgt=1/1 max=2/3 seen=2/3 req=-1 sync=true/-1 over=true
+REF 200: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 201: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 202: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 203: target | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=-1 sync=true/-1 over=true
+REF 204: req | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 205: maxspatial | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 206: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 207: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 208: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 209: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 210: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 211: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 212: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 213: pkt sel=true rel=false sw=true res=true m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 214: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 215: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 216: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 217: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 218: current | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 219: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 220: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 221: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 222: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 223: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 224: target | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 225: start | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 226: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 227: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 228: seenspatial | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 229: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 230: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 231: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 232: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 233: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 234: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 235: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 236: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 237: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 238: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 239: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 240: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 241: start | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 242: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 243: rollback | kind=simulcast cur=-1/-1 tgt=2/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 244: target | kind=simulcast cur=-1/-1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 245: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 246: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 247: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 248: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 249: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 250: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 251: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 252: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 253: seenspatial | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 254: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 255: seenspatial | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 256: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 257: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 258: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 259: seenspatial | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 260: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 261: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 262: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 263: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 264: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 265: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 266: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 267: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 268: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 269: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 270: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 271: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 272: seenspatial | kind=simulcast cur=1/1 tgt=1/1 max=2/2 seen=0/2 req=2 sync=false/2 over=true
+REF 273: maxspatial | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=0/2 req=2 sync=false/2 over=true
+REF 274: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=0/2 req=2 sync=false/2 over=true
+REF 275: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=0/2 req=2 sync=false/2 over=true
+REF 276: seenspatial | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 277: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 278: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 279: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=1/1 tgt=1/1 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 280: rollback | kind=simulcast cur=-1/-1 tgt=1/1 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 281: target | kind=simulcast cur=-1/-1 tgt=2/0 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 282: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 283: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=1/2 seen=2/2 req=2 sync=false/2 over=true
+REF 284: maxspatial | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 285: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 286: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 287: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 288: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 289: seenspatial | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 290: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 291: seenspatial | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=1/2 req=2 sync=false/2 over=true
+REF 292: seenspatial | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 293: target | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 294: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 295: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 296: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 297: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 298: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 299: maxspatial | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 300: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 301: target | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 302: maxspatial | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 303: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 304: pkt sel=true rel=false sw=true res=true m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 305: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 306: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 307: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 308: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 309: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 310: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 311: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 312: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 313: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 314: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 315: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 316: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 317: target | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 318: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 319: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 320: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 321: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 322: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 323: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 324: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 325: start | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 326: target | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 327: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 328: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 329: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 330: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 331: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 332: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 333: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 334: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 335: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 336: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 337: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 338: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 339: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 340: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 341: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 342: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 343: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 344: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 345: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 346: pkt sel=true rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 347: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 348: target | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 349: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 350: rollback | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 351: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 352: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 353: pkt sel=true rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 354: rollback | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 355: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=2/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 356: rollback | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 357: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 358: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 359: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 360: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=simulcast cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=true
+REF 361: pkt sel=true rel=false sw=true res=true m=false dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=2/2 seen=2/2 req=2 sync=true/2 over=true
+REF 362: maxspatial | kind=simulcast cur=2/2 tgt=2/2 max=0/2 seen=2/2 req=2 sync=true/2 over=true
+REF 363: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=0/2 seen=2/2 req=2 sync=true/2 over=true
+REF 364: pkt sel=false rel=false sw=false res=false m=true dd=0/0 | kind=simulcast cur=2/2 tgt=2/2 max=0/2 seen=2/2 req=2 sync=true/2 over=true
+REF 367: new | kind=vp9 cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 368: max | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=-1/-1 req=-1 sync=true/-1 over=false
+REF 369: seen | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=-1 sync=true/-1 over=false
+REF 370: target | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=-1 sync=true/-1 over=false
+REF 371: req | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 372: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 373: pkt sel=false rel=true sw=true res=true m=false dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 374: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 375: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=2/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 376: target | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 377: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 378: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 379: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 380: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 381: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 382: rollback | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 383: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 384: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 385: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 386: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 387: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 388: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 389: pkt sel=false rel=true sw=true res=true m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 390: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 391: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 392: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 393: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 394: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 395: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 396: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 397: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 398: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 399: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 400: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 401: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 402: target | kind=vp9 cur=0/1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 403: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 404: pkt sel=false rel=true sw=true res=false m=true dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 405: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 406: target | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 407: pkt sel=false rel=true sw=true res=true m=true dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 408: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 409: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 410: current | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 411: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 412: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 413: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 414: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 415: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 416: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 417: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 418: target | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 419: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 420: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 421: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 422: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 423: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 424: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 425: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 426: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 427: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 428: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 429: pkt sel=false rel=true sw=true res=true m=false dd=0/0 | kind=vp9 cur=2/1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 430: current | kind=vp9 cur=-1/-1 tgt=2/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 431: target | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 432: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 433: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 434: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 435: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 436: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 437: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 438: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 439: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 440: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 441: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 442: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 443: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 444: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 445: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 446: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 447: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 448: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 449: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 450: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 451: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 452: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 453: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 454: pkt sel=false rel=true sw=true res=true m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 455: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 456: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 457: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 458: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 459: target | kind=vp9 cur=0/0 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 460: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 461: current | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 462: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 463: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 464: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 465: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 466: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 467: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 468: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 469: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 470: target | kind=vp9 cur=-1/-1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 471: pkt sel=false rel=true sw=true res=true m=true dd=0/0 | kind=vp9 cur=2/0 tgt=1/2 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 472: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 473: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 474: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 475: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 476: rollback | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 477: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 478: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 479: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 480: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 481: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 482: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 483: target | kind=vp9 cur=1/2 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 484: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 485: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 486: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 487: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 488: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 489: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 490: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 491: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 492: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 493: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 494: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 495: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 496: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 497: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 498: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 499: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 500: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 501: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 502: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 503: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 504: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 505: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 506: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 507: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 508: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/0 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 509: rollback | kind=vp9 cur=1/2 tgt=1/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 510: target | kind=vp9 cur=1/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 511: target | kind=vp9 cur=1/2 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 512: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 513: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/2 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 514: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 515: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 516: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=1/1 tgt=1/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 517: target | kind=vp9 cur=1/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 518: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 519: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=1/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 520: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=1/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 521: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=0/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 522: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 523: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 524: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 525: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/2 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 526: target | kind=vp9 cur=0/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 527: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 528: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 529: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 530: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 531: rollback | kind=vp9 cur=0/2 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 532: pkt sel=false rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 533: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 534: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 535: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 536: target | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 537: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 538: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 539: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 540: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 541: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 542: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 543: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 544: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 545: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 546: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 547: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/0 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 548: pkt sel=true rel=true sw=true res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 549: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 550: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 551: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 552: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 553: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=0/1 tgt=0/2 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 554: target | kind=vp9 cur=0/1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 555: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=2/1 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 556: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 557: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 558: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 559: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 560: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 561: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 562: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 563: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 564: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 565: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 566: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 567: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 568: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 569: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 570: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 571: pkt sel=true rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 572: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 573: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 574: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 575: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 576: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 577: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 578: pkt sel=true rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=2/0 tgt=2/0 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 579: target | kind=vp9 cur=2/0 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=true/2 over=false
+REF 580: pkt sel=true rel=true sw=true res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 581: pkt sel=false rel=false sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 582: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 583: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 584: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 585: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 586: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 587: pkt sel=false rel=true sw=false res=false m=true dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 588: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 589: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 590: pkt sel=false rel=true sw=false res=false m=false dd=0/0 | kind=vp9 cur=-1/-1 tgt=-1/-1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 591: target | kind=vp9 cur=-1/-1 tgt=0/1 max=2/2 seen=2/2 req=2 sync=false/2 over=false
+REF 594: new | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 595: tls | kind=simulcast cur=-1/-1 tgt=-1/-1 max=-1/-1 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 596: max | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/3 seen=-1/-1 req=-1 sync=true/-1 over=true
+REF 597: seen | kind=simulcast cur=-1/-1 tgt=-1/-1 max=2/3 seen=2/3 req=-1 sync=true/-1 over=true
+REF 598: current | kind=simulcast cur=0/0 tgt=-1/-1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 599: target | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 600: tpkt this=1 | kind=simulcast cur=0/1 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 601: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 602: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 603: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 604: target | kind=simulcast cur=0/3 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 605: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 606: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 607: tpkt this=3 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 608: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 609: target | kind=simulcast cur=0/0 tgt=0/1 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 610: target | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 611: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 612: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 613: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 614: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 615: target | kind=simulcast cur=0/3 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 616: tpkt this=3 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 617: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 618: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 619: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 620: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 621: tls | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 622: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 623: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 624: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 625: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 626: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 627: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 628: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 629: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 630: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 631: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 632: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 633: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 634: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 635: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 636: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 637: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 638: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 639: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 640: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 641: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 642: tls | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 643: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 644: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 645: target | kind=simulcast cur=0/2 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 646: target | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 647: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 648: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 649: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 650: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 651: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 652: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 653: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 654: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 655: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 656: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 657: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 658: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 659: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 660: target | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 661: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 662: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 663: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 664: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 665: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 666: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 667: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 668: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 669: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 670: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 671: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 672: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 673: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 674: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 675: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 676: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 677: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 678: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 679: target | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 680: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 681: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 682: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 683: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 684: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 685: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 686: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 687: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 688: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 689: target | kind=simulcast cur=0/2 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 690: target | kind=simulcast cur=0/2 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 691: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 692: tpkt this=2 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 693: target | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 694: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 695: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 696: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 697: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 698: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 699: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 700: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 701: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 702: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 703: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 704: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/0 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 705: target | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 706: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 707: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 708: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 709: tpkt this=0 | kind=simulcast cur=0/0 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 710: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 711: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 712: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 713: target | kind=simulcast cur=0/3 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 714: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 715: tpkt this=3 | kind=simulcast cur=0/3 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 716: tpkt this=3 | kind=simulcast cur=0/2 tgt=0/2 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 717: target | kind=simulcast cur=0/2 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 718: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
+REF 719: tpkt this=2 | kind=simulcast cur=0/2 tgt=0/3 max=2/3 seen=2/3 req=-1 sync=false/-1 over=true
