@@ -51,9 +51,10 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
 | `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
 | `pkg/sfu/streamtrackermanager.go` | `sfu/streamtrackermanager.rs` | none upstream | Eight tests added, their expected events and states printed by the Go original for the same steps. The listener is held weakly. `Bitrates` and `ReceiverCodecState` of `receiver_base.go` are in `sfu/receiver_base.rs` ahead of the receiver. |
-| `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender` and `DownTrackListener` as traits with fakes. `DownTrackStreamAllocatorListener` follows with the down track. |
+| `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender`, `DownTrackListener` and `DownTrackStreamAllocatorListener` as traits with fakes. |
 | `pkg/sfu/pacer/` (six files) | `sfu/pacer/` (same names) | 2 / 2 | Ten tests added: what each of the three pacers stamps and tells the estimator, compared with a run of the original (header bytes, sizes, send times where LiveKit's rounding differs from pion's). A packet owns its parts: no pools and no scratch buffers, at the cost of two small allocations per send for the stamped extensions. `Pacer` has a fake. One assertion on allocations left out. |
 | `pkg/sfu/redreceiver.go`, `redprimaryreceiver.go` | `sfu/redreceiver.rs`, `redprimaryreceiver.rs` | 4 / 4 | The methods that forward to the wrapped receiver are what Go's embedding was. Seven assertions that compare with `ReceiverBase` are left out until the receiver is ported, and `TestRedReceiverReusedReadBuffer` runs with a stand-in for the buffer: both to be redone then. The state `ForwardRTP` changes has a lock the original does not need. `close_track_senders` of `receiver_base.go` is in `redreceiver.rs` until the receiver is ported. |
+| `pkg/sfu/downtrack.go` | `sfu/downtrack.rs` | 8 / 11 | Its tests are upstream's integration test over pion's virtual network; the eight that exercise the down track itself run on a bound context of the test's own with a recording writer and a fake receiver, their expected bytes and counts taken from a run of the original. Not ported yet: two that need the stream allocator (with it), and one that tests pion's virtual network. Two tests added. Each lock guards what it guards upstream. The down track holds its receiver strongly and its listeners and transceiver weakly. `close` blocks the calling thread up to a second, as upstream. The SDES item with the transceiver's mid is not written (`rtc-rtcp` has no such item type). One assertion on allocations left out. `DownTrackStreamAllocatorListener` of `interfaces.go` came with it. |
 | `pkg/sfu/forwarder.go` | `sfu/forwarder.rs` | 34 / 34 | Every subtest and table case. A selector is swapped by taking the old one out of its field (a null selector stands in until the new one is assigned). `GetTranslationParams` returns the parameters together with the error, as the original does. The 400 random pairs of one subtest are written out from a run of Go's generator. |
 | `pkg/sfu/playoutdelay.go` | `sfu/playoutdelay.rs` | 1 / 1 | |
 | `pkg/sfu/connectionquality/scorer.go`, `connectionstats.go` | `sfu/connectionquality/` (same names) | 3 / 3 | Every table case. The providers of statistics are traits held weakly. Also run against the original: 728 lines from the scorer over six kinds of track (score bit for bit, quality) and 18 from `get_stat`, identical; 58 pinned. `f64::ln` agreed with Go's `math.Log` on every input of the run, which nothing guarantees in general. |
@@ -144,6 +145,9 @@ Clients that cannot use UDP are therefore not served yet (an open question of th
   the TURN credential). The port logs a message with `Debug`, in full. The lines concerned
   are at debug level ("handling signal request", "sent signal response", a participant's
   init). To be settled for the whole crate before it serves real users.
+- **The mid in a sender's SDES.** The down track's source description carries the CNAME
+  only; the original adds an item with the transceiver's mid (type 15), which `rtc-rtcp`
+  0.21 cannot write and reads as the end of the list.
 - **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
   files) are left out: counting allocations needs an allocator of the test binary's own,
   which needs `unsafe`, and the workspace forbids it.
@@ -301,6 +305,12 @@ What looked wrong or fragile upstream and was ported as it is:
   is neither read nor counted as dropped. Seen once as a failure of
   `TestForwardSampleBufferConcurrent` (ported as it is) at a load average of 44; the cause
   is from reading the code, which is the original's line for line.
+- `downtrack.go`: in `Bind`, for encrypted tracks, the check `!IsOpus(u) || !IsRED(u)` is
+  true for every codec, so the early break for "RED and Opus" never happens. In
+  `handleRTCP` the jitter in milliseconds is computed in 32 bits (it wraps) and divided by
+  the clock rate of the first upstream codec, not the negotiated one; a clock rate of 0
+  panics. `doBind` calls `onBinding` with the bind lock held, and `SetReceiver` calls into
+  both receivers with it held.
 - `forwarder.go`: three log lines log `"targetLayer"` with the current layer;
   `GetNextHigherTransition` takes the write lock though it only reads; a state with more
   than three sender reports panics in `SeedState`. `TestForwarderGetTranslationParamsMuted`
