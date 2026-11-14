@@ -119,6 +119,29 @@ pub enum Error {
     /// `rtc.ErrLimitExceeded`).
     #[error(transparent)]
     Rtc(#[from] rtc::Error),
+
+    // roommanager.go and signal.go, which make these where they return them (`errors.New`,
+    // `errors.Wrap`)
+    #[error("could not restart closed participant")]
+    CouldNotRestartClosedParticipant,
+    #[error("could not restart participant")]
+    CouldNotRestartParticipant,
+    #[error("not implemented")]
+    NotImplemented,
+    #[error("no API keys configured")]
+    NoApiKeysConfigured,
+    #[error("failed to read participant from session: {0}")]
+    ReadParticipantFromSession(String),
+    /// The error of `rtc::WebRtcConfig::new` (of `rtcconfig`, which is not `Clone`), as its
+    /// text.
+    #[error("{0}")]
+    RtcConfig(String),
+    /// An error of `pkg/routing` that the room manager passes on (of the router).
+    #[error(transparent)]
+    Routing(#[from] crate::routing::Error),
+    /// An error of the protocol's `auth` that the room manager passes on (`ToJWT`).
+    #[error(transparent)]
+    Auth(#[from] crate::protocol::auth::Error),
 }
 
 impl Error {

@@ -17,6 +17,9 @@
 //!   WebSocket, in protobuf or in its JSON form.
 //! - [`LocalStore`], [`StandardRoomAllocator`] and the traits they implement
 //!   (`interfaces.rs`): the rooms and participants of the node.
+//! - [`RoomManager`] (`roommanager.rs`): the rooms of the node, the sessions of their
+//!   participants and the room-side operations of the room API; [`SignalServer`]
+//!   (`signal.rs`): where a session started through the router reaches the room manager.
 //!
 //! [`useragent`] is written new: it stands in for the user agent parser the original uses.
 
@@ -25,6 +28,8 @@ mod errors;
 mod interfaces;
 mod localstore;
 mod roomallocator;
+mod roommanager;
+mod signal;
 pub mod useragent;
 mod utils;
 mod wsprotocol;
@@ -34,5 +39,7 @@ pub use errors::*;
 pub use interfaces::*;
 pub use localstore::*;
 pub use roomallocator::*;
+pub use roommanager::*;
+pub use signal::*;
 pub use utils::*;
 pub use wsprotocol::*;
