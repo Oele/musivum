@@ -50,6 +50,10 @@ pub enum Error {
     #[error("participant is not given permission to subscribe to metrics")]
     NoSubscribeMetricsPermission,
 
+    // uptrackmanager.go
+    #[error("either participant identity or SID needed")]
+    SubscriptionPermissionNeedsId,
+
     // errors of other packages that the methods of `types/interfaces.go` pass on: of the
     // sink a participant's messages are written to, of the signal handler and the limits on
     // a participant's metadata, of the down track a subscription makes, of the peer

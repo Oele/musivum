@@ -11,16 +11,24 @@ pub mod types;
 
 mod clientinfo;
 mod errors;
+mod medialossproxy;
 mod participant_data_blob;
+mod roomtrackmanager;
+mod signalanddatastats;
 mod subscribepacer;
 #[cfg(test)]
 pub mod testutils;
+mod uptrackmanager;
 mod user_packet_deduper;
 mod utils;
 
 pub use clientinfo::*;
 pub use errors::*;
+pub use medialossproxy::*;
 pub use participant_data_blob::*;
+pub use roomtrackmanager::*;
+pub use signalanddatastats::*;
 pub use subscribepacer::*;
+pub use uptrackmanager::*;
 pub use user_packet_deduper::*;
 pub use utils::*;
