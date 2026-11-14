@@ -31,6 +31,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | protocol `codecs/codecs.go` | `protocol/codecs/codecs.rs` | none upstream | Three tests added. |
 | protocol `auth/accesstoken.go`, `grants.go`, `verifier.go`, `provider.go`, `interfaces.go` | `protocol/auth/` (same names, with `jwt.rs` and `json.rs`) | 13 / 13 | Seventeen tests added. `jwt.rs` is what the original takes from golang-jwt (MIT), ported in part; `json.rs` is new. Tokens signed by Go verify here and tokens signed here verify in Go (run both ways, every grant; for fixed claims and times the token is Go's byte for byte). More than 200 unusual tokens and 60 key files were put through Go, and the tests expect Go's outcome. Token times are compared with the system clock, as in Go. `authfakes` is not ported. |
 | protocol `utils/`: `timed_version.go`, `bitmap.go`, `time_size_cache.go`, `timed_aggregator.go`, `rtpstats.go`, `protoproxy.go`, `dedupedslice.go`, `guid/id.go`, `id.go`, `connectionquality.go`, `error.go`, `data_channel_rpc.go`, `secret.go`, `pointer/to.go` | `protocol/utils/` (same names) | 11 / 12 | 29 tests added, with values from the originals. `guid.Hash` and its test are not ported (it reproduces Go's ChaCha8 sequence for a seed; only request ids of the service use it). Identifiers take their random numbers from the `rand` crate. `base62.rs` is jxskiss/base62's encoder (MIT). The database methods of `TimedVersion`, `LocalNodeID` and the psrpc conversion are left out. `ProtoProxy` is generic over a value with `Default` and `PartialEq`; its `update_fn` has to hold its owner weakly. |
+| protocol `datatrack/packet.go`, `extension_e2ee.go`, `extension_participant_sid.go`, `extension_user_timestamp.go` | `protocol/datatrack/` (same names) | 5 / 5 | The fuzz test runs its property over the 15 seeds; the fuzzing itself is not carried over. Three tests added. A participant id that is not UTF-8 is read with replacement characters (a Go string holds any bytes). Also run against the original with 5,173 inputs (truncated at every length, flipped bits): all agreed. |
 | protocol `utils/mono/mono.go` | `protocol/utils/mono.rs` | 0 / 2 | The clock itself is `go::time`; upstream's two tests are about Go's `time.Time` and have nothing to test here. |
 | protocol `livekit/types.go` | `protocol/livekit/types.rs` | 0 / 4 | Only the identifier types; upstream's tests are of the YAML conversions, which are not ported. |
 | protocol `utils/rtputil/rtpconverter.go` | `protocol/utils/rtputil.rs` | 1 / 1 | |
@@ -191,6 +192,11 @@ What looked wrong or fragile upstream and was ported as it is:
   `FindRTXPayloadType`: compares the whole fmtp line with `apt=N`, so `apt=96;rtx-time=200`
   is not found. Two upstream tests cannot fail on what they are named for
   (`TestDecoderResetsOnBigSequenceGap`, RED's "history window edge").
+- protocol `datatrack`: the size of the extensions is held and written in 16 bits, so from
+  65,531 bytes of extensions on a packet that was read marshals to bytes that do not read
+  back, or read back as another packet (run in both, pinned). `Header.Unmarshal` into a
+  header that was used before appends to its extensions, and marshalling that runs out of
+  the buffer (read, not run; the server reads into a fresh packet).
 - protocol `auth`: `GetCanPublishSource` compares the stored strings exactly while
   `GetCanPublishSources` upper-cases them; `checkOutputForCredentials` has no case for
   image outputs; a token without `iss` is verified with the secret of the key `""`;
