@@ -125,6 +125,18 @@ hard-coded.
    engine's negotiated codecs). It cannot be done above the crate: its media engine cannot
    be read once a connection has it, and a local description has to be set as the crate
    wrote it. To be proposed upstream: proposed as webrtc-rs/rtc#327 and #328 (issues; pull requests after a reply).
+6. **Its controlled ICE agent keeps the first nominated pair.** `rtc-ice` selects a pair at
+   the first nomination on a pair its own check has proved and never moves after that; it
+   drops a nomination on a pair it has not checked yet (and leaves it unanswered), and as a
+   lite agent it checks back. pion's controlled selector, which LiveKit uses, moves to a
+   later nomination (a full agent to a pair of higher priority, a lite one always), selects
+   a pair nominated before its check when the check succeeds, and a lite agent sends no
+   checks. A client's first nominated pair usually has a peer-reflexive remote, its first
+   check coming before its candidates; when it nominated a better pair later, musivum went
+   on sending DTLS and media to the first. On loopback that still arrived; behind a phone's
+   hotspot ICE connected and the connection never did (found in production, 2026-11-14).
+   `third_party/rtc-ice` is `rtc-ice` 0.21.1 with pion's rules (`MUSIVUM.md`,
+   `MUSIVUM.patch`), used through `[patch.crates-io]`. Not proposed upstream yet.
 
 None of these changes the structure of the port.
 
