@@ -12,7 +12,9 @@ Safety, as this machine is also a live server:
   from its environment;
 - a run starts only below 75 °C and a load average below 8 (it waits up to 5 minutes);
 - a run is stopped (lk first, then the server) when the temperature stays above 90 °C for
-  5 s, the load average passes 16, or the server's RSS passes 6 GB; the stop is recorded;
+  30 s (the CPU fan takes a few seconds to spin up, and the CPU throttles itself near
+  100 °C) or above 97 °C for 10 s, the load average passes 16, or the server's RSS passes
+  6 GB; the stop is recorded;
 - the server runs in a scope of its own with MemoryMax=8G (systemd-run --user), everything
   under nice -n 10, and what is started is stopped by its process group.
 """
@@ -64,7 +66,9 @@ SCENARIOS = {
 START_TEMP_C = 75
 START_LOAD = 8
 STOP_TEMP_C = 90
-STOP_TEMP_S = 5
+STOP_TEMP_S = 30
+HARD_STOP_TEMP_C = 97
+HARD_STOP_TEMP_S = 10
 STOP_LOAD = 16
 STOP_RSS = 6 * 1000 ** 3
 WAIT_COOL_S = 300
@@ -343,6 +347,7 @@ def run(target, scenario, sc, lk, tag, procs, stops, server, tpath, tsource, bef
     participants = sc['rooms'] * (max(sc['video'], sc['audio']) + sc['subscribers'])
     deadline = t_lk + DURATION_S + participants / JOINS_PER_S + 120
     hot_s = 0
+    very_hot_s = 0
     steady_at = None
     server_exit = None
     next_tick = time.monotonic() + 1
@@ -363,8 +368,11 @@ def run(target, scenario, sc, lk, tag, procs, stops, server, tpath, tsource, bef
         elif s[1] > STOP_RSS:
             reason = f'server RSS {round(s[1] / 1e6)} MB above {STOP_RSS // 10 ** 6} MB'
         hot_s = hot_s + 1 if row['tempC'] > STOP_TEMP_C else 0
+        very_hot_s = very_hot_s + 1 if row['tempC'] > HARD_STOP_TEMP_C else 0
         if hot_s >= STOP_TEMP_S:
             reason = f'above {STOP_TEMP_C} °C for {hot_s} s'
+        if very_hot_s >= HARD_STOP_TEMP_S:
+            reason = f'above {HARD_STOP_TEMP_C} °C for {very_hot_s} s'
         if row['load1'] > STOP_LOAD:
             reason = f'load average {row["load1"]} above {STOP_LOAD}'
         if time.monotonic() > deadline:

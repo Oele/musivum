@@ -164,8 +164,8 @@ was checked:
   subscribers; 10 calls of 4 (c); one publisher and 100 subscribers (d). Each second it
   samples the server's CPU, RSS and threads, the machine's load and the CPU temperature;
   `lk` reports per subscriber the tracks it got, their bitrate and the packets lost. A run
-  starts below 75 °C and a load of 8, and is stopped above 90 °C for 5 s, a load of 16 or
-  an RSS of 6 GB. Results are in `tests/load/results/`; `python3 -I tests/load/compare.py`
+  starts below 75 °C and a load of 8, and is stopped above 90 °C for 30 s (the fan takes a
+  few seconds to spin up) or 97 °C for 10 s, a load of 16 or an RSS of 6 GB. Results are in `tests/load/results/`; `python3 -I tests/load/compare.py`
   marks where musivum has fewer subscribers with media, more loss, errors, or more than
   twice LiveKit's CPU.
 
