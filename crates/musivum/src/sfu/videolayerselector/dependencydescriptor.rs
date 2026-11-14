@@ -36,7 +36,7 @@ use parking_lot::Mutex;
 
 use super::{
     Base, DecodeTarget, FrameChain, FrameNumberWrapper, SelectorDecision, SelectorDecisionCache,
-    VideoLayerSelector, VideoLayerSelectorResult, shl,
+    VideoLayerSelector, VideoLayerSelectorResult,
 };
 use crate::protocol::logger::Logger;
 use crate::sfu::buffer;
@@ -400,8 +400,10 @@ impl VideoLayerSelector for DependencyDescriptor {
             self.base.current_layer = highest_decode_target.layer;
 
             self.previous_active_decode_targets_bitmask = self.active_decode_targets_bitmask;
-            let active_decode_targets_bitmask =
-                get_active_decode_target_bitmask(self.base.current_layer, &ddwdt.decode_targets);
+            let active_decode_targets_bitmask = buffer::get_active_decode_target_bitmask(
+                self.base.current_layer,
+                &ddwdt.decode_targets,
+            );
             self.active_decode_targets_bitmask = Some(active_decode_targets_bitmask);
             debugw!(
                 self.base.logger,
@@ -585,24 +587,6 @@ fn panic_message(r: &(dyn Any + Send)) -> String {
     } else {
         "panic".to_string()
     }
-}
-
-// `GetActiveDecodeTargetBitmask` of pkg/sfu/buffer/dependencydescriptorparser.go, which is
-// not ported yet apart from its two types: to be `buffer::get_active_decode_target_bitmask`
-// when it is. It gives the bitmask itself, where the original gives a pointer that is never
-// nil.
-fn get_active_decode_target_bitmask(
-    layer: buffer::VideoLayer,
-    decode_targets: &[buffer::DependencyDescriptorDecodeTarget],
-) -> u32 {
-    let mut active_bit_mask = 0u32;
-    for dt in decode_targets {
-        if dt.layer.spatial <= layer.spatial && dt.layer.temporal <= layer.temporal {
-            active_bit_mask |= shl(1, dt.target);
-        }
-    }
-
-    active_bit_mask
 }
 
 // Open to the package: ddforwarder_test.rs uses its fixture.
