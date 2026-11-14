@@ -42,9 +42,13 @@ registry). No interceptor is registered unless asked for, and an application can
 own at any position, which is pion's first door and, placed closest to the wire, the second
 one too.
 
-**webrtc 0.21** (not looked at further). The asynchronous interface on top of `rtc`. musivum
-drives connections itself and has no use for a second layer; the 0.17 line, the older direct
-port of pion, is in maintenance.
+**webrtc 0.21** (read, not run). The asynchronous interface on top of `rtc`: a handle per
+peer connection with a background task that drives the core and does the I/O. It binds
+sockets of its own for every connection (`PeerConnectionBuilder::with_udp_addrs`), so all
+connections of a server cannot share one UDP port, which is how LiveKit is usually run and
+what a homeserver with calls built in wants from its firewall. musivum drives `rtc` itself,
+as the experiment does. The 0.17 line of `webrtc`, the older direct port of pion, is in
+maintenance.
 
 ## The experiment
 
