@@ -11,6 +11,7 @@
 mod buffer_base;
 mod datastats;
 mod dependencydescriptorparser;
+mod fps;
 mod frameintegrity;
 mod rtcpreader;
 mod videolayer;
@@ -19,6 +20,7 @@ mod videolayerutils;
 pub use buffer_base::*;
 pub use datastats::*;
 pub use dependencydescriptorparser::*;
+pub use fps::*;
 pub use frameintegrity::*;
 pub use rtcpreader::*;
 pub use videolayer::*;
@@ -31,4 +33,15 @@ pub enum Error {
     // io.EOF
     #[error("EOF")]
     Eof,
+
+    // dependencydescriptorparser.go
+    #[error("frame is earlier than current keyframe")]
+    FrameEarlierThanKeyFrame,
+    #[error("dependency descriptor structure is attached to non-first packet of a frame")]
+    DdStructureAttachedToNonFirstPacket,
+    #[error("dependency descriptor extension not found")]
+    DdExtentionNotFound,
+    // an error of the reader of the dependency descriptor, which the parser passes on
+    #[error(transparent)]
+    DependencyDescriptor(#[from] crate::sfu::rtpextension::dependencydescriptor::Error),
 }
