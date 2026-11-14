@@ -282,6 +282,42 @@ for traits of the `musivum` crate (the macro refers to `crate::testutils::fakes`
 whose fakes a test has to get back from an `Arc<dyn Trait>` has `Any` as a supertrait.
 Counterfeiter's `Invocations()` has no counterpart.
 
+## The interfaces of `pkg/rtc` (`rtc/types/interfaces.rs`)
+
+How a method of `types/interfaces.go` reads in Rust. The same rules hold for code that
+implements or calls these traits; the header of the file has them at greater length.
+
+- **Shared objects.** Anything behind an interface, a `*sfu.DownTrack`, or pion's sender,
+  transceiver and local track is an `Arc<dyn Trait>` (`Arc<sfu::DownTrack>`), by value both
+  ways; an `Option` of it where an implementation returns nil or a caller passes nil or
+  checks for it. `add_subscriber` returns `Result<Option<Arc<..>>, Error>`: `Ok(None)` is
+  the original's "nil, nil".
+- **Protocol messages.** Taken as `&livekit::X` (whoever keeps it clones it; `Option<&..>`
+  where a caller passes nil); returned owned, `Option` where nil is returned; returned as
+  `Arc<..>` only where the original hands out the object it keeps and replaces whole
+  (`get_client_info`, `claim_grants`, `subscription_permission`, the data blobs).
+- **Small things.** Identifiers: `&livekit::TrackId` taken, by value returned. `string`:
+  `&str` / `String`. `[]T`: `&[T]` / `Vec<T>`. Maps: `&HashMap` / `HashMap`. By value:
+  numbers, enums, `MimeType`, `TimedVersion`, `Time`, `Duration`, and structs Go passes by
+  value. `int` is `usize` for a count, `i32` for a layer.
+- **Errors.** `Result<_, crate::rtc::Error>`; several results are a tuple in Go's order,
+  inside the `Result` when the last is the error. Another package's error that is passed on
+  is a transparent variant of `rtc::Error` (`Routing`, `Signalling`, `Sfu`, `Webrtc`, ...).
+- **Callbacks.** `Box<dyn Fn(..) + Send + Sync>`, written out in the signature (the fake
+  macro does not see through a type alias); an `Option` where nil is passed. A participant
+  is handed to a callback as `Arc<dyn LocalParticipant>`.
+- **Channels.** `<-chan struct{}` is a `tokio_util::sync::CancellationToken`.
+- **`x.(*T)`.** The traits that are asserted upstream have `Any` as a supertrait:
+  `Arc<dyn Trait>` coerces to `Arc<dyn Any + Send + Sync>`, then `downcast`; in tests
+  `fakes::downcast::<FakeX>(..)`.
+- **`x.(types.LocalMediaTrack)` and `p.(types.LocalParticipant)`** are
+  `track.clone().as_local_media_track()` and `p.clone().as_local_participant()`, each an
+  `Option<Arc<dyn ..>>`, from two one-method supertraits (`AsLocalMediaTrack`,
+  `AsLocalParticipant`) that every implementor writes (`Some(self)` or `None`).
+- **Fakes.** All seventeen traits have one. A method whose return type has no zero value
+  (a plain `Arc<dyn ..>`) must be given a return before the code under test calls it.
+  `rtc::testutils` has `new_mock_participant` and `new_mock_track`, as upstream.
+
 ## Running things
 
 - Everything cargo runs here (test binaries, `cargo run`) goes through

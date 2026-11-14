@@ -13,6 +13,8 @@ mod clientinfo;
 mod errors;
 mod participant_data_blob;
 mod subscribepacer;
+#[cfg(test)]
+pub mod testutils;
 mod user_packet_deduper;
 mod utils;
 
