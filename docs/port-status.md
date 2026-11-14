@@ -521,7 +521,11 @@ On 2026-11-14 asaroton's lab ran musivum in place of `livekit-server`, with the 
 asaroton writes for LiveKit: a call of two Element Web peers in Element Call (90 s) worked as
 with LiveKit (both over UDP, each receiving both 720p videos for the whole call). It found
 one bug: no webhook ever left the server binary, because the senders ran on musivum's own
-runtime, which had no network IO (fixed, with a test of the server made as `main` makes it).
+runtime, which had no network IO (fixed, with a test of the server made as `main` makes it;
+after the fix asaroton received the same 14 webhooks as from LiveKit, and its delayed leave
+events went out 2 ms after a participant closed). Also as with LiveKit: a three-way browser
+call (the tiles drop to 360p with three and return to 720p when one leaves), and Element X
+26.10.1 on Android in a call with Element Web (video both ways, the hang-up seen at once).
 
 ## On a degraded network
 
