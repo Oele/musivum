@@ -18,6 +18,9 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | mtu `pkg/bucket/bucket.go`, `errors.go` | `mediatransportutil/bucket/` | 6 / 6 | `GetPacket` on a nil bucket is the caller's `None`. Also run against the Go original: 288,000 operations, identical. |
 | mtu `pkg/nack/nack.go` | `mediatransportutil/nack/nack.rs` | 3 / 3 | Also run against the Go original, identical. |
 | mtu `helpers.go` | `mediatransportutil/helpers.rs` | 1 / 1 | Two tests added (the way back from NTP time, RTT from a receiver report). |
+| pion/rtp `packet.go`, `error.go` | `webrtc/rtp/packet.rs`, `error.rs` | 43 / 43 | Four tests added. Benchmarks left out. Run against pion with 432,008 generated inputs: every output identical, error texts and the cases where pion panics included. |
+| pion/rtp `abssendtimeextension.go`, `audiolevelextension.go`, `transportccextension.go`, `playoutdelayextension.go`, `abscapturetimeextension.go` | `webrtc/rtp/` (same names) | 20 / 20 | Benchmarks left out. |
+| pion/rtp `header_extension.go` | `webrtc/rtp/header_extension.rs` | 0 / 13 | Only the one function `packet.go` calls; LiveKit does not use the types of this file. |
 | protocol `utils/mono/mono.go` | `protocol/utils/mono.rs` | 0 / 2 | The clock itself is `go::time`; upstream's two tests are about Go's `time.Time` and have nothing to test here. |
 | protocol `livekit/types.go` | `protocol/livekit/types.rs` | 0 / 4 | Only the identifier types; upstream's tests are of the YAML conversions, which are not ported. |
 | protocol `utils/rtputil/rtpconverter.go` | `protocol/utils/rtputil.rs` | 1 / 1 | |
@@ -53,5 +56,16 @@ What looked wrong or fragile upstream and was ported as it is:
 - mtu `bucket.go`: `addPacket` refuses packets longer than the slot size minus the size
   header although the slot has room (read, not run); `wrap()` reduces by repeated
   subtraction, so a very large jump in a 64 bit sequence number loops for a long time.
+- pion/rtp `packet.go` (the first four confirmed by running pion):
+  `MarshalPacketTo` with the padding bit set and a padding size of 0 writes a zero byte 255
+  bytes past the payload, or panics if the buffer is shorter (`Packet.MarshalTo` refuses the
+  same packet). A padding size without the padding bit grows the packet without marking it.
+  `SetExtension` on a header without extensions checks neither id nor size. A reused
+  `Header` keeps the previous extension profile when the next packet has no extension. A
+  one-byte extension with an empty payload marshals as `id<<4 | 0xFF`. More than 15 CSRCs
+  spill into the version bits.
+- pion/rtp tests: `TestClonePacket` compares a byte with an untyped integer and cannot
+  fail; `TestAbsCaptureTimeExtension_Roundtrip` computes its second value from the first
+  input; `TestBasic` builds an expected packet for excessive padding and never compares it.
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
