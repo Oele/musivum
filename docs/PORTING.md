@@ -157,6 +157,17 @@ was checked:
   where musivum freezes more, recovers later, or gets a lower layer or frame rate. Until
   nothing is marked, LiveKit stays the default wherever both can be used. A run on a busy
   machine is flagged and says little.
+- **Load.** `tests/load/run.sh <reference|musivum> [a b c d]` runs LiveKit's own load
+  generator (`lk perf load-test` of livekit-cli v2.19.4, Apache-2.0, LiveKit's release
+  binary) against one server on the loopback interface (ports 39560 to 39562), 60 s per
+  scenario: one room with 2 publishers of simulcast video and audio and 10 (a) or 50 (b)
+  subscribers; 10 calls of 4 (c); one publisher and 100 subscribers (d). Each second it
+  samples the server's CPU, RSS and threads, the machine's load and the CPU temperature;
+  `lk` reports per subscriber the tracks it got, their bitrate and the packets lost. A run
+  starts below 75 °C and a load of 8, and is stopped above 90 °C for 5 s, a load of 16 or
+  an RSS of 6 GB. Results are in `tests/load/results/`; `python3 -I tests/load/compare.py`
+  marks where musivum has fewer subscribers with media, more loss, errors, or more than
+  twice LiveKit's CPU.
 
 ## Following upstream
 

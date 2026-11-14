@@ -523,8 +523,21 @@ down to the lowest layer (180p) where LiveKit stayed at 360p, though it froze fo
 0.3 a second. Single runs: repeated runs of both are needed before any of these counts as a
 difference.
 
+## Under load
+
+`tests/load` (2026-11-14, LiveKit's `lk load-test`, one run per scenario): both servers
+gave every subscriber all its media with no loss and no join errors, up to 100 subscribers
+of one track and 10 calls of 4. musivum's memory is lower (an idle 13 MB against 49 MB,
+about 2 MB per participant against 3). Its CPU was LiveKit's while a track had fewer than
+20 subscribers, and 2 to 4 times LiveKit's above that: the ported fan-out of a packet to
+its down tracks started a thread of the operating system per worker for every packet,
+where LiveKit starts goroutines on Go's fixed set of threads (being changed to a
+persistent pool). Not measured yet: latency and freezes under load, runs of minutes,
+joins and leaves during a run. Each ops queue is a thread of its own (four per
+participant).
+
 ## In progress, not on `main`
 
 LiveKit's embedded
 TURN server (ported from pion/turn, with a relay-only variant of the browser call as its
-proof).
+proof); a persistent worker pool for the fan-out of packets to down tracks.
