@@ -8,6 +8,7 @@
 use super::*;
 
 #[allow(dead_code)]
+#[derive(Clone)]
 struct TestPacket {
     seq: i64,
 }
@@ -208,5 +209,100 @@ fn test_broadcast_rtp_reuses_threads() {
         num_threads <= utils::num_cpu() + 1,
         "{num_threads} threads wrote over {calls} calls, num_cpu is {}",
         utils::num_cpu()
+    );
+}
+
+// New for musivum: the caller of `broadcast_rtp` is the first of its workers, as the thread
+// of the original's caller runs the goroutines while the caller waits, and the others are
+// started while there is work left: with writes that take a while, the caller writes the
+// first step itself and other threads write too.
+#[test]
+fn test_broadcast_rtp_caller_is_a_worker() {
+    struct SlowSender {
+        id: ParticipantId,
+        thread: parking_lot::Mutex<Option<std::thread::ThreadId>>,
+    }
+
+    impl Sender for SlowSender {
+        fn subscriber_id(&self) -> ParticipantId {
+            self.id.clone()
+        }
+    }
+
+    impl RtpWriter<TestPacket> for SlowSender {
+        fn write_rtp(&self, _pkt: &TestPacket, _layer: i32) -> i32 {
+            *self.thread.lock() = Some(std::thread::current().id());
+            std::thread::sleep(std::time::Duration::from_micros(500));
+            1
+        }
+    }
+
+    const NUM_DOWN_TRACKS: usize = 50;
+    let d = DownTrackSpreader::<Arc<SlowSender>>::new(DownTrackSpreaderParams {
+        threshold: 20,
+        ..Default::default()
+    });
+    for i in 0..NUM_DOWN_TRACKS {
+        d.store(Arc::new(SlowSender {
+            id: ParticipantId::from(format!("p{i}")),
+            thread: parking_lot::Mutex::new(None),
+        }));
+    }
+
+    assert_eq!(
+        NUM_DOWN_TRACKS as i32,
+        broadcast_rtp(&d, &TestPacket { seq: 0 }, 0)
+    );
+
+    let me = std::thread::current().id();
+    let down_tracks = d.get_down_tracks();
+    for dt in &down_tracks[..BROADCAST_STEP as usize] {
+        assert_eq!(
+            Some(me),
+            *dt.thread.lock(),
+            "{} not written by the caller",
+            dt.id
+        );
+    }
+    let threads: std::collections::HashSet<_> = down_tracks
+        .iter()
+        .map(|dt| dt.thread.lock().unwrap())
+        .collect();
+    assert!(threads.len() > 1, "only the caller wrote");
+}
+
+// New for musivum: a worker is started only while no other is on its way and there is work
+// left. With writes that take no time the caller is done before a worker it started can
+// begin, so a call starts about one worker, where starting `numWorkers` of them at once (the
+// original's goroutines) wakes 15 more threads for each packet, on 16 processors.
+#[test]
+fn test_broadcast_rtp_starts_workers_while_there_is_work() {
+    const NUM_DOWN_TRACKS: usize = 50;
+    const CALLS: u64 = 200;
+    let (_d, senders) = new_test_spreader(NUM_DOWN_TRACKS, 20);
+    let down_tracks: Arc<[Arc<TestSender>]> = Arc::from(senders);
+    let num_workers = 16;
+
+    let mut started = 0;
+    for _ in 0..CALLS {
+        let b = Arc::new(RtpBroadcast {
+            down_tracks: down_tracks.clone(),
+            pkt: TestPacket { seq: 0 },
+            layer: 0,
+            next: atomic::Uint64::new(0),
+            written: atomic::Int32::new(0),
+            wg: WaitGroup::new(),
+            to_start: atomic::Uint64::new(num_workers - 1),
+            starting: atomic::Bool::new(false),
+        });
+        b.run();
+        assert!(!b.wg.wait());
+        assert_eq!(NUM_DOWN_TRACKS as i32, b.written.load());
+        started += num_workers - 1 - b.to_start.load();
+    }
+
+    assert!(
+        started <= 3 * CALLS,
+        "{started} workers started over {CALLS} calls"
     );
 }

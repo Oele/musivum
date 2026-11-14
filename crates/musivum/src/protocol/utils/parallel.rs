@@ -1,11 +1,17 @@
 // Ported from LiveKit's protocol, utils/parallel.go at v1.53.1-0.20261023175527-46332a036e25.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust; the workers are jobs on rayon's pool of threads where
-// the original starts goroutines on Go's threads: the caller spawns them into a
-// `rayon::in_place_scope` and does not run one itself, as the original's does not, and the
-// end of the scope is the wait that the original's `sync.WaitGroup` is; the state is on the
-// caller's stack and borrowed by the workers; `fn` (here `f`) gets each element by reference.
-// `num_cpu` stands in for Go's `runtime.NumCPU()` and is written new.
+// the original starts goroutines on Go's threads, and the end of a `rayon::in_place_scope` is
+// the wait that the original's `sync.WaitGroup` is. They are started as Go's scheduler gets
+// its threads to the goroutines, not all at once: the caller is the first worker (in Go the
+// thread of the caller runs the goroutines while the caller waits), and a worker that takes
+// work while there is more left starts one more, as long as no other is on its way and fewer
+// than `numCPU` were started (Go wakes another thread when a woken one has found work, and
+// only while none is looking for it); the state is on the caller's stack and borrowed by the
+// workers; `fn` (here `f`) gets each element by reference. The workers stay on rayon, where
+// those of `sfu/utils.BroadcastRTP` run on `go::sync::go`'s threads: `fn` borrows from the
+// caller, which only a scoped pool can take without `unsafe`, and this runs far less often
+// than for every packet. `num_cpu` stands in for Go's `runtime.NumCPU()` and is written new.
 
 use std::sync::LazyLock;
 
@@ -29,14 +35,21 @@ struct ParallelState<'a, T, F> {
     step: u64,
     end: u64,
     start: atomic::Uint64,
+    // New: how many workers may still be started, and whether one was started that has not
+    // begun yet (see the header)
+    to_start: atomic::Uint64,
+    starting: atomic::Bool,
 }
 
-impl<T, F: Fn(&T)> ParallelState<'_, T, F> {
-    fn run(&self) {
+impl<'a, T: Sync, F: Fn(&T) + Sync> ParallelState<'a, T, F> {
+    fn run(&'a self, s: &rayon::Scope<'a>) {
         loop {
             let n = self.start.add(self.step);
             if n >= self.end.wrapping_add(self.step) {
                 return;
+            }
+            if n < self.end {
+                self.start_worker(s);
             }
 
             let mut i = n.wrapping_sub(self.step);
@@ -45,6 +58,22 @@ impl<T, F: Fn(&T)> ParallelState<'_, T, F> {
                 i += 1;
             }
         }
+    }
+
+    // New: starts one more worker, unless one is on its way or all were started
+    fn start_worker(&'a self, s: &rayon::Scope<'a>) {
+        if self.starting.load() || !self.starting.cas(false, true) {
+            return;
+        }
+        if self.to_start.load() == 0 {
+            // `starting` stays set: there is nothing more to start
+            return;
+        }
+        self.to_start.dec();
+        s.spawn(move |s| {
+            self.starting.store(false);
+            self.run(s);
+        });
     }
 }
 
@@ -74,13 +103,11 @@ where
         step,
         end: vals.len() as u64,
         start: atomic::Uint64::new(0),
+        to_start: atomic::Uint64::new(num_cpu.saturating_sub(1) as u64),
+        starting: atomic::Bool::new(false),
     };
 
-    rayon::in_place_scope(|s| {
-        for _ in 0..num_cpu {
-            s.spawn(|_| st.run());
-        }
-    });
+    rayon::in_place_scope(|s| st.run(s));
 }
 
 #[cfg(test)]

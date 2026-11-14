@@ -58,3 +58,46 @@ fn test_parallel_reuses_threads() {
         num_cpu()
     );
 }
+
+// New for musivum: the caller of `parallel_exec` is the first of its workers, as the thread
+// of the original's caller runs the goroutines while the caller waits, and the others are
+// started while there is work left: with calls of `f` that take a while, the caller runs the
+// first step itself and other threads run `f` too; with calls that take no time, a call
+// starts about one worker, not `numCPU` of them at once.
+#[test]
+fn test_parallel_starts_workers_while_there_is_work() {
+    let vals: Vec<usize> = (0..50).collect();
+    let me = std::thread::current().id();
+    let threads: Vec<parking_lot::Mutex<Option<std::thread::ThreadId>>> =
+        vals.iter().map(|_| parking_lot::Mutex::new(None)).collect();
+    parallel_exec(&vals, 10, 2, |i: &usize| {
+        *threads[*i].lock() = Some(std::thread::current().id());
+        std::thread::sleep(std::time::Duration::from_micros(500));
+    });
+    assert_eq!(Some(me), *threads[0].lock());
+    assert_eq!(Some(me), *threads[1].lock());
+    let distinct: std::collections::HashSet<_> =
+        threads.iter().map(|t| t.lock().unwrap()).collect();
+    assert!(distinct.len() > 1, "only the caller ran f");
+
+    const CALLS: u64 = 200;
+    let num_workers = 16;
+    let mut started = 0;
+    for _ in 0..CALLS {
+        let st = ParallelState {
+            vals: &vals,
+            f: |_: &usize| {},
+            step: 2,
+            end: vals.len() as u64,
+            start: atomic::Uint64::new(0),
+            to_start: atomic::Uint64::new(num_workers - 1),
+            starting: atomic::Bool::new(false),
+        };
+        rayon::in_place_scope(|s| st.run(s));
+        started += num_workers - 1 - st.to_start.load();
+    }
+    assert!(
+        started <= 3 * CALLS,
+        "{started} workers started over {CALLS} calls"
+    );
+}

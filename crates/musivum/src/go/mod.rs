@@ -4,4 +4,5 @@
 
 pub mod atomic;
 pub mod core;
+pub mod sync;
 pub mod time;

@@ -7,10 +7,18 @@
 // params are inside the lock, as `SetThreshold` changes them under it; the threshold is
 // unsigned. The functions called with the lock held take the locked state. The writer of
 // `broadcast` and `write_rtp` get the down track and the packet by reference. The workers of
-// `broadcast_rtp` are jobs on rayon's pool of threads where the original starts goroutines on
-// Go's threads: the caller spawns them into a `rayon::in_place_scope` and does not run one
-// itself, as the original's does not, and the end of the scope is the wait that the
-// `sync.WaitGroup` is.
+// `broadcast_rtp` are jobs on the threads of `go::sync::go`, which sleep as soon as there is
+// nothing to do, where the original starts goroutines on Go's threads (they were jobs on
+// rayon's pool, whose threads look for work for a while after each job, and that cost more
+// than the writes did); the shared state is in an `Arc` with a copy of the packet, as a job
+// there outlives the borrow (Go shares it by pointer). They are started as Go's scheduler
+// gets its threads to the goroutines, not all at once: the caller is the first worker (in Go
+// the thread of the caller runs the goroutines while the caller waits), and a worker that
+// takes work while there is more left starts one more, as long as no other is on its way and
+// fewer than `numWorkers` were started (Go wakes another thread when a woken one has found
+// work, and only while none is looking for it). The `WaitGroup` counts a worker when it
+// begins, so that the caller does not wait for one that begins after all the work was
+// taken; a worker that panicked makes the caller panic.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,6 +26,7 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 use crate::go::atomic;
+use crate::go::sync::{WaitGroup, go};
 use crate::protocol::livekit::ParticipantId;
 use crate::protocol::logger::Logger;
 use crate::protocol::utils;
@@ -178,16 +187,25 @@ impl<P: ?Sized, S: RtpWriter<P> + ?Sized> RtpWriter<P> for Arc<S> {
 
 // rtpBroadcast is the shared state of one parallel BroadcastRTP, it carries the
 // packet and layer so that no closure has to be allocated per packet
-struct RtpBroadcast<'a, T: RtpWriter<P>, P: ?Sized> {
-    down_tracks: &'a [T],
-    pkt: &'a P,
+struct RtpBroadcast<T, P> {
+    down_tracks: Arc<[T]>,
+    pkt: P,
     layer: i32,
     next: atomic::Uint64,
     written: atomic::Int32,
+    wg: WaitGroup,
+    // New: how many workers may still be started, and whether one was started that has not
+    // begun yet (see the header)
+    to_start: atomic::Uint64,
+    starting: atomic::Bool,
 }
 
-impl<T: RtpWriter<P>, P: ?Sized> RtpBroadcast<'_, T, P> {
-    fn run(&self) {
+impl<T, P> RtpBroadcast<T, P>
+where
+    T: RtpWriter<P> + 'static,
+    P: Send + Sync + 'static,
+{
+    fn run(self: &Arc<Self>) {
         let mut written: i32 = 0;
         let end = self.down_tracks.len() as u64;
         loop {
@@ -195,24 +213,46 @@ impl<T: RtpWriter<P>, P: ?Sized> RtpBroadcast<'_, T, P> {
             if n >= end + BROADCAST_STEP {
                 break;
             }
+            if n < end {
+                self.start_worker();
+            }
             let mut i = n - BROADCAST_STEP;
             while i < n && i < end {
                 written = written
-                    .wrapping_add(self.down_tracks[i as usize].write_rtp(self.pkt, self.layer));
+                    .wrapping_add(self.down_tracks[i as usize].write_rtp(&self.pkt, self.layer));
                 i += 1;
             }
         }
         self.written.add(written);
     }
+
+    // New: starts one more worker, unless one is on its way or all were started
+    fn start_worker(self: &Arc<Self>) {
+        if self.starting.load() || !self.starting.cas(false, true) {
+            return;
+        }
+        if self.to_start.load() == 0 {
+            // `starting` stays set: there is nothing more to start
+            return;
+        }
+        self.to_start.dec();
+        let b = self.clone();
+        go(move || {
+            b.wg.add(1);
+            let _done = b.wg.defer_done();
+            b.starting.store(false);
+            b.run();
+        });
+    }
 }
 
 // BroadcastRTP writes pkt to every down track and returns how many accepted it.
-// Below the threshold it runs on the caller without allocating; above it, it
-// starts the workers.
+// Below the threshold it runs on the caller without allocating; above it, the
+// only allocations are the shared state (with a copy of the packet) and the workers.
 pub fn broadcast_rtp<T, P>(d: &DownTrackSpreader<T>, pkt: &P, layer: i32) -> i32
 where
-    T: Sender + RtpWriter<P> + Clone,
-    P: Sync + ?Sized,
+    T: Sender + RtpWriter<P> + Clone + 'static,
+    P: Clone + Send + Sync + 'static,
 {
     let (down_tracks, threshold) = d.snapshot();
     if down_tracks.len() < threshold {
@@ -224,18 +264,20 @@ where
     }
 
     let num_workers = utils::num_cpu().min(down_tracks.len());
-    let b = RtpBroadcast {
-        down_tracks: &down_tracks,
-        pkt,
+    let b = Arc::new(RtpBroadcast {
+        down_tracks,
+        pkt: pkt.clone(),
         layer,
         next: atomic::Uint64::new(0),
         written: atomic::Int32::new(0),
-    };
-    rayon::in_place_scope(|s| {
-        for _ in 0..num_workers {
-            s.spawn(|_| b.run());
-        }
+        wg: WaitGroup::new(),
+        to_start: atomic::Uint64::new(num_workers.saturating_sub(1) as u64),
+        starting: atomic::Bool::new(false),
     });
+    b.run();
+    if b.wg.wait() {
+        panic!("a worker of broadcast_rtp panicked");
+    }
 
     b.written.load()
 }
