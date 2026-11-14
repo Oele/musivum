@@ -198,14 +198,15 @@ lazily is not needed, since the macros do not evaluate values when the level is 
 ## Running things
 
 - Everything cargo runs here (test binaries, `cargo run`) goes through
-  `scripts/capped-run.sh` (`.cargo/config.toml`): 8 GB of address space at most, and for a
-  test binary 30 minutes at most. A loop that allocates without end, by mistake or by a
+  `scripts/capped-run.sh` (`.cargo/config.toml`): 8 GB of memory at most, and for a test
+  binary 30 minutes at most. A loop that allocates without end, by mistake or by a
   mutation made on purpose, then fails instead of taking the machine's memory. It happened:
   a mutation check without a cap had a 45 GB test binary killed by the kernel on a machine
   that also runs a live server.
 - Anything run outside cargo that could run away (a Go harness, a script that replays
-  generated inputs) gets the same by hand: `ulimit -v 8388608` in the shell that starts it,
-  and `timeout`.
+  generated inputs) gets the same by hand: `ulimit -d 8388608` in the shell that starts it
+  (`-d`, not `-v`: a limit on address space keeps programs with many threads from starting
+  them), and `timeout`.
 - Scratch files go in the repository's `target/` or under `~/.cache/musivum`, not in `/tmp`.
 - Test servers listen on the loopback interface, on ephemeral ports or ports from 39000 to
   39999 that are free; never 7880, 7881, 5349, 50000 to 60000 or 38000 to 38999.
