@@ -1,7 +1,129 @@
+diff -ru a/src/peer_connection/mod.rs b/src/peer_connection/mod.rs
+--- a/src/peer_connection/mod.rs
++++ b/src/peer_connection/mod.rs
+@@ -1445,7 +1445,8 @@
+                                 transceiver.set_direction(RTCRtpTransceiverDirection::Recvonly);
+                             }
+ 
+-                            transceiver.set_codec_preferences_from_remote_description(
++                            // musivum's patch: the preferences stay, as pion's do.
++                            transceiver.set_remote_codecs_from_remote_description(
+                                 media,
+                                 &self.media_engine,
+                             )?;
+@@ -1528,10 +1529,9 @@
+ 
+                         transceiver.set_current_direction(direction);
+ 
+-                        transceiver.set_codec_preferences_from_remote_description(
+-                            media,
+-                            &self.media_engine,
+-                        )?;
++                        // musivum's patch: the preferences stay, as pion's do.
++                        transceiver
++                            .set_remote_codecs_from_remote_description(media, &self.media_engine)?;
+                     }
+                 }
+             }
+diff -ru a/src/rtp_transceiver/internal.rs b/src/rtp_transceiver/internal.rs
+--- a/src/rtp_transceiver/internal.rs
++++ b/src/rtp_transceiver/internal.rs
+@@ -4,7 +4,7 @@
+ use crate::rtp_transceiver::rtp_receiver::internal::RTCRtpReceiverInternal;
+ use crate::rtp_transceiver::rtp_sender::internal::RTCRtpSenderInternal;
+ use crate::rtp_transceiver::rtp_sender::rtp_codec::{
+-    CodecMatch, codec_parameters_fuzzy_search, find_rtx_payload_type,
++    CodecMatch, codec_parameters_fuzzy_search, filter_unattached_rtx, find_rtx_payload_type,
+ };
+ use crate::rtp_transceiver::rtp_sender::{RTCRtpCodecParameters, RtpCodecKind};
+ use crate::rtp_transceiver::{
+@@ -225,6 +225,8 @@
+                 return Err(Error::ErrRTPTransceiverCodecUnsupported);
+             }
+         }
++        // musivum's patch: as pion's `RTPTransceiver.SetCodecPreferences` keeps them.
++        let codecs = filter_unattached_rtx(codecs);
+ 
+         if let Some(sender) = self.sender_mut() {
+             sender.set_codec_preferences(codecs.clone());
+@@ -297,6 +299,19 @@
+         media: &MediaDescription,
+         media_engine: &MediaEngine,
+     ) -> Result<()> {
++        let codecs = self.set_remote_codecs_from_remote_description(media, media_engine)?;
++        self.set_codec_preferences(codecs, media_engine)
++    }
++
++    // musivum's patch: a remote description for a transceiver that was there before it keeps
++    // the codec preferences, as pion's does (it sets them only for a transceiver a remote offer
++    // creates, above), where this crate replaced them each time. What the description gives is
++    // what the receiver maps incoming payload types through, and is returned.
++    pub(crate) fn set_remote_codecs_from_remote_description(
++        &mut self,
++        media: &MediaDescription,
++        media_engine: &MediaEngine,
++    ) -> Result<Vec<RTCRtpCodecParameters>> {
+         let mut remote_codecs = codecs_from_media_description(media)?;
+ 
+         // make a copy as this slice is modified
+@@ -387,6 +402,15 @@
+             }
+         }
+ 
+-        self.set_codec_preferences(filtered_codecs, media_engine)
++        // The sender's parameters are made anew with its codecs as they are, as at every remote
++        // description before (what the media engine negotiated may have changed).
++        if let Some(sender) = self.sender_mut() {
++            let send_codecs = sender.get_send_codecs().to_vec();
++            sender.set_codec_preferences(send_codecs);
++        }
++        if let Some(receiver) = self.receiver_mut() {
++            receiver.set_remote_codecs(filtered_codecs.clone());
++        }
++        Ok(filtered_codecs)
+     }
+ }
 diff -ru a/src/rtp_transceiver/rtp_receiver/internal.rs b/src/rtp_transceiver/rtp_receiver/internal.rs
 --- a/src/rtp_transceiver/rtp_receiver/internal.rs
 +++ b/src/rtp_transceiver/rtp_receiver/internal.rs
-@@ -145,7 +145,18 @@
+@@ -7,8 +7,8 @@
+ };
+ use crate::rtp_transceiver::rtp_sender::rtp_capabilities::RTCRtpCapabilities;
+ use crate::rtp_transceiver::rtp_sender::rtp_codec::{
+-    CodecMatch, RtpCodecKind, codec_parameters_fuzzy_search, find_fec_payload_type,
+-    find_rtx_payload_type, is_repair_codec, parse_rtx_apt,
++    CodecMatch, RtpCodecKind, codec_parameters_fuzzy_search, filter_unattached_rtx,
++    find_fec_payload_type, find_rtx_payload_type,
+ };
+ use crate::rtp_transceiver::rtp_sender::rtp_codec_parameters::RTCRtpCodecParameters;
+ use crate::rtp_transceiver::rtp_sender::rtp_coding_parameters::RTCRtpCodingParameters;
+@@ -39,6 +39,9 @@
+ 
+     receive_codings: Vec<RTCRtpCodingParameters>,
+     receive_codecs: Vec<RTCRtpCodecParameters>,
++    // musivum's patch: the codecs the latest remote description gave this receiver's media
++    // section, see `get_codec_preferences`.
++    remote_codecs: Option<Vec<RTCRtpCodecParameters>>,
+ 
+     last_returned_parameters: Option<RTCRtpReceiveParameters>,
+ }
+@@ -54,6 +57,7 @@
+             receive_codings,
+ 
+             receive_codecs: vec![],
++            remote_codecs: None,
+             last_returned_parameters: None,
+         }
+     }
+@@ -138,45 +142,32 @@
+     ) -> Vec<RTCRtpCodecParameters> {
+         let media_engine_codecs = media_engine.get_codecs_by_kind(kind);
+         if codecs.is_empty() {
+-            return media_engine_codecs;
++            return filter_unattached_rtx(media_engine_codecs);
+         }
+         let mut filtered_codecs = vec![];
+         for codec in codecs {
              let (c, match_type) =
                  codec_parameters_fuzzy_search(&codec.rtp_codec, &media_engine_codecs);
              if match_type != CodecMatch::None {
@@ -21,6 +143,71 @@ diff -ru a/src/rtp_transceiver/rtp_receiver/internal.rs b/src/rtp_transceiver/rt
              }
          }
  
+-        // Repair codecs survive the filter. They are not alternative media formats to choose
+-        // between — they accompany whichever primary was chosen — so W3C `setCodecPreferences`
+-        // leaves them in place, and dropping them here would produce an offer no peer can act on:
+-        // an `a=ssrc-group:FEC-FR` naming a repair SSRC with no `a=rtpmap:<pt> flexfec-03/90000`
+-        // to give it a format, and likewise `a=ssrc-group:FID` with no `rtx` codec.
+-        for codec in &media_engine_codecs {
+-            if !is_repair_codec(&codec.rtp_codec)
+-                || filtered_codecs
+-                    .iter()
+-                    .any(|filtered| filtered.payload_type == codec.payload_type)
+-            {
+-                continue;
+-            }
+-
+-            // An RTX codec repairs one specific primary (RFC 4588 `apt`), so it belongs here only
+-            // when that primary survived. FEC and RED are not bound to a payload type and always do.
+-            if let Some(apt) = parse_rtx_apt(&codec.rtp_codec.sdp_fmtp_line)
+-                && !filtered_codecs
+-                    .iter()
+-                    .any(|filtered| filtered.payload_type == apt)
+-            {
+-                continue;
+-            }
+-
+-            filtered_codecs.push(codec.clone());
+-        }
+-
+-        filtered_codecs
++        // musivum's patch: what the preferences leave out stays out, and an RTX whose codec is
++        // not there goes, as pion's `RTPTransceiver.getCodecs` has it; this crate added the
++        // media engine's repair codecs (RTX of a kept codec, FEC, RED) back.
++        filter_unattached_rtx(filtered_codecs)
+     }
+ 
+     pub(crate) fn get_coding_parameters(&self) -> &[RTCRtpCodingParameters] {
+@@ -198,8 +189,14 @@
+         // self.last_returned_parameters = None;
+     }
+ 
++    // musivum's patch: every caller of this function maps incoming payload types through what
++    // it gives. That is the codecs the latest remote description gave this media section (pion
++    // maps them through its media engine, which has what was negotiated), and the preferences
++    // only until there is one, since the preferences no longer follow remote descriptions.
+     pub(crate) fn get_codec_preferences(&self) -> &[RTCRtpCodecParameters] {
+-        &self.receive_codecs
++        self.remote_codecs
++            .as_deref()
++            .unwrap_or(&self.receive_codecs)
+     }
+ 
+     pub(crate) fn set_codec_preferences(&mut self, codecs: Vec<RTCRtpCodecParameters>) {
+@@ -207,6 +204,13 @@
+         self.last_returned_parameters = None;
+     }
+ 
++    // musivum's patch: see `get_codec_preferences`. The parameters are made anew, as at every
++    // remote description before: what the media engine negotiated may have changed.
++    pub(crate) fn set_remote_codecs(&mut self, codecs: Vec<RTCRtpCodecParameters>) {
++        self.remote_codecs = Some(codecs);
++        self.last_returned_parameters = None;
++    }
++
+     pub(crate) fn set_track(&mut self, track: MediaStreamTrack) {
+         self.track = track;
+     }
 diff -ru a/src/rtp_transceiver/rtp_sender/internal.rs b/src/rtp_transceiver/rtp_sender/internal.rs
 --- a/src/rtp_transceiver/rtp_sender/internal.rs
 +++ b/src/rtp_transceiver/rtp_sender/internal.rs
@@ -45,3 +232,45 @@ diff -ru a/src/rtp_transceiver/rtp_sender/internal.rs b/src/rtp_transceiver/rtp_
  
              self.last_returned_parameters = Some(RTCRtpSendParameters {
                  rtp_parameters,
+diff -ru a/src/rtp_transceiver/rtp_sender/rtp_codec.rs b/src/rtp_transceiver/rtp_sender/rtp_codec.rs
+--- a/src/rtp_transceiver/rtp_sender/rtp_codec.rs
++++ b/src/rtp_transceiver/rtp_sender/rtp_codec.rs
+@@ -254,21 +254,23 @@
+         .find_map(|value| value.trim().parse::<PayloadType>().ok())
+ }
+ 
+-/// Whether `codec` repairs another stream rather than carrying media of its own.
+-///
+-/// Covers retransmission (RTX, RFC 4588) and forward error correction (FlexFEC, ULPFEC, RED).
+-/// These are not alternative media formats a peer chooses between — they accompany whichever
+-/// primary codec was chosen — which is why codec preferences leave them in place. See
+-/// [setCodecPreferences](https://www.w3.org/TR/webrtc/#dom-rtcrtptransceiver-setcodecpreferences):
+-///
+-/// > Codecs of type RTX, RED and FEC are always supported […] and are not affected by this method.
+-pub(crate) fn is_repair_codec(codec: &RTCRtpCodec) -> bool {
+-    let mime_type = codec.mime_type.to_lowercase();
+-    let subtype = mime_type
+-        .split_once('/')
+-        .map_or(mime_type.as_str(), |(_, subtype)| subtype);
+-
+-    matches!(subtype, "rtx" | "ulpfec" | "red") || subtype.starts_with("flexfec")
++/// musivum's patch: pion's `filterUnattachedRTX`, which takes the RTX codecs whose primary
++/// codec (their `apt`) is not among `codecs` away. It takes the place of `is_repair_codec`,
++/// with which the transceiver's codecs added the media engine's repair codecs (RTX, FEC, RED)
++/// to codec preferences that left them out; pion adds nothing.
++pub(crate) fn filter_unattached_rtx(
++    mut codecs: Vec<RTCRtpCodecParameters>,
++) -> Vec<RTCRtpCodecParameters> {
++    let payload_types: Vec<PayloadType> = codecs.iter().map(|c| c.payload_type).collect();
++    codecs.retain(|codec| {
++        !codec
++            .rtp_codec
++            .mime_type
++            .eq_ignore_ascii_case(MIME_TYPE_RTX)
++            || parse_rtx_apt(&codec.rtp_codec.sdp_fmtp_line)
++                .is_some_and(|apt| payload_types.contains(&apt))
++    });
++    codecs
+ }
+ 
+ // For now, only FlexFEC is supported.

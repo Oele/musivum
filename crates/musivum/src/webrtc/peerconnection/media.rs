@@ -364,10 +364,9 @@ impl RtpSender {
     /// transmission of media on the sender's track.
     ///
     /// The codecs are the transceiver's, as pion's: its codec preferences, or the media
-    /// engine's codecs of its kind where none are set (`rtc` sets them from the other side's
-    /// description at each negotiation, so after one they are what was negotiated). The
-    /// header extensions are those of its kind; the one encoding has the SSRC and that of the
-    /// retransmission stream.
+    /// engine's codecs of its kind where none are set (after a negotiation, what was
+    /// negotiated). The header extensions are those of its kind; the one encoding has the SSRC
+    /// and that of the retransmission stream.
     pub fn get_parameters(&self) -> RtpSendParameters {
         let Some(pc) = self.pc.upgrade() else {
             return RtpSendParameters::default();

@@ -4,7 +4,7 @@ use crate::peer_connection::sdp::codecs_from_media_description;
 use crate::rtp_transceiver::rtp_receiver::internal::RTCRtpReceiverInternal;
 use crate::rtp_transceiver::rtp_sender::internal::RTCRtpSenderInternal;
 use crate::rtp_transceiver::rtp_sender::rtp_codec::{
-    CodecMatch, codec_parameters_fuzzy_search, find_rtx_payload_type,
+    CodecMatch, codec_parameters_fuzzy_search, filter_unattached_rtx, find_rtx_payload_type,
 };
 use crate::rtp_transceiver::rtp_sender::{RTCRtpCodecParameters, RtpCodecKind};
 use crate::rtp_transceiver::{
@@ -225,6 +225,8 @@ impl RTCRtpTransceiverInternal {
                 return Err(Error::ErrRTPTransceiverCodecUnsupported);
             }
         }
+        // musivum's patch: as pion's `RTPTransceiver.SetCodecPreferences` keeps them.
+        let codecs = filter_unattached_rtx(codecs);
 
         if let Some(sender) = self.sender_mut() {
             sender.set_codec_preferences(codecs.clone());
@@ -297,6 +299,19 @@ impl RTCRtpTransceiverInternal {
         media: &MediaDescription,
         media_engine: &MediaEngine,
     ) -> Result<()> {
+        let codecs = self.set_remote_codecs_from_remote_description(media, media_engine)?;
+        self.set_codec_preferences(codecs, media_engine)
+    }
+
+    // musivum's patch: a remote description for a transceiver that was there before it keeps
+    // the codec preferences, as pion's does (it sets them only for a transceiver a remote offer
+    // creates, above), where this crate replaced them each time. What the description gives is
+    // what the receiver maps incoming payload types through, and is returned.
+    pub(crate) fn set_remote_codecs_from_remote_description(
+        &mut self,
+        media: &MediaDescription,
+        media_engine: &MediaEngine,
+    ) -> Result<Vec<RTCRtpCodecParameters>> {
         let mut remote_codecs = codecs_from_media_description(media)?;
 
         // make a copy as this slice is modified
@@ -387,6 +402,15 @@ impl RTCRtpTransceiverInternal {
             }
         }
 
-        self.set_codec_preferences(filtered_codecs, media_engine)
+        // The sender's parameters are made anew with its codecs as they are, as at every remote
+        // description before (what the media engine negotiated may have changed).
+        if let Some(sender) = self.sender_mut() {
+            let send_codecs = sender.get_send_codecs().to_vec();
+            sender.set_codec_preferences(send_codecs);
+        }
+        if let Some(receiver) = self.receiver_mut() {
+            receiver.set_remote_codecs(filtered_codecs.clone());
+        }
+        Ok(filtered_codecs)
     }
 }

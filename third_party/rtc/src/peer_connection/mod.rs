@@ -1445,7 +1445,8 @@ impl RTCPeerConnection {
                                 transceiver.set_direction(RTCRtpTransceiverDirection::Recvonly);
                             }
 
-                            transceiver.set_codec_preferences_from_remote_description(
+                            // musivum's patch: the preferences stay, as pion's do.
+                            transceiver.set_remote_codecs_from_remote_description(
                                 media,
                                 &self.media_engine,
                             )?;
@@ -1528,10 +1529,9 @@ impl RTCPeerConnection {
 
                         transceiver.set_current_direction(direction);
 
-                        transceiver.set_codec_preferences_from_remote_description(
-                            media,
-                            &self.media_engine,
-                        )?;
+                        // musivum's patch: the preferences stay, as pion's do.
+                        transceiver
+                            .set_remote_codecs_from_remote_description(media, &self.media_engine)?;
                     }
                 }
             }

@@ -863,15 +863,17 @@ impl PeerConnection {
     /// `codecs`, with the header extensions that were negotiated for media of its kind.
     ///
     /// `rtc` keeps its media engine to itself. What it shows of it is what a receiver or a
-    /// sender has: the codecs of its media section as they were negotiated (`rtc` sets them
-    /// from the other side's description), and the header extensions of its kind. So the
+    /// sender has: the codecs of its media section (the transceiver's: what was negotiated,
+    /// unless codec preferences are set), and the header extensions of its kind. So the
     /// media sections are asked, video before audio as the media engine looks, each where it
-    /// receives if it does and where it sends otherwise. That differs from pion's in three ways:
+    /// receives if it does and where it sends otherwise. That differs from pion's in four ways:
     /// [`Error::CodecNotFound`] until a remote description was set (pion's falls back on
     /// what was registered) and for a payload type that no media section of the connection
     /// has; the header extensions are those of the direction that was asked (pion's gives
     /// them for both; they differ only where an extension was registered for one direction);
-    /// and a media section whose transceiver was stopped does not answer.
+    /// a media section whose transceiver was stopped does not answer; and one whose
+    /// transceiver has codec preferences answers with the preferred codec (pion's with the
+    /// negotiated one, which may differ in its fmtp line and feedback).
     pub fn get_rtp_parameters_by_payload_type(
         &self,
         payload_type: u8,
