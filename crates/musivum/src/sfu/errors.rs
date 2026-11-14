@@ -18,4 +18,20 @@ pub enum Error {
     DuplicatePacket,
     #[error("padding cannot send on non-frame boundary")]
     PaddingNotOnFrameBoundary,
+
+    // receiver_base.go
+    #[error("receiver closed")]
+    ReceiverClosed,
+
+    // redreceiver.go: a `fmt.Errorf` there, with the size of the payload that does not fit
+    #[error("red payload don't have enough space, needsize {0}")]
+    RedPayloadNoSpace(usize),
+
+    // errors of other packages that redreceiver.go and redprimaryreceiver.go pass on
+    #[error(transparent)]
+    Bucket(#[from] crate::mediatransportutil::bucket::Error),
+    #[error(transparent)]
+    Red(#[from] crate::mediatransportutil::red::Error),
+    #[error(transparent)]
+    Rtp(#[from] crate::webrtc::rtp::Error),
 }
