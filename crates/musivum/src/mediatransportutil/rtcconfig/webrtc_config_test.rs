@@ -468,17 +468,138 @@ fn test_host_candidate_ips() {
 }
 
 #[test]
+fn test_node_addresses() {
+    // New for musivum: the addresses the node listens at, a socket each, and what each is
+    // advertised as: those a UDP mux of the original listens on, IPv6 among them, as the
+    // filters leave them.
+    let ifaces = [
+        iface("lo", true, true, &["127.0.0.1", "::1"]),
+        iface(
+            "eth0",
+            true,
+            false,
+            &["192.0.2.10", "2001:db8::10", "fe80::1"],
+        ),
+        iface("docker0", true, false, &["172.17.0.1", "fd00::1"]),
+    ];
+    let both = [NetworkType::Udp4, NetworkType::Udp6];
+    let addresses = |if_filter: Option<&InterfaceFilter>,
+                     ip_filter: Option<&IpFilter>,
+                     nat_1to1_ips: &[&str],
+                     include_internal|
+     -> Vec<(IpAddr, Vec<IpAddr>)> {
+        let local = local_interfaces(&ifaces, if_filter, ip_filter, &both, false);
+        let rules = nat_1to1_address_rewrite_rules(&strings(nat_1to1_ips), include_internal);
+        node_addresses(&local, &rules)
+            .unwrap()
+            .into_iter()
+            .map(|a| (a.local, a.advertised))
+            .collect()
+    };
+    let as_is = |a: &str| (ips(&[a])[0], ips(&[a]));
+
+    // Both families, each address as it is.
+    assert_eq!(
+        vec![
+            as_is("192.0.2.10"),
+            as_is("2001:db8::10"),
+            as_is("172.17.0.1"),
+            as_is("fd00::1")
+        ],
+        addresses(None, None, &[], false)
+    );
+
+    // An address set by hand for each family stands for the local addresses of its
+    // family; one for IPv4 only leaves the IPv6 addresses as they are.
+    let v4 = |local: &str, external: &str| (ips(&[local])[0], ips(&[external]));
+    assert_eq!(
+        vec![
+            v4("192.0.2.10", "203.0.113.5"),
+            v4("2001:db8::10", "2001:db8::5"),
+            v4("172.17.0.1", "203.0.113.5"),
+            v4("fd00::1", "2001:db8::5")
+        ],
+        addresses(None, None, &["203.0.113.5", "2001:db8::5"], false)
+    );
+    assert_eq!(
+        vec![
+            v4("192.0.2.10", "203.0.113.5"),
+            as_is("2001:db8::10"),
+            v4("172.17.0.1", "203.0.113.5"),
+            as_is("fd00::1")
+        ],
+        addresses(None, None, &["203.0.113.5"], false)
+    );
+    // With the local address advertised too.
+    assert_eq!(
+        (
+            ips(&["2001:db8::10"])[0],
+            ips(&["2001:db8::10", "2001:db8::5"])
+        ),
+        addresses(None, None, &["2001:db8::5"], true)[1]
+    );
+
+    // The filters: on addresses (IPv6 left out, or only it), and on interfaces.
+    let no_ipv6 = ip_filter_from_conf(&IpsConfig {
+        excludes: strings(&["::/0"]),
+        ..Default::default()
+    })
+    .unwrap();
+    assert_eq!(
+        vec![as_is("192.0.2.10"), as_is("172.17.0.1")],
+        addresses(None, Some(&no_ipv6), &[], false)
+    );
+    let only_ipv6 = ip_filter_from_conf(&IpsConfig {
+        includes: strings(&["2001:db8::/32"]),
+        ..Default::default()
+    })
+    .unwrap();
+    assert_eq!(
+        vec![as_is("2001:db8::10")],
+        addresses(None, Some(&only_ipv6), &[], false)
+    );
+    let no_docker = interface_filter_from_conf(&InterfacesConfig {
+        excludes: strings(&["docker0"]),
+        ..Default::default()
+    });
+    assert_eq!(
+        vec![as_is("192.0.2.10"), as_is("2001:db8::10")],
+        addresses(Some(&no_docker), None, &[], false)
+    );
+
+    // A local address a rule takes away has no socket.
+    let rules = [IceAddressRewriteRule {
+        local: "172.17.0.1".to_string(),
+        as_candidate_type: IceCandidateType::Host,
+        mode: IceAddressRewriteMode::Replace,
+        ..Default::default()
+    }];
+    assert_eq!(
+        vec![ips(&["192.0.2.10"])[0], ips(&["fd00::1"])[0]],
+        node_addresses(&ips(&["192.0.2.10", "172.17.0.1", "fd00::1"]), &rules)
+            .unwrap()
+            .into_iter()
+            .map(|a| a.local)
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
 fn test_new_webrtc_config_development() {
     // New for musivum: a configuration with nothing set, validated for development.
     let conf = new_webrtc_config(&loopback_only(validated(true)), true).unwrap();
 
-    // The node's socket: the port of `udp_port` on all IPv4 addresses, and the local
-    // addresses as they are.
+    // The node's sockets: the port of `udp_port` at each local address, which is advertised
+    // as it is.
+    assert_eq!(UdpPorts::Ports(vec![7882]), conf.node_config.udp_ports);
+    assert!(conf.node_config.standalone_udp_ports.is_empty());
     assert_eq!(
-        "0.0.0.0:7882".parse::<SocketAddr>().unwrap(),
-        conf.node_config.bind_address
+        vec![NodeAddress {
+            local: ips(&["127.0.0.1"])[0],
+            advertised: ips(&["127.0.0.1"]),
+        }],
+        conf.node_config.addresses
     );
-    assert_eq!(ips(&["127.0.0.1"]), conf.node_config.nat_1to1_ips);
     assert!(conf.nat_1to1_ips.is_empty());
     assert!(!conf.use_mdns);
 
@@ -551,13 +672,22 @@ fn test_new_webrtc_config_options() {
     rtc_conf.relay_acceptance_min_wait = Duration::from_millis(400);
     let conf = new_webrtc_config(&rtc_conf, false).unwrap();
 
-    // The first port of the range, and the address set by hand in the place of the local
-    // one.
+    // Ports of the range, and the address set by hand in the place of the local one.
     assert_eq!(
-        "0.0.0.0:50000".parse::<SocketAddr>().unwrap(),
-        conf.node_config.bind_address
+        UdpPorts::Range {
+            start: 50000,
+            end: 60000,
+            count: num_cpu(),
+        },
+        conf.node_config.udp_ports
     );
-    assert_eq!(ips(&["203.0.113.5"]), conf.node_config.nat_1to1_ips);
+    assert_eq!(
+        vec![NodeAddress {
+            local: ips(&["127.0.0.1"])[0],
+            advertised: ips(&["203.0.113.5"]),
+        }],
+        conf.node_config.addresses
+    );
     // Only what STUN found is kept here.
     assert!(conf.nat_1to1_ips.is_empty());
     assert!(conf.use_mdns);
@@ -605,9 +735,9 @@ fn test_new_webrtc_config_options() {
     );
     assert!(s.lite);
 
-    // The layer's engine has the settings the layer has, the TCP network types among them:
-    // the node's TCP listener (`new_node`) gives a connection with them its passive TCP
-    // candidates.
+    // The layer's engine has the settings the layer has, the network types of both
+    // protocols and both families among them: the node's TCP listeners (`new_node`) give a
+    // connection with the TCP ones its passive TCP candidates.
     assert_eq!(
         vec![
             NetworkType::Udp4,
@@ -642,17 +772,17 @@ fn test_new_webrtc_config_options() {
     let conf = new_webrtc_config(&rtc_conf, false).unwrap();
     assert_eq!(
         ips(&["127.0.0.1", "203.0.113.5"]),
-        conf.node_config.nat_1to1_ips
+        conf.node_config.addresses[0].advertised
     );
     assert_eq!(
         IceAddressRewriteMode::Append,
         conf.setting_engine.ice_address_rewrite_rules[0].mode
     );
 
-    // Without the loopback address there is nothing to advertise.
+    // Without the loopback address there is nothing to listen at.
     rtc_conf.enable_loopback_candidate = false;
     let conf = new_webrtc_config(&rtc_conf, false).unwrap();
-    assert!(conf.node_config.nat_1to1_ips.is_empty());
+    assert!(conf.node_config.addresses.is_empty());
     assert!(!conf.setting_engine.include_loopback_candidate);
 }
 
@@ -662,23 +792,42 @@ fn test_new_webrtc_config_ports() {
 
     // Neither a port nor a range (not validated): any port.
     let conf = new_webrtc_config(&loopback_only(RtcConfig::default()), true).unwrap();
-    assert_eq!(0, conf.node_config.bind_address.port());
+    assert_eq!(UdpPorts::Ports(vec![0]), conf.node_config.udp_ports);
     assert_eq!(None, conf.setting_engine.ephemeral_udp_port_range);
 
-    // Of a range in `udp_port`, the first port.
+    // Of a range in `udp_port`, the first ports, as many as the machine has processors; and
+    // with `use_stun_port_as_ice` the STUN port at each address besides.
     let mut rtc_conf = loopback_only(RtcConfig::default());
     rtc_conf.udp_port = PortRange {
         start: 7882,
         end: 7890,
     };
+    rtc_conf.use_stun_port_as_ice = true;
     let conf = new_webrtc_config(&rtc_conf, true).unwrap();
-    assert_eq!(7882, conf.node_config.bind_address.port());
+    assert_eq!(
+        UdpPorts::Ports((7882..=7890).take(num_cpu()).collect()),
+        conf.node_config.udp_ports
+    );
+    assert_eq!(vec![3478], conf.node_config.standalone_udp_ports);
+    // One port, as one.
+    rtc_conf.udp_port.end = 0;
+    let conf = new_webrtc_config(&rtc_conf, true).unwrap();
+    assert_eq!(UdpPorts::Ports(vec![7882]), conf.node_config.udp_ports);
 
-    // A range comes before a port, as in the original.
+    // A range comes before a port, as in the original, and the STUN port is then not
+    // bound either.
     rtc_conf.ice_port_range_start = 40000;
     rtc_conf.ice_port_range_end = 40100;
     let conf = new_webrtc_config(&rtc_conf, true).unwrap();
-    assert_eq!(40000, conf.node_config.bind_address.port());
+    assert_eq!(
+        UdpPorts::Range {
+            start: 40000,
+            end: 40100,
+            count: num_cpu(),
+        },
+        conf.node_config.udp_ports
+    );
+    assert!(conf.node_config.standalone_udp_ports.is_empty());
     assert_eq!(
         Some((40000, 40100)),
         conf.setting_engine.ephemeral_udp_port_range
@@ -716,7 +865,7 @@ fn test_new_webrtc_config_ports() {
     );
     rtc_conf.tcp_port = 7881;
     let conf = new_webrtc_config(&rtc_conf, true).unwrap();
-    assert_eq!(0, conf.node_config.bind_address.port());
+    assert_eq!(UdpPorts::Ports(vec![0]), conf.node_config.udp_ports);
     assert_eq!(7881, conf.tcp_port);
     assert_eq!(
         vec![NetworkType::Tcp4, NetworkType::Tcp6],
@@ -731,7 +880,7 @@ fn test_new_webrtc_config_ports() {
     // A TCP port beside UDP.
     rtc_conf.force_tcp = false;
     let conf = new_webrtc_config(&rtc_conf, true).unwrap();
-    assert_eq!(7882, conf.node_config.bind_address.port());
+    assert_eq!(UdpPorts::Ports(vec![7882]), conf.node_config.udp_ports);
     assert_eq!(7881, conf.tcp_port);
     assert_eq!(
         vec![
@@ -781,9 +930,13 @@ fn test_new_node_listens_on_the_tcp_port() {
     rtc_conf.udp_port = PortRange::default();
     rtc_conf.tcp_port = u32::from(free_port);
     let mut conf = new_webrtc_config(&rtc_conf, true).unwrap();
-    conf.node_config.bind_address = "127.0.0.1:0".parse().unwrap();
+    // On the loopback address only, on a UDP port of the system's choosing.
+    assert_eq!(UdpPorts::Ports(vec![0]), conf.node_config.udp_ports);
     let node = conf.new_node().unwrap();
-    assert_eq!(free_port, node.tcp_local_addr().unwrap().port());
+    assert_eq!(
+        vec![SocketAddr::new(Ipv4Addr::LOCALHOST.into(), free_port)],
+        node.tcp_local_addrs()
+    );
 
     conf.tcp_port = 0;
     let node = conf.new_node().unwrap();
@@ -799,16 +952,12 @@ fn test_new_webrtc_config_says_what_is_not_applied() {
     rtc_conf.use_stun_port_as_ice = true;
     rtc_conf.batch_io.batch_size = 16;
     rtc_conf.sctp_min_cwnd = 3;
+    rtc_conf.udp_port.end = 7890;
+    rtc_conf.interfaces.excludes = strings(&["docker0"]);
     let log = capture_log(Level::WARN, || {
         new_webrtc_config(&rtc_conf, true).unwrap();
     });
-    for option in [
-        "use_stun_port_as_ice",
-        "batch_io",
-        "sctp_min_cwnd",
-        "ips",
-        "stun_servers",
-    ] {
+    for option in ["batch_io", "sctp_min_cwnd", "stun_servers"] {
         assert!(
             log.lines().any(
                 |line| line.contains("rtc option is accepted but not applied")
@@ -821,14 +970,24 @@ fn test_new_webrtc_config_says_what_is_not_applied() {
         "tcp_port",
         "force_tcp",
         "use_mdns",
-        "port_range_start",
+        "use_stun_port_as_ice",
+        "udp_port",
+        "ips",
         "interfaces",
+        "IPv6",
     ] {
         assert!(
             !log.contains(&format!("option=\"{option}")),
             "{option} is in:\n{log}"
         );
     }
+    // Nor is a range of ports.
+    rtc_conf.ice_port_range_start = 40000;
+    rtc_conf.ice_port_range_end = 40100;
+    let log = capture_log(Level::WARN, || {
+        new_webrtc_config(&rtc_conf, false).unwrap();
+    });
+    assert!(!log.contains("option=\"port_range_start"), "{log}");
 }
 
 #[test]
@@ -865,11 +1024,14 @@ fn test_new_webrtc_config_external_ip() {
         }],
         conf.setting_engine.ice_address_rewrite_rules
     );
+    assert_eq!(UdpPorts::Ports(vec![port]), conf.node_config.udp_ports);
     assert_eq!(
-        SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port),
-        conf.node_config.bind_address
+        vec![NodeAddress {
+            local: Ipv4Addr::LOCALHOST.into(),
+            advertised: ips(&["127.0.0.1"]),
+        }],
+        conf.node_config.addresses
     );
-    assert_eq!(ips(&["127.0.0.1"]), conf.node_config.nat_1to1_ips);
     assert!(conf.ice_servers.is_empty());
     assert!(conf.setting_engine.lite);
 
@@ -895,10 +1057,10 @@ fn test_new_webrtc_config_external_ip() {
     );
     assert_eq!("", conf.setting_engine.ice_address_rewrite_rules[0].local);
 
-    // What comes out is what a node is made from: on the loopback interface here, where
-    // the configuration has all addresses.
+    // What comes out is what a node is made from: on a port of the system's choosing here,
+    // where the configuration has the port the external address was asked from.
     let node = Node::new(NodeConfig {
-        bind_address: SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0),
+        udp_ports: UdpPorts::default(),
         ..conf.node_config
     })
     .unwrap();

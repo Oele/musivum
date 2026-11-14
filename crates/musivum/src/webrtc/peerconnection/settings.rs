@@ -87,15 +87,16 @@ pub struct SettingEngine {
     /// A client's connection, as in the layer's tests, sets it. Nothing happens without a TCP
     /// type in `network_types` (when that is not empty).
     pub active_tcp: bool,
-    /// The addresses this connection gives as host candidates, each with the port of the
-    /// node's socket, when they are not the node's own: what pion's agent makes of
-    /// `SetICEAddressRewriteRules`, `SetIPFilter` and `SetInterfaceFilter` on the copy of the
-    /// engine a connection is made from (LiveKit gives some clients the external addresses
-    /// only). `None`: the node's ([`Node::candidates`](super::Node::candidates)).
+    /// The addresses this connection gives as host candidates, when they are not the node's
+    /// own: what pion's agent makes of `SetICEAddressRewriteRules`, `SetIPFilter` and
+    /// `SetInterfaceFilter` on the copy of the engine a connection is made from (LiveKit
+    /// gives some clients the external addresses only). `None`: the node's
+    /// ([`Node::candidates`](super::Node::candidates)).
     ///
-    /// The node's socket is the same for every connection: an address here has to be one
-    /// that reaches it. Addresses of a family the node has no socket for are left out, and
-    /// with none left the connection advertises nothing.
+    /// Each is given with the port of every socket of the node the connection has that can
+    /// be reached at it: one the node advertises it for, or one bound to it. An address no
+    /// socket can be reached at is left out, and with none left the connection advertises
+    /// nothing.
     pub host_candidate_ips: Option<Vec<IpAddr>>,
 }
 

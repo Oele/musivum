@@ -10,8 +10,9 @@
 //   `host_candidate_ips` works out the addresses a connection made from a changed copy
 //   advertises (the layer gathers nothing, so the filters and the rewrite rules are applied
 //   here).
-// - `WebRTCConfig.UDPMux` is `node_config`: what the node's one socket is made from. No
-//   socket is bound here; `Node::new` does that. The addresses the node advertises are
+// - `WebRTCConfig.UDPMux` is `node_config`: what the node's sockets are made from, a socket
+//   at each local address for each port, as `CreateUDPMuxesFromPorts` binds them. No socket
+//   is bound here; `Node::new` does that. The addresses and what each is advertised as are
 //   worked out here once (`node_config_for`), as pion's agent works them out for every
 //   connection from the mux's addresses and the rewrite rules. `local_interfaces` is the
 //   function of that name in pkg/transport/ip.go of the same module (which addresses the
@@ -19,6 +20,11 @@
 //   `evaluateRewriteRules` of pion/ice do (gather.go and external_ip_mapper.go at
 //   livekit/ice v4.4.0-warp.3, MIT) for the rules this package makes, so an address in a
 //   rule that is none is refused here and not when the first connection gathers.
+//   `NewMultiPortsUDPMux` (pkg/transport/udpmultimux.go), which gives each connection one
+//   port of a range at each address in turn and the standalone port 3478 besides, is the
+//   node's (`UdpPorts`, `standalone_udp_ports`). With `port_range_start`/`port_range_end`
+//   pion opens a port of the range for every connection; the node binds ports of the range
+//   as for `udp_port` and gives them out the same way (see `new_webrtc_config`).
 // - `WebRTCConfig.Configuration` is `ice_servers`, the one thing the original sets in it
 //   besides the SDP semantics, which are always unified plan in `rtc`. They go into the
 //   layer's `Configuration.ice_servers`.
@@ -41,7 +47,9 @@ use rand::RngExt;
 
 use crate::go::time::Duration;
 use crate::protocol::logger;
-use crate::webrtc::peerconnection::{IceServer, Node, NodeConfig, SettingEngine};
+use crate::webrtc::peerconnection::{
+    IceServer, Node, NodeAddress, NodeConfig, SettingEngine, UdpPorts,
+};
 use crate::{infow, warnw};
 
 use super::config::{DEFAULT_UDP_BUFFER_SIZE, parse_ip};
@@ -68,9 +76,9 @@ pub struct WebRtcConfig {
     /// (`Configuration.ice_servers`) and gathers nothing from them.
     pub ice_servers: Vec<IceServer>,
     pub setting_engine: SettingEngineConfig,
-    /// What the node's socket is made from (`Node::new`): it stands where `UDPMux` did.
+    /// What the node's sockets are made from (`Node::new`): it stands where `UDPMux` did.
     pub node_config: NodeConfig,
-    /// The port of the node's TCP listener for ICE over TCP (`rtc.tcp_port`), where the
+    /// The port of the node's TCP listeners for ICE over TCP (`rtc.tcp_port`), where the
     /// original opens its `TCPMux`; 0 for none. [`WebRtcConfig::new_node`] passes it on.
     pub tcp_port: u16,
     pub nat_1to1_ips: Vec<String>,
@@ -78,8 +86,8 @@ pub struct WebRtcConfig {
 }
 
 impl WebRtcConfig {
-    /// The node the connections of this configuration run on: its UDP socket, and its TCP
-    /// listener when `tcp_port` is set. Upstream `NewWebRTCConfig` opens both itself; here
+    /// The node the connections of this configuration run on: its UDP sockets, and its TCP
+    /// listeners when `tcp_port` is set. Upstream `NewWebRTCConfig` opens both itself; here
     /// whoever owns the connections makes the node once, from this.
     pub fn new_node(&self) -> std::io::Result<Node> {
         if self.tcp_port != 0 {
@@ -110,7 +118,8 @@ pub struct SettingEngineConfig {
     pub ice_multicast_dns_mode: MulticastDnsMode,
     /// `SetICEAddressRewriteRules`. They are used where the node's addresses are chosen.
     pub ice_address_rewrite_rules: Vec<IceAddressRewriteRule>,
-    /// `SetEphemeralUDPPortRange`. The layer has one socket for all connections.
+    /// `SetEphemeralUDPPortRange`. Kept as data: the node's sockets are bound on ports of
+    /// the range (`node_config.udp_ports`), not one for each connection.
     pub ephemeral_udp_port_range: Option<(u16, u16)>,
     /// `SetNetworkTypes`.
     pub network_types: Vec<NetworkType>,
@@ -145,9 +154,10 @@ impl SettingEngineConfig {
 
     /// The layer's `SettingEngine` with what the layer has of these settings: ICE lite, the
     /// mDNS mode, the waits before a candidate pair is accepted, the largest SCTP message,
-    /// and the network types (a connection with the TCP ones has passive TCP candidates on
-    /// the node's TCP listener, when the node has one). The caller goes on from there with the
-    /// settings of its own (the layer's engine is data too).
+    /// and the network types (UDP and TCP, IPv4 and IPv6: a connection advertises the node's
+    /// candidates of these types only, the passive TCP ones when the node has TCP
+    /// listeners). The caller goes on from there with the settings of its own (the layer's
+    /// engine is data too).
     ///
     /// A connection made with it advertises the node's addresses. For a copy of these
     /// settings whose filters or rewrite rules were changed for one connection, the addresses
@@ -169,8 +179,8 @@ impl SettingEngineConfig {
 
     /// The addresses a connection made from these settings gives as host candidates: what
     /// pion's agent makes of the addresses of the UDP mux with this engine's filters and
-    /// rewrite rules. For the settings `new_webrtc_config` made they are the node's
-    /// (`node_config.nat_1to1_ips`, which has the IPv4 ones). It asks the system for its
+    /// rewrite rules. For the settings `new_webrtc_config` made they are the node's (the
+    /// `advertised` addresses of `node_config.addresses`). It asks the system for its
     /// interfaces.
     pub fn host_candidate_ips(&self) -> Result<Vec<IpAddr>, Error> {
         host_candidate_ips_of(self, self.include_loopback_candidate)
@@ -212,26 +222,26 @@ fn not_applied(option: &str, value: &dyn fmt::Debug, reason: &str) {
 ///
 /// | option | here |
 /// |---|---|
-/// | `udp_port` | the port of the node's socket (`node_config.bind_address`); of a range the first port only (logged) |
-/// | `port_range_start`, `port_range_end` | kept (`setting_engine.ephemeral_udp_port_range`) and logged: the node has one socket for all connections, bound to the first port of the range |
-/// | `tcp_port` | the port of the node's TCP listener (`tcp_port`, made by `new_node`); the TCP network types |
+/// | `udp_port` | the ports of the node's sockets (`node_config.udp_ports`): of a range the first ones, as many as the machine has processors, each connection given one of them at each address in turn |
+/// | `port_range_start`, `port_range_end` | kept (`setting_engine.ephemeral_udp_port_range`); the node binds the first ports of the range that are free, as many as the machine has processors, and gives them out as for `udp_port`, where pion opens a port of the range for every connection |
+/// | `tcp_port` | the port of the node's TCP listeners (`tcp_port`, made by `new_node`); the TCP network types |
 /// | `force_tcp` | the UDP network types are left out, as in the original; without `tcp_port` it is the original's error |
-/// | `use_stun_port_as_ice` | logged: no second socket on port 3478 |
+/// | `use_stun_port_as_ice` | with `udp_port`: a socket on port 3478 at each address besides, whose candidates every connection has (`node_config.standalone_udp_ports`) |
 /// | `node_ip` | set by hand: the address every local address is advertised as (a rewrite rule for all); found by `validate`: as below |
 /// | `use_external_ip`, `stun_servers`, `skip_external_ip_validation` | the external address of every local address is asked from the STUN servers and advertised in its place (`nat_1to1_ips`, a rewrite rule each) |
 /// | `advertise_internal_ip` | the rewrite rules append: the local address is advertised too |
 /// | `external_ip_only` | the IP filter keeps only local IPv4 addresses that have an external one |
 /// | `require_ipv4` | in `validate` only, as in the original |
-/// | `interfaces`, `ips` | which local addresses are advertised and asked about; logged: the socket itself listens on all addresses |
-/// | `enable_loopback_candidate` | loopback addresses are advertised too |
+/// | `interfaces`, `ips` | which local addresses the node listens at (a socket at each) and advertises, and which are asked about |
+/// | `enable_loopback_candidate` | loopback addresses are listened at and advertised too |
 /// | `use_ice_lite` | `setting_engine.lite`, to the layer |
 /// | `use_mdns` | off: `rtc` is told to drop mDNS candidates, and `use_mdns` is there for the server to drop them from what it signals; on: logged, the node gives the answer to an mDNS query to no connection |
 /// | `stun_servers` as the ICE servers of a server that is not ICE lite and has no address set | kept (`ice_servers`) and logged: the connections gather no server reflexive candidates |
 /// | `batch_io` | logged: the node writes every datagram at once |
 /// | `sctp_min_cwnd`, `sctp_fast_rtx_wnd`, `sctp_cwnd_ca_step` | kept and logged: `rtc` has no such settings |
 /// | `host_acceptance_min_wait` and the three like it | to the layer |
-/// | (no option) the buffers of 16 MiB on the socket | logged: the node's socket has the system's |
-/// | (no option) IPv6 | logged when there are such addresses: the node's socket is IPv4 |
+/// | (no option) the buffers of 16 MiB on the socket | logged: the node's sockets have the system's |
+/// | (no option) IPv6 | the local IPv6 addresses the original's mux keeps are listened at and advertised like the IPv4 ones |
 #[cfg_attr(not(unix), allow(unused_variables))]
 pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebRtcConfig, Error> {
     let logger = logger::get_logger();
@@ -268,7 +278,6 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
     if !rtc_conf.interfaces.includes.is_empty() || !rtc_conf.interfaces.excludes.is_empty() {
         if_filter = Some(interface_filter_from_conf(&rtc_conf.interfaces));
         s.interface_filter = if_filter.clone();
-        not_applied("interfaces", &rtc_conf.interfaces, FILTER_NOT_ON_SOCKET);
     }
 
     let mut ip_filter: Option<IpFilter> = None;
@@ -276,7 +285,6 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
         let filter = ip_filter_from_conf(&rtc_conf.ips)?;
         ip_filter = Some(filter.clone());
         s.ip_filter = Some(filter);
-        not_applied("ips", &rtc_conf.ips, FILTER_NOT_ON_SOCKET);
     }
 
     if !rtc_conf.use_mdns {
@@ -323,10 +331,11 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
 
     let mut network_types = Vec::with_capacity(4);
 
-    // The port of the node's socket. With neither a port nor a range (a configuration that
-    // was not validated) pion takes any port, and so does the node. With TCP forced the
-    // node still has its UDP socket, on any port, and no connection gathers on it.
-    let mut port: u16 = 0;
+    // The ports of the node's sockets. With neither a port nor a range (a configuration
+    // that was not validated) pion takes any port, and so does the node. With TCP forced
+    // the node still has its UDP sockets, on any port, and no connection gathers on them.
+    let mut udp_ports = UdpPorts::default();
+    let mut standalone_udp_ports = Vec::new();
     if !rtc_conf.force_tcp {
         network_types.extend([NetworkType::Udp4, NetworkType::Udp6]);
         if rtc_conf.ice_port_range_start != 0 && rtc_conf.ice_port_range_end != 0 {
@@ -334,18 +343,18 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
                 rtc_conf.ice_port_range_start as u16,
                 rtc_conf.ice_port_range_end as u16,
             )?;
-            port = rtc_conf.ice_port_range_start as u16;
-            not_applied(
-                "port_range_start, port_range_end",
-                &(rtc_conf.ice_port_range_start, rtc_conf.ice_port_range_end),
-                "the node has one socket for all connections: it is bound to the first port of the range",
-            );
+            // pion opens a port of the range for every connection; the node binds the
+            // first ports of it that are free, as many as for a range of `udp_port`
+            udp_ports = UdpPorts::Range {
+                start: rtc_conf.ice_port_range_start as u16,
+                end: rtc_conf.ice_port_range_end as u16,
+                count: num_cpu(),
+            };
         } else if rtc_conf.udp_port.valid() {
-            port = u16::try_from(rtc_conf.udp_port.start).map_err(|_| Error::Port)?;
             not_applied(
                 "the socket buffers of the UDP mux",
                 &DEFAULT_UDP_BUFFER_SIZE,
-                "the node's socket keeps the sizes the system gives it",
+                "the node's sockets keep the sizes the system gives them",
             );
             if rtc_conf.batch_io.batch_size > 0 {
                 not_applied(
@@ -354,20 +363,18 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
                     "the node writes every datagram at once",
                 );
             }
-            if rtc_conf.udp_port.to_slice().len() > 1 {
-                not_applied(
-                    "udp_port",
-                    &rtc_conf.udp_port,
-                    "the node has one socket: of a range of ports the first is used",
-                );
+            let available_ports = rtc_conf.udp_port.to_slice();
+
+            let mut ports = Vec::with_capacity(available_ports.len());
+            let mut i = 0;
+            while i < num_cpu() && i < available_ports.len() {
+                ports.push(u16::try_from(available_ports[i]).map_err(|_| Error::Port)?);
+                i += 1;
             }
+            udp_ports = UdpPorts::Ports(ports);
 
             if rtc_conf.use_stun_port_as_ice {
-                not_applied(
-                    "use_stun_port_as_ice",
-                    &rtc_conf.use_stun_port_as_ice,
-                    "the node has one socket: none is bound to port 3478",
-                );
+                standalone_udp_ports = vec![3478];
             }
 
             #[cfg(unix)]
@@ -376,7 +383,12 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
             }
         }
     }
-    let node_config = node_config_for(&s, port, rtc_conf.enable_loopback_candidate)?;
+    let node_config = node_config_for(
+        &s,
+        udp_ports,
+        standalone_udp_ports,
+        rtc_conf.enable_loopback_candidate,
+    )?;
 
     // use TCP mux when it's set
     let mut tcp_port: u16 = 0;
@@ -441,38 +453,62 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
 }
 
 const NO_SCTP_SETTING: &str = "the WebRTC library has no such setting";
-const FILTER_NOT_ON_SOCKET: &str =
-    "only in part: it chooses the addresses that are advertised, the node's socket listens on all";
 
-/// What the node's socket is made from: bound to all IPv4 addresses on `port`, advertising
-/// the addresses pion's agent would give as host candidates on a UDP mux made with these
-/// settings.
+/// Go's `runtime.NumCPU()`: how many ports of a range the node binds.
+fn num_cpu() -> usize {
+    std::thread::available_parallelism().map_or(1, |n| n.get())
+}
+
+/// What the node's sockets are made from: the local addresses a UDP mux of the original made
+/// with these settings listens on (`CreateUDPMuxesFromPorts`, IPv4 and IPv6), each with the
+/// addresses pion's agent gives as host candidates for it, and the ports.
 fn node_config_for(
     s: &SettingEngineConfig,
-    port: u16,
+    udp_ports: UdpPorts,
+    standalone_udp_ports: Vec<u16>,
     include_loopback: bool,
 ) -> Result<NodeConfig, Error> {
-    let candidates = host_candidate_ips_of(s, include_loopback)?;
-    let (v4, v6): (Vec<IpAddr>, Vec<IpAddr>) = candidates.into_iter().partition(IpAddr::is_ipv4);
-    if !v6.is_empty() {
-        not_applied(
-            "IPv6 addresses",
-            &v6,
-            "the node has one socket, for IPv4: these addresses are not advertised",
-        );
-    }
-    if v4.is_empty() {
+    let local_ips = local_interfaces(
+        &interfaces()?,
+        s.interface_filter.as_ref(),
+        s.ip_filter.as_ref(),
+        &[NetworkType::Udp4, NetworkType::Udp6],
+        include_loopback,
+    );
+    let addresses = node_addresses(&local_ips, &s.ice_address_rewrite_rules)?;
+    if addresses.is_empty() {
         warnw!(
             logger::get_logger(),
-            "the node has no IPv4 address to advertise",
+            "the node has no address to listen at",
             nil
         );
     }
     Ok(NodeConfig {
-        bind_address: SocketAddr::new(Ipv4Addr::UNSPECIFIED.into(), port),
-        nat_1to1_ips: v4,
+        addresses,
+        udp_ports,
+        standalone_udp_ports,
         logger: logger::get_logger(),
     })
+}
+
+/// The addresses the node listens at, each with what pion's agent advertises for it under
+/// these rules. A local address a rule takes away has no candidate, and is left out.
+fn node_addresses(
+    local_ips: &[IpAddr],
+    rules: &[IceAddressRewriteRule],
+) -> Result<Vec<NodeAddress>, Error> {
+    let mut addresses = Vec::with_capacity(local_ips.len());
+    for local in local_ips {
+        let advertised = host_candidate_ips(std::slice::from_ref(local), rules)?;
+        if advertised.is_empty() {
+            continue;
+        }
+        addresses.push(NodeAddress {
+            local: local.to_canonical(),
+            advertised,
+        });
+    }
+    Ok(addresses)
 }
 
 /// The host candidates of a UDP mux made with these settings, of both families.

@@ -1892,13 +1892,19 @@ async fn test_settings_per_connection() {
     let unused: std::net::IpAddr = "127.0.0.9".parse().unwrap();
     let own: std::net::IpAddr = "127.0.0.1".parse().unwrap();
     let node = Node::new(NodeConfig {
-        nat_1to1_ips: vec![unused, own],
+        addresses: vec![NodeAddress {
+            local: own,
+            advertised: vec![unused, own],
+        }],
         ..Default::default()
     })
     .unwrap();
     let port = node.local_addr().port();
     assert_eq!(
-        node.candidates_for(&["::1".parse().unwrap(), own]),
+        node.connection_candidates(Some(&["::1".parse().unwrap(), own]))
+            .iter()
+            .map(|c| c.addr)
+            .collect::<Vec<_>>(),
         vec![SocketAddr::new(own, port)]
     );
 
@@ -3262,3 +3268,6 @@ async fn test_codec_preferences_leave_repair_codecs_out() {
 
 #[path = "tcp_test.rs"]
 mod tcp_test;
+
+#[path = "ports_test.rs"]
+mod ports_test;

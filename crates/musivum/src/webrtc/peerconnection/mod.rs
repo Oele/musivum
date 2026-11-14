@@ -9,10 +9,11 @@
 //!
 //! # How it runs
 //!
-//! - A [`Node`] has one UDP socket for all its connections. One task reads it and gives each
-//!   datagram to the connection it belongs to, through a queue per connection. A node may
-//!   also have a TCP listener ([`Node::new_with_tcp`]): a stream is given to the connection
-//!   its first binding request names, and its packets go through the same queue.
+//! - A [`Node`] has UDP sockets that all its connections share: one at each of its addresses,
+//!   IPv4 and IPv6, for each of its ports. A task for each reads it and gives each datagram
+//!   to the connection it belongs to, through a queue per connection. A node may also have
+//!   TCP listeners ([`Node::new_with_tcp`]): a stream is given to the connection its first
+//!   binding request names, and its packets go through the same queue.
 //! - Every [`PeerConnection`] has a task of its own on `crate::go::time::runtime()`. It
 //!   takes the datagrams from the queue, drives the timers of `rtc`, and makes all the calls
 //!   out of the connection: the callbacks set with `on_...`, the sink, `bind` and `unbind` of
@@ -29,9 +30,11 @@
 //!
 //! - A connection has to be closed ([`PeerConnection::close`]); dropping the last handle
 //!   closes it too, unless a callback holds a handle.
-//! - Gathering is over at once: the candidates are the node's addresses, or the addresses
-//!   the connection was given in their place ([`SettingEngine::host_candidate_ips`]), over
-//!   UDP and, on a node with a TCP listener, as passive TCP candidates; active TCP
+//! - Gathering is over at once: the candidates are the node's addresses (with the port of
+//!   each socket the connection is given, [`UdpPorts`]), or the addresses the connection was
+//!   given in their place ([`SettingEngine::host_candidate_ips`]), over UDP and, on a node
+//!   with TCP listeners, as passive TCP candidates, of the network types the settings
+//!   allow; active TCP
 //!   candidates only where the settings ask for them ([`SettingEngine::active_tcp`]). ICE
 //!   servers are taken ([`Configuration::ice_servers`]) and nothing is asked of them: a
 //!   connection has no server reflexive and no relayed candidates of its own.
@@ -110,12 +113,12 @@ use crate::webrtc::{
 use crate::{debugw, warnw};
 
 use self::media::SenderContext;
-use self::node::{ConnectionGuard, Datagram};
+use self::node::{ConnectionGuard, Datagram, HostCandidate};
 use self::tap::{Captured, Inbox, Tap};
 
 pub use self::datachannel::{DataChannel, DataChannelInit, DataChannelMessage};
 pub use self::media::{RtpReceiver, RtpSender, RtpTransceiver, RtpTransceiverInit, TrackRemote};
-pub use self::node::{Node, NodeConfig, NodeStats};
+pub use self::node::{Node, NodeAddress, NodeConfig, NodeStats, UdpPorts};
 pub use self::settings::SettingEngine;
 
 /// pion's `DataChannelState`.
@@ -182,7 +185,7 @@ pub struct Configuration {
     pub setting_engine: SettingEngine,
     /// pion's `Configuration.ICEServers`. The URLs are checked when the connection is made
     /// and kept ([`PeerConnection::ice_servers`]). Nothing is gathered from them: the
-    /// connection's candidates are host candidates on the node's socket.
+    /// connection's candidates are host candidates on the node's sockets.
     pub ice_servers: Vec<IceServer>,
     /// Where received packets go. It can also be set later with
     /// [`PeerConnection::set_packet_sink`], but what arrives before is lost.
@@ -331,11 +334,12 @@ pub(crate) struct Inner {
     node: Node,
     pub(crate) logger: Logger,
     pub(crate) this: Weak<Inner>,
-    // The addresses this connection advertises: the node's, or its own.
-    host_candidates: Vec<SocketAddr>,
-    // The same with the port of the node's TCP listener: its passive TCP candidates. Empty
-    // when the node has no TCP listener or the settings leave TCP out.
-    tcp_host_candidates: Vec<SocketAddr>,
+    // The addresses this connection advertises over UDP, each with the node's socket behind
+    // it: the node's, or its own.
+    host_candidates: Vec<HostCandidate>,
+    // The same at the node's TCP listeners: its passive TCP candidates. Empty when the node
+    // has no TCP listener or the settings leave TCP out.
+    tcp_host_candidates: Vec<HostCandidate>,
     // Whether the connection has active TCP candidates, and dials.
     active_tcp: bool,
     core: Mutex<Core>,
@@ -384,23 +388,24 @@ impl PeerConnection {
             .with_interceptor_registry(registry)
             .build(Instant::now())?;
 
-        let host_candidates = match &config.setting_engine.host_candidate_ips {
-            Some(ips) => {
-                let candidates = node.candidates_for(ips);
-                if candidates.len() < ips.len() {
-                    warnw!(config.logger, "not every address of the connection can be advertised", nil,
-                        "addresses" => ips,
-                        "candidates" => candidates);
-                }
-                candidates
-            }
-            None => node.candidates(),
-        };
+        let ips = config.setting_engine.host_candidate_ips.as_deref();
+        let host_candidates = node.connection_candidates(ips);
+        if let Some(ips) = ips
+            && ips.iter().any(|ip| {
+                !host_candidates
+                    .iter()
+                    .any(|c| c.addr.ip() == ip.to_canonical())
+            })
+        {
+            warnw!(config.logger, "not every address of the connection can be advertised", nil,
+                "addresses" => ips,
+                "candidates" => host_candidates.iter().map(|c| c.addr).collect::<Vec<_>>());
+        }
         let tcp = tcp_allowed(&config.setting_engine.network_types);
-        let tcp_host_candidates = match &config.setting_engine.host_candidate_ips {
-            _ if !tcp => Vec::new(),
-            Some(ips) => node.tcp_candidates_for(ips),
-            None => node.tcp_candidates(),
+        let tcp_host_candidates = if tcp {
+            node.connection_tcp_candidates(ips)
+        } else {
+            Vec::new()
         };
         let active_tcp = tcp && config.setting_engine.active_tcp;
 
@@ -621,8 +626,9 @@ impl PeerConnection {
     /// sends on, `None` while it has none (before it connects, after a restart or a failure
     /// until it has connected again, and when the connection is closed).
     ///
-    /// The local candidate of a connection on a node that advertises several addresses is the
-    /// first of them, whichever the client sent to: the node has one socket for them all.
+    /// The local candidate of a connection on a node that advertises several addresses for
+    /// one socket (a local address and an external one) is the first of them, whichever the
+    /// client sent to: they are one socket.
     pub fn get_selected_candidate_pair(&self) -> Option<IceCandidatePair> {
         self.inner()
             .read(|core| selected_candidate_pair(core).flatten())
@@ -1051,12 +1057,25 @@ impl Inner {
         }
     }
 
-    /// Pushes the datagrams `rtc` wants sent into the socket.
+    /// Pushes the datagrams `rtc` wants sent into the sockets of the candidates they are sent
+    /// from.
     fn flush(&self, core: &mut Core) {
         while let Some(datagram) = core.rtc.poll_write() {
+            let listener = self.listener_of(&datagram.transport);
             self.node
-                .send(self.id, &datagram.transport, &datagram.message);
+                .send(self.id, listener, &datagram.transport, &datagram.message);
         }
+    }
+
+    /// The node's UDP socket behind the candidate a datagram is sent from.
+    fn listener_of(&self, transport: &TransportContext) -> Option<usize> {
+        if transport.transport_protocol != TransportProtocol::UDP {
+            return None;
+        }
+        self.host_candidates
+            .iter()
+            .find(|c| c.addr == transport.local_addr)
+            .map(|c| c.listener)
     }
 
     fn take_inbox(&self, core: &mut Core, at: Time) {
@@ -1274,21 +1293,23 @@ impl Inner {
             core.ice_gathering_state = IceGatheringState::Gathering;
             core.out
                 .push(Delivery::IceGatheringState(IceGatheringState::Gathering));
-            for addr in &self.host_candidates {
+            // Each is given to `rtc`, whose agent drops those of a network type the settings
+            // leave out (an IPv6 one without `Udp6` or `Tcp6`, as pion's agent gathers none).
+            for c in &self.host_candidates {
                 core.rtc
-                    .add_local_candidate(host_candidate(*addr, TcpType::Unspecified)?)?;
+                    .add_local_candidate(host_candidate(c.addr, TcpType::Unspecified)?)?;
             }
-            for addr in &self.tcp_host_candidates {
+            for c in &self.tcp_host_candidates {
                 core.rtc
-                    .add_local_candidate(host_candidate(*addr, TcpType::Passive)?)?;
+                    .add_local_candidate(host_candidate(c.addr, TcpType::Passive)?)?;
             }
             if self.active_tcp {
                 // One for each address of the connection, with the port that says it has
                 // none (RFC 6544): it dials from one of the system's choosing.
                 let mut ips: Vec<IpAddr> = Vec::new();
-                for addr in &self.host_candidates {
-                    if !ips.contains(&addr.ip()) {
-                        ips.push(addr.ip());
+                for c in &self.host_candidates {
+                    if !ips.contains(&c.addr.ip()) {
+                        ips.push(c.addr.ip());
                     }
                 }
                 for ip in ips {
@@ -1420,27 +1441,26 @@ impl Inner {
     }
 
     /// The address `rtc` is told a datagram arrived at. Its ICE agent takes a datagram only
-    /// at an address that is a candidate of the connection, so for a connection with
-    /// addresses of its own it is the first of those on the socket the datagram came in on.
+    /// at an address that is a candidate of the connection, so it is the connection's first
+    /// candidate at the socket or listener the datagram came in at. At one where the
+    /// connection has none (another port of the node's, which the connection was not given)
+    /// it is the socket's own, which the agent does not take, as pion's mux gives such a
+    /// datagram to no connection.
     ///
     /// A packet on a TCP stream the connection dialled arrived at its active candidate (the
     /// node keeps that address with the stream), which the agent knows by its IP address.
     fn local_addr_of(&self, datagram: &Datagram) -> SocketAddr {
+        let Some(listener) = datagram.listener else {
+            return datagram.local;
+        };
         let candidates = match datagram.protocol {
-            TransportProtocol::TCP if datagram.local.port() == tcp::ACTIVE_TCP_PORT => {
-                return datagram.local;
-            }
             TransportProtocol::TCP => &self.tcp_host_candidates,
             _ => &self.host_candidates,
         };
-        if candidates.contains(&datagram.local) {
-            return datagram.local;
-        }
         candidates
             .iter()
-            .find(|c| c.port() == datagram.local.port() && c.is_ipv4() == datagram.local.is_ipv4())
-            .copied()
-            .unwrap_or(datagram.local)
+            .find(|c| c.listener == listener)
+            .map_or(datagram.local, |c| c.addr)
     }
 
     /// Tells what there is to tell. Only the connection's task calls this, so it is one at a

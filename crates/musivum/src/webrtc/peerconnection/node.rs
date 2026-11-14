@@ -1,8 +1,25 @@
-//! The sockets of a node: one UDP socket that all its peer connections share.
+//! The sockets of a node, which all its peer connections share.
 //!
 //! It stands for what LiveKit sets up in `pkg/rtc/config.go` and pion does underneath: a UDP
-//! mux on one port (`rtc.udp_port`), host candidates for the node's address (`node_ip`), no
-//! gathering.
+//! mux (`rtc.udp_port`), host candidates for the node's addresses (`node_ip`), no gathering.
+//!
+//! # Sockets
+//!
+//! A node listens at each of its addresses ([`NodeConfig::addresses`]), IPv4 and IPv6 alike,
+//! with a socket of its own for each address, as LiveKit's UDP mux does
+//! (`CreateUDPMuxesFromPorts` binds every local address it keeps): what a connection sends
+//! then leaves from the address the other side sent to. One socket on all addresses would
+//! answer from whichever address the system picks for the way back, and on a host with
+//! several addresses that is not always the one the client knows; a client takes no answer
+//! from an address it did not send to (RFC 8445, 7.2.5.2.1), and neither does a node, which
+//! routes by address.
+//!
+//! At each address there is a socket for each port of [`NodeConfig::udp_ports`]; with more
+//! than one port, every new connection is given one of them at each address, in turn
+//! (LiveKit's `udp_port` as a range, `NewMultiPortsUDPMux`), so that the connections spread
+//! over the sockets and the tasks that read them. The sockets on the standalone ports
+//! ([`NodeConfig::standalone_udp_ports`], LiveKit's `use_stun_port_as_ice`) are every
+//! connection's.
 //!
 //! How a datagram finds its connection (pion's `UDPMux` does the same):
 //!
@@ -18,20 +35,19 @@
 //! A node can therefore have many connections that are spoken to, but of connections that
 //! speak first only one per remote address: their answers carry no name.
 //!
-//! One task reads the socket and does nothing but route: each connection has a queue of its
-//! own and a task that empties it, so connections do not wait for each other and their work
-//! spreads over the runtime's threads. Writing does not go through a task at all: a
-//! connection pushes its datagrams into the socket from whatever thread it is called on.
-//!
-//! A node has a list of listeners with one entry. A second socket (IPv6) is another entry:
-//! outgoing datagrams already name the local address and protocol they are for
-//! ([`Node::send`]), incoming ones the listener they came in on.
+//! A task for each socket reads it and does nothing but route: each connection has a queue
+//! of its own and a task that empties it, so connections do not wait for each other and
+//! their work spreads over the runtime's threads. Writing does not go through a task at all:
+//! a connection pushes its datagrams into the socket of the candidate they are sent from,
+//! from whatever thread it is called on. The routing is the node's, over all its sockets:
+//! a binding request finds its connection whichever socket it came in on, and the connection
+//! tells `rtc` it arrived at its candidate on that socket.
 //!
 //! # ICE over TCP
 //!
 //! A node made with [`Node::new_with_tcp`] also listens on a TCP port (LiveKit's
-//! `rtc.tcp_port`, pion's TCP mux), and its connections advertise passive TCP host candidates
-//! on it. A stream is given to a connection once, by the user name of the binding request
+//! `rtc.tcp_port`, pion's TCP mux), at each of its addresses, and its connections advertise
+//! passive TCP host candidates on it. A stream is given to a connection once, by the user name of the binding request
 //! that is its first frame, and everything that comes on it after that is the connection's;
 //! a stream whose first frame is no such request, or is too long, or comes too late, is
 //! closed. What a connection sends over TCP goes to the stream it has with that address. A
@@ -69,31 +85,96 @@ pub(crate) const CONNECTION_QUEUE: usize = 1024;
 /// What a node is made from.
 #[derive(Clone, Debug)]
 pub struct NodeConfig {
-    /// The address and port the UDP socket is bound to. Port 0 lets the system choose.
-    pub bind_address: SocketAddr,
-    /// The addresses given to clients as host candidates, with the socket's port: LiveKit's
-    /// `node_ip`, pion's "NAT 1:1" addresses. Empty: the address the socket is bound to.
-    pub nat_1to1_ips: Vec<IpAddr>,
+    /// The addresses the node listens at, each with what clients are told for it. Each has
+    /// sockets of its own: one for each port of `udp_ports` and of `standalone_udp_ports`,
+    /// and a TCP listener on a node made with [`Node::new_with_tcp`].
+    pub addresses: Vec<NodeAddress>,
+    /// The ports of the UDP sockets at each address.
+    pub udp_ports: UdpPorts,
+    /// Ports on which there is a UDP socket at each address besides, whose candidates every
+    /// connection has: LiveKit's `use_stun_port_as_ice` (3478). 0 lets the system choose.
+    pub standalone_udp_ports: Vec<u16>,
     pub logger: Logger,
 }
 
 impl Default for NodeConfig {
-    /// The loopback interface and a port of the system's choosing, which is what tests want.
+    /// The IPv4 loopback address and a port of the system's choosing, which is what tests
+    /// want.
     fn default() -> Self {
         NodeConfig {
-            bind_address: SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 0),
-            nat_1to1_ips: Vec::new(),
+            addresses: vec![NodeAddress::new(IpAddr::V4(Ipv4Addr::LOCALHOST))],
+            udp_ports: UdpPorts::default(),
+            standalone_udp_ports: Vec::new(),
             logger: logger::get_logger(),
         }
     }
+}
+
+/// An address a node listens at.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeAddress {
+    /// The address the sockets are bound to. The unspecified address of a family binds them
+    /// to every address of that family, and an answer then leaves from the address the
+    /// system chooses; such an address needs addresses to advertise.
+    pub local: IpAddr,
+    /// The addresses given to clients for it as host candidates, each with the port of each
+    /// socket: LiveKit's `node_ip`, pion's "NAT 1:1" addresses (the rewrite rules for host
+    /// candidates). Empty: `local` itself.
+    pub advertised: Vec<IpAddr>,
+}
+
+impl NodeAddress {
+    /// An address that is advertised as it is.
+    pub fn new(local: IpAddr) -> NodeAddress {
+        NodeAddress {
+            local,
+            advertised: Vec::new(),
+        }
+    }
+}
+
+/// The ports of a node's UDP sockets at each of its addresses.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum UdpPorts {
+    /// A socket on each of these ports; 0 lets the system choose one. A port that cannot be
+    /// bound is an error. With more than one, each connection is given one of the sockets at
+    /// each address, in turn: LiveKit's `udp_port` as a range, of which it binds as many
+    /// ports as the machine has processors.
+    Ports(Vec<u16>),
+    /// Sockets on the first `count` ports from `start` to `end` (both included) that can be
+    /// bound, each connection given one of them at each address, in turn: LiveKit's
+    /// `port_range_start` and `port_range_end`, where pion opens a port of the range for
+    /// every connection. A port that cannot be bound is passed over, as pion passes over
+    /// the ports of the range that are taken; none at all is an error.
+    Range { start: u16, end: u16, count: usize },
+}
+
+impl Default for UdpPorts {
+    /// One socket, on a port of the system's choosing.
+    fn default() -> Self {
+        UdpPorts::Ports(vec![0])
+    }
+}
+
+/// A host candidate of a connection: an address it is advertised at, and the socket (UDP)
+/// or listener (TCP) behind it, by its number on the node.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct HostCandidate {
+    pub(crate) addr: SocketAddr,
+    pub(crate) listener: usize,
 }
 
 /// A datagram on its way to a connection.
 pub(crate) struct Datagram {
     pub(crate) data: BytesMut,
     pub(crate) from: SocketAddr,
-    /// The address `rtc` is told it arrived at: the first candidate of the listener.
+    /// The address `rtc` is told it arrived at when the connection has no candidate at its
+    /// listener: the first candidate of the listener, or for a stream the connection
+    /// dialled, its active candidate.
     pub(crate) local: SocketAddr,
+    /// The UDP socket or TCP listener it came in at, by its number; none for a stream the
+    /// connection dialled.
+    pub(crate) listener: Option<usize>,
     pub(crate) protocol: TransportProtocol,
     /// When it was read from the socket.
     pub(crate) at: Time,
@@ -121,19 +202,38 @@ pub struct NodeStats {
     pub tcp_streams_refused: u64,
 }
 
+/// A UDP socket of the node.
 struct Listener {
-    socket: Arc<UdpSocket>,
-    protocol: TransportProtocol,
+    // The same socket for writing, as the system's: tokio's `try_send_to` does not try
+    // before the runtime has seen the socket writable, which a socket that was just bound
+    // has not always been, and a datagram would be lost that the system takes.
+    sender: std::net::UdpSocket,
     local_addr: SocketAddr,
     /// What clients are told: the advertised addresses with the socket's port.
     candidates: Vec<SocketAddr>,
 }
 
-/// The TCP listener of a node, as the connections see it.
+/// A TCP listener of the node, as the connections see it.
 struct TcpListenerInfo {
     local_addr: SocketAddr,
     /// The passive candidates: the advertised addresses with the listener's port.
     candidates: Vec<SocketAddr>,
+}
+
+/// The sockets of one address on the ports of `udp_ports`, by their numbers, and which of
+/// them the next connection is given.
+struct PortGroup {
+    listeners: Vec<usize>,
+    next: AtomicUsize,
+}
+
+/// Whether a connection can be reached at `ip` through a socket bound at `local` that is
+/// advertised as `candidates`: it is one of those, or the bound address, or of the family of
+/// a socket bound to all addresses of a family.
+fn reachable_at(ip: IpAddr, local: SocketAddr, candidates: &[SocketAddr]) -> bool {
+    candidates.iter().any(|c| c.ip() == ip)
+        || local.ip() == ip
+        || (local.ip().is_unspecified() && local.is_ipv4() == ip.is_ipv4())
 }
 
 #[derive(Clone)]
@@ -173,8 +273,15 @@ struct Routes {
 
 struct NodeInner {
     logger: Logger,
+    // The UDP sockets, in the order of the addresses: at each, the ports of `udp_ports`,
+    // then the standalone ports.
     listeners: Vec<Listener>,
-    tcp: Option<TcpListenerInfo>,
+    // For each address, its sockets on the ports of `udp_ports`.
+    groups: Vec<PortGroup>,
+    // The sockets on the standalone ports, which every connection has.
+    standalone: Vec<usize>,
+    // The TCP listeners, one for each address; none without a TCP port.
+    tcp: Vec<TcpListenerInfo>,
     routes: RwLock<Routes>,
     next_id: AtomicU64,
     next_stream: AtomicU64,
@@ -209,11 +316,13 @@ pub struct Node {
 }
 
 /// The runtime that reads sockets. `crate::go::time::runtime()` may be one without I/O (the
-/// library's own, for callers on plain threads), so reading has a thread of its own.
+/// library's own, for callers on plain threads), so reading has threads of its own: as many
+/// as the machine has processors, so that the sockets of a node with several ports are read
+/// at the same time.
 fn io_runtime() -> &'static tokio::runtime::Runtime {
     static RUNTIME: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
         tokio::runtime::Builder::new_multi_thread()
-            .worker_threads(1)
+            .worker_threads(std::thread::available_parallelism().map_or(1, |n| n.get()))
             .thread_name("musivum-net")
             .enable_io()
             .enable_time()
@@ -224,61 +333,94 @@ fn io_runtime() -> &'static tokio::runtime::Runtime {
 }
 
 impl Node {
-    /// Binds the socket and starts reading it.
+    /// Binds the sockets and starts reading them.
     pub fn new(config: NodeConfig) -> io::Result<Node> {
         Node::open(config, None)
     }
 
-    /// Binds the socket and a TCP listener for ICE over TCP on the same address, at
-    /// `tcp_port` (LiveKit's `rtc.tcp_port`; 0 lets the system choose), and starts reading
-    /// both. The node's connections advertise passive TCP candidates with the listener's port
-    /// at the addresses they advertise for UDP, unless their settings leave TCP out
-    /// ([`SettingEngine::network_types`](super::SettingEngine::network_types)).
+    /// Binds the sockets and a TCP listener for ICE over TCP at each address, on `tcp_port`
+    /// (LiveKit's `rtc.tcp_port`; 0 lets the system choose, for each address its own), and
+    /// starts reading them. The node's connections advertise passive TCP candidates with a
+    /// listener's port at the addresses they advertise for it, unless their settings leave
+    /// TCP out ([`SettingEngine::network_types`](super::SettingEngine::network_types)).
     pub fn new_with_tcp(config: NodeConfig, tcp_port: u16) -> io::Result<Node> {
         Node::open(config, Some(tcp_port))
     }
 
     fn open(config: NodeConfig, tcp_port: Option<u16>) -> io::Result<Node> {
-        let ips = if config.nat_1to1_ips.is_empty() {
-            if config.bind_address.ip().is_unspecified() {
-                return Err(io::Error::new(
-                    io::ErrorKind::InvalidInput,
-                    "a socket bound to all addresses needs an address to advertise",
-                ));
+        if config.addresses.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a node needs an address to listen at",
+            ));
+        }
+        let mut listeners = Vec::new();
+        let mut sockets = Vec::new();
+        let mut groups = Vec::new();
+        let mut standalone = Vec::new();
+        let mut tcp = Vec::new();
+        let mut tcp_listeners = Vec::new();
+        let mut bind = |local: SocketAddr, ips: &[IpAddr]| -> io::Result<usize> {
+            let (socket, listener) = bind_udp(local, ips)?;
+            debugw!(config.logger, "node socket bound", "address" => listener.local_addr, "candidates" => listener.candidates);
+            sockets.push(socket);
+            listeners.push(listener);
+            Ok(listeners.len() - 1)
+        };
+        for address in &config.addresses {
+            let ips = if address.advertised.is_empty() {
+                if address.local.is_unspecified() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidInput,
+                        "a socket bound to all addresses needs an address to advertise",
+                    ));
+                }
+                vec![address.local]
+            } else {
+                address.advertised.clone()
+            };
+
+            let mut group = Vec::new();
+            match &config.udp_ports {
+                UdpPorts::Ports(ports) => {
+                    for port in ports {
+                        group.push(bind(SocketAddr::new(address.local, *port), &ips)?);
+                    }
+                }
+                UdpPorts::Range { start, end, count } => {
+                    let mut last_err = None;
+                    for port in *start..=*end {
+                        if group.len() >= (*count).max(1) {
+                            break;
+                        }
+                        match bind(SocketAddr::new(address.local, port), &ips) {
+                            Ok(listener) => group.push(listener),
+                            Err(err) => last_err = Some(err),
+                        }
+                    }
+                    if group.is_empty() {
+                        return Err(last_err.unwrap_or_else(|| {
+                            io::Error::new(io::ErrorKind::InvalidInput, "the port range is empty")
+                        }));
+                    }
+                }
             }
-            vec![config.bind_address.ip()]
-        } else {
-            config.nat_1to1_ips.clone()
-        };
+            groups.push(PortGroup {
+                listeners: group,
+                next: AtomicUsize::new(0),
+            });
+            for port in &config.standalone_udp_ports {
+                standalone.push(bind(SocketAddr::new(address.local, *port), &ips)?);
+            }
 
-        let socket = std::net::UdpSocket::bind(config.bind_address)?;
-        socket.set_nonblocking(true)?;
-        let local_addr = socket.local_addr()?;
-        let socket = {
-            let _guard = io_runtime().enter();
-            Arc::new(UdpSocket::from_std(socket)?)
-        };
-        let listener = Listener {
-            socket: socket.clone(),
-            protocol: TransportProtocol::UDP,
-            local_addr,
-            candidates: ips
-                .iter()
-                .map(|ip| SocketAddr::new(*ip, local_addr.port()))
-                .collect(),
-        };
-        debugw!(config.logger, "node socket bound", "address" => local_addr, "candidates" => listener.candidates);
-
-        let mut tcp_listener = None;
-        let tcp = match tcp_port {
-            Some(port) => {
+            if let Some(port) = tcp_port {
                 let std_listener =
-                    std::net::TcpListener::bind(SocketAddr::new(config.bind_address.ip(), port))?;
+                    std::net::TcpListener::bind(SocketAddr::new(address.local, port))?;
                 std_listener.set_nonblocking(true)?;
                 let local_addr = std_listener.local_addr()?;
-                tcp_listener = {
+                let listener = {
                     let _guard = io_runtime().enter();
-                    Some(TcpListener::from_std(std_listener)?)
+                    TcpListener::from_std(std_listener)?
                 };
                 let info = TcpListenerInfo {
                     local_addr,
@@ -288,15 +430,23 @@ impl Node {
                         .collect(),
                 };
                 debugw!(config.logger, "node TCP listener bound", "address" => local_addr, "candidates" => info.candidates);
-                Some(info)
+                tcp_listeners.push(listener);
+                tcp.push(info);
             }
-            None => None,
-        };
+        }
+        if listeners.is_empty() {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "a node needs a UDP port",
+            ));
+        }
 
         let shutdown = CancellationToken::new();
         let inner = Arc::new(NodeInner {
             logger: config.logger,
-            listeners: vec![listener],
+            listeners,
+            groups,
+            standalone,
             tcp,
             routes: RwLock::new(Routes::default()),
             next_id: AtomicU64::new(1),
@@ -312,58 +462,107 @@ impl Node {
             tcp_streams_closed: AtomicU64::new(0),
             tcp_streams_refused: AtomicU64::new(0),
         });
-        io_runtime().spawn(receive(socket, 0, Arc::downgrade(&inner), shutdown.clone()));
-        if let Some(tcp_listener) = tcp_listener {
-            io_runtime().spawn(accept(tcp_listener, Arc::downgrade(&inner), shutdown));
+        for (i, socket) in sockets.into_iter().enumerate() {
+            io_runtime().spawn(receive(socket, i, Arc::downgrade(&inner), shutdown.clone()));
+        }
+        for (i, listener) in tcp_listeners.into_iter().enumerate() {
+            io_runtime().spawn(accept(
+                listener,
+                i,
+                Arc::downgrade(&inner),
+                shutdown.clone(),
+            ));
         }
         Ok(Node { inner })
     }
 
-    /// The address the UDP socket is bound to.
+    /// The address the first UDP socket is bound to.
     pub fn local_addr(&self) -> SocketAddr {
         self.inner.listeners[0].local_addr
     }
 
-    /// The address the TCP listener is bound to, if the node has one.
-    pub fn tcp_local_addr(&self) -> Option<SocketAddr> {
-        self.inner.tcp.as_ref().map(|tcp| tcp.local_addr)
+    /// The addresses all UDP sockets are bound to, in the order of the node's addresses: at
+    /// each, the ports of `udp_ports`, then the standalone ports.
+    pub fn local_addrs(&self) -> Vec<SocketAddr> {
+        self.inner.listeners.iter().map(|l| l.local_addr).collect()
     }
 
-    /// The host candidates of this node: what a client is told to send to over UDP.
+    /// The address the first TCP listener is bound to, if the node has one.
+    pub fn tcp_local_addr(&self) -> Option<SocketAddr> {
+        self.inner.tcp.first().map(|tcp| tcp.local_addr)
+    }
+
+    /// The addresses the TCP listeners are bound to, one for each address of the node; none
+    /// without a TCP port.
+    pub fn tcp_local_addrs(&self) -> Vec<SocketAddr> {
+        self.inner.tcp.iter().map(|tcp| tcp.local_addr).collect()
+    }
+
+    /// The host candidates of all sockets of this node: what clients are told to send to over
+    /// UDP. A connection has some of them ([`UdpPorts`]).
     pub fn candidates(&self) -> Vec<SocketAddr> {
-        self.inner
-            .listeners
-            .iter()
-            .flat_map(|l| l.candidates.iter().copied())
-            .collect()
+        let mut candidates = Vec::new();
+        for c in self.inner.listeners.iter().flat_map(|l| &l.candidates) {
+            if !candidates.contains(c) {
+                candidates.push(*c);
+            }
+        }
+        candidates
     }
 
     /// The passive TCP candidates of this node: what a client is told to connect to over
     /// TCP. Empty without a TCP listener.
     pub fn tcp_candidates(&self) -> Vec<SocketAddr> {
-        self.inner
-            .tcp
-            .as_ref()
-            .map(|tcp| tcp.candidates.clone())
-            .unwrap_or_default()
-    }
-
-    /// What a connection that advertises these addresses in the place of the node's own
-    /// tells a client to send to: each address with the port of the socket that can be
-    /// reached at it. An address of a family the node has no socket for is left out.
-    pub(crate) fn candidates_for(&self, ips: &[IpAddr]) -> Vec<SocketAddr> {
         let mut candidates = Vec::new();
-        for listener in &self.inner.listeners {
-            candidates_at(ips, listener.local_addr, &mut candidates);
+        for c in self.inner.tcp.iter().flat_map(|l| &l.candidates) {
+            if !candidates.contains(c) {
+                candidates.push(*c);
+            }
         }
         candidates
     }
 
-    /// The same for the TCP listener: the passive candidates of such a connection.
-    pub(crate) fn tcp_candidates_for(&self, ips: &[IpAddr]) -> Vec<SocketAddr> {
+    /// The UDP candidates of a new connection: at each address one of its sockets on the
+    /// ports of `udp_ports`, in turn, and the sockets on the standalone ports, each with the
+    /// addresses it is advertised at. With `ips`, the connection advertises those in the
+    /// place of the node's own: each at every socket of the connection that can be reached
+    /// at it (one it is advertised at, or the one bound to it); an address no socket can be
+    /// reached at is left out. A candidate that is there already is not added again, as
+    /// pion's agent leaves out a candidate it has.
+    pub(crate) fn connection_candidates(&self, ips: Option<&[IpAddr]>) -> Vec<HostCandidate> {
+        let inner = &self.inner;
+        let mut chosen = Vec::new();
+        for group in inner.groups.iter().filter(|g| !g.listeners.is_empty()) {
+            let i = group.next.fetch_add(1, Ordering::Relaxed) % group.listeners.len();
+            chosen.push(group.listeners[i]);
+        }
+        chosen.extend(&inner.standalone);
         let mut candidates = Vec::new();
-        if let Some(tcp) = &self.inner.tcp {
-            candidates_at(ips, tcp.local_addr, &mut candidates);
+        for i in chosen {
+            let listener = &inner.listeners[i];
+            candidates_at(
+                ips,
+                i,
+                listener.local_addr,
+                &listener.candidates,
+                &mut candidates,
+            );
+        }
+        candidates
+    }
+
+    /// The passive TCP candidates of a new connection: those of every TCP listener, with
+    /// `ips` as for UDP.
+    pub(crate) fn connection_tcp_candidates(&self, ips: Option<&[IpAddr]>) -> Vec<HostCandidate> {
+        let mut candidates = Vec::new();
+        for (i, listener) in self.inner.tcp.iter().enumerate() {
+            candidates_at(
+                ips,
+                i,
+                listener.local_addr,
+                &listener.candidates,
+                &mut candidates,
+            );
         }
         candidates
     }
@@ -500,9 +699,17 @@ impl Node {
         drop(streams);
     }
 
-    /// Pushes a datagram of a connection into the socket it is for, now. One the socket does
-    /// not take is lost, as UDP allows.
-    pub(crate) fn send(&self, id: u64, transport: &TransportContext, data: &[u8]) {
+    /// Pushes a datagram of a connection into the socket it is for, now: over UDP the socket
+    /// `listener` (the one behind the connection's candidate it is sent from), or when that
+    /// is not known, the one whose candidates have the local address. One the socket does not
+    /// take is lost, as UDP allows.
+    pub(crate) fn send(
+        &self,
+        id: u64,
+        listener: Option<usize>,
+        transport: &TransportContext,
+        data: &[u8],
+    ) {
         if transport.transport_protocol == TransportProtocol::TCP {
             self.send_tcp(id, transport, data);
             return;
@@ -511,8 +718,11 @@ impl Node {
         if data.first().is_some_and(|first| *first < 4) {
             self.learn_addr(id, transport.peer_addr);
         }
-        let listener = self.inner.listener_for(transport);
-        match listener.socket.try_send_to(data, transport.peer_addr) {
+        let listener = match listener.and_then(|l| self.inner.listeners.get(l)) {
+            Some(listener) => listener,
+            None => self.inner.listener_for(transport),
+        };
+        match listener.sender.send_to(data, transport.peer_addr) {
             Ok(_) => {
                 self.inner.datagrams_sent.fetch_add(1, Ordering::Relaxed);
             }
@@ -584,6 +794,7 @@ impl Node {
             serial: None,
             peer,
             local: transport.local_addr,
+            listener: None,
         };
         io_runtime().spawn(dial(end, queue, closed));
     }
@@ -599,8 +810,11 @@ struct StreamEnd {
     // dialled once, as pion's agent dials a passive candidate once.
     serial: Option<u64>,
     peer: SocketAddr,
-    // The address `rtc` is told the packets arrived at.
+    // The address `rtc` is told the packets arrived at when the connection has no candidate
+    // at the listener: the listener's first, or the active candidate of a dialled stream.
     local: SocketAddr,
+    // The listener that accepted the stream; none for a dialled one.
+    listener: Option<usize>,
 }
 
 impl StreamEnd {
@@ -619,6 +833,7 @@ impl StreamEnd {
             data,
             from: self.peer,
             local: self.local,
+            listener: self.listener,
             protocol: TransportProtocol::TCP,
             at: Time::now(),
         };
@@ -711,8 +926,14 @@ async fn dial(end: StreamEnd, queue: tcp::WriterQueue, closed: CancellationToken
     end.read(read, FrameReader::default(), closed).await;
 }
 
-/// Accepts TCP streams until the node is closed or dropped.
-async fn accept(listener: TcpListener, node: Weak<NodeInner>, shutdown: CancellationToken) {
+/// Accepts TCP streams at the listener with this number until the node is closed or
+/// dropped.
+async fn accept(
+    listener: TcpListener,
+    index: usize,
+    node: Weak<NodeInner>,
+    shutdown: CancellationToken,
+) {
     loop {
         let res = tokio::select! {
             _ = shutdown.cancelled() => return,
@@ -720,7 +941,13 @@ async fn accept(listener: TcpListener, node: Weak<NodeInner>, shutdown: Cancella
         };
         match res {
             Ok((stream, peer)) => {
-                tokio::spawn(serve(stream, peer, node.clone(), shutdown.child_token()));
+                tokio::spawn(serve(
+                    stream,
+                    peer,
+                    index,
+                    node.clone(),
+                    shutdown.child_token(),
+                ));
             }
             Err(err) => {
                 // Out of descriptors, mostly: said, and tried again a little later.
@@ -738,6 +965,7 @@ async fn accept(listener: TcpListener, node: Weak<NodeInner>, shutdown: Cancella
 async fn serve(
     stream: TcpStream,
     peer: SocketAddr,
+    listener: usize,
     node: Weak<NodeInner>,
     closed: CancellationToken,
 ) {
@@ -775,12 +1003,8 @@ async fn serve(
         Err(reason) => return refuse(reason),
     };
     inner.tcp_streams_opened.fetch_add(1, Ordering::Relaxed);
-    let local = inner
-        .tcp
-        .as_ref()
-        .map(|tcp| tcp.candidates[0])
-        .unwrap_or(peer);
-    debugw!(inner.logger, "TCP stream accepted", "connection" => id, "address" => peer);
+    let local = inner.tcp[listener].candidates[0];
+    debugw!(inner.logger, "TCP stream accepted", "connection" => id, "address" => peer, "local" => local_addr);
     drop(inner);
 
     tokio::spawn(tcp::write_loop(write, queue, closed.clone()));
@@ -791,6 +1015,7 @@ async fn serve(
         serial: Some(serial),
         peer,
         local,
+        listener: Some(listener),
     };
     if end.deliver(first, &closed).await {
         end.read(read, reader, closed).await;
@@ -815,17 +1040,17 @@ impl Drop for ConnectionGuard {
 }
 
 impl NodeInner {
+    /// The UDP socket a datagram from this local address leaves from, when the connection
+    /// did not say: the first whose candidates have it, or that is bound to it with its port.
     fn listener_for(&self, transport: &TransportContext) -> &Listener {
         let local = transport.local_addr;
         self.listeners
             .iter()
-            .find(|l| l.protocol == transport.transport_protocol && l.candidates.contains(&local))
-            // A connection with addresses of its own: they have the port of their socket.
+            .find(|l| l.candidates.contains(&local))
             .or_else(|| {
                 self.listeners.iter().find(|l| {
-                    l.protocol == transport.transport_protocol
-                        && l.local_addr.port() == local.port()
-                        && l.local_addr.is_ipv4() == local.is_ipv4()
+                    l.local_addr.port() == local.port()
+                        && reachable_at(local.ip(), l.local_addr, &l.candidates)
                 })
             })
             .unwrap_or(&self.listeners[0])
@@ -896,7 +1121,7 @@ impl NodeInner {
 
 /// Reads one socket until the node is closed or dropped.
 async fn receive(
-    socket: Arc<UdpSocket>,
+    socket: UdpSocket,
     listener: usize,
     node: Weak<NodeInner>,
     shutdown: CancellationToken,
@@ -915,7 +1140,8 @@ async fn receive(
                     data: BytesMut::from(&buf[..n]),
                     from,
                     local: l.candidates[0],
-                    protocol: l.protocol,
+                    listener: Some(listener),
+                    protocol: TransportProtocol::UDP,
                     at: Time::now(),
                 });
             }
@@ -934,13 +1160,50 @@ async fn receive(
     }
 }
 
-/// Each address with the port of a socket bound at `local`, if it is of the socket's family,
-/// added to `candidates` unless it is there.
-fn candidates_at(ips: &[IpAddr], local: SocketAddr, candidates: &mut Vec<SocketAddr>) {
-    for ip in ips {
-        let candidate = SocketAddr::new(ip.to_canonical(), local.port());
-        if candidate.is_ipv4() == local.is_ipv4() && !candidates.contains(&candidate) {
-            candidates.push(candidate);
+/// Binds a UDP socket for the node at `local`, advertised at `ips`.
+fn bind_udp(local: SocketAddr, ips: &[IpAddr]) -> io::Result<(UdpSocket, Listener)> {
+    let socket = std::net::UdpSocket::bind(local)?;
+    socket.set_nonblocking(true)?;
+    let local_addr = socket.local_addr()?;
+    let sender = socket.try_clone()?;
+    let socket = {
+        let _guard = io_runtime().enter();
+        UdpSocket::from_std(socket)?
+    };
+    let listener = Listener {
+        sender,
+        local_addr,
+        candidates: ips
+            .iter()
+            .map(|ip| SocketAddr::new(*ip, local_addr.port()))
+            .collect(),
+    };
+    Ok((socket, listener))
+}
+
+/// Adds to `candidates` those of a connection at the socket or listener `listener`, bound at
+/// `local` and advertised as `advertised`: the advertised ones, or with `ips` each of those
+/// the socket can be reached at, with its port. One that is there is not added again.
+fn candidates_at(
+    ips: Option<&[IpAddr]>,
+    listener: usize,
+    local: SocketAddr,
+    advertised: &[SocketAddr],
+    candidates: &mut Vec<HostCandidate>,
+) {
+    let mut add = |addr: SocketAddr| {
+        if !candidates.iter().any(|c| c.addr == addr) {
+            candidates.push(HostCandidate { addr, listener });
+        }
+    };
+    match ips {
+        None => advertised.iter().copied().for_each(&mut add),
+        Some(ips) => {
+            for ip in ips.iter().map(IpAddr::to_canonical) {
+                if reachable_at(ip, local, advertised) {
+                    add(SocketAddr::new(ip, local.port()));
+                }
+            }
         }
     }
 }
@@ -998,7 +1261,7 @@ mod tests {
     #[test]
     fn a_socket_on_all_addresses_needs_an_address_to_advertise() {
         let err = Node::new(NodeConfig {
-            bind_address: "0.0.0.0:0".parse().unwrap(),
+            addresses: vec![NodeAddress::new("0.0.0.0".parse().unwrap())],
             ..Default::default()
         })
         .err()
@@ -1006,8 +1269,10 @@ mod tests {
         assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
 
         let node = Node::new(NodeConfig {
-            bind_address: "0.0.0.0:0".parse().unwrap(),
-            nat_1to1_ips: vec!["127.0.0.1".parse().unwrap()],
+            addresses: vec![NodeAddress {
+                local: "0.0.0.0".parse().unwrap(),
+                advertised: vec!["127.0.0.1".parse().unwrap()],
+            }],
             ..Default::default()
         })
         .unwrap();
@@ -1089,7 +1354,7 @@ mod tests {
 
         // The connection answers: from now on the address is its own. Media it sends there
         // changes nothing.
-        node.send(first, &to_client, &response);
+        node.send(first, None, &to_client, &response);
         client.send_to(&media, node.local_addr()).unwrap();
         assert_eq!(next(&mut first_queue).await, Some(media.to_vec()));
 
@@ -1099,13 +1364,13 @@ mod tests {
             .send_to(&binding_request("two2"), node.local_addr())
             .unwrap();
         assert_eq!(next(&mut second_queue).await, Some(binding_request("two2")));
-        node.send(second, &to_client, &media);
+        node.send(second, None, &to_client, &media);
         client.send_to(&media, node.local_addr()).unwrap();
         assert_eq!(next(&mut first_queue).await, Some(media.to_vec()));
         assert_eq!(next(&mut second_queue).await, None);
 
         // Only when the other connection answers there is the address its own.
-        node.send(second, &to_client, &response);
+        node.send(second, None, &to_client, &response);
         client.send_to(&media, node.local_addr()).unwrap();
         assert_eq!(next(&mut second_queue).await, Some(media.to_vec()));
         assert_eq!(next(&mut first_queue).await, None);
