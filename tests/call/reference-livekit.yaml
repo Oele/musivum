@@ -1,0 +1,14 @@
+# The reference server for the call test: LiveKit itself, at the version musivum is ported
+# from, on ports of its own and on the loopback interface only.
+port: 39500
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 39501
+  udp_port: 39502
+  use_external_ip: false
+  node_ip: 127.0.0.1
+keys:
+  calltestkey: calltestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info

@@ -1,0 +1,10 @@
+{
+  "name": "musivum-call-test",
+  "private": true,
+  "license": "Apache-2.0",
+  "description": "The same scripted call against LiveKit and against musivum: what the clients observe has to match",
+  "dependencies": {
+    "livekit-client": "2.24.0",
+    "puppeteer-core": "^24.0.0"
+  }
+}

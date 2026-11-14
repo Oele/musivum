@@ -1,0 +1,120 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>musivum: call test</title>
+<body>
+<div id="media"></div>
+<script src="/livekit-client.umd.js"></script>
+<script>
+// One participant of the scripted call. The driver calls these functions and reads
+// `window.log`: the events this participant observed, in order.
+const LK = LivekitClient;
+window.log = [];
+const note = (event, detail = {}) => window.log.push({t: Math.round(performance.now()), event, ...detail});
+
+window.join = async (url, token, options = {}) => {
+  const room = new LK.Room({adaptiveStream: true, dynacast: true, ...options});
+  window.room = room;
+  const E = LK.RoomEvent;
+  room
+    .on(E.Connected, () => note('Connected'))
+    .on(E.Reconnecting, () => note('Reconnecting'))
+    .on(E.SignalReconnecting, () => note('SignalReconnecting'))
+    .on(E.Reconnected, () => note('Reconnected'))
+    .on(E.Disconnected, reason => note('Disconnected', {reason: LK.DisconnectReason[reason] ?? String(reason)}))
+    .on(E.ParticipantConnected, p => note('ParticipantConnected', {identity: p.identity}))
+    .on(E.ParticipantDisconnected, p => note('ParticipantDisconnected', {identity: p.identity}))
+    .on(E.TrackPublished, (pub, p) => note('TrackPublished', {identity: p.identity, source: pub.source, kind: pub.kind, simulcasted: pub.simulcasted, mimeType: pub.mimeType}))
+    .on(E.TrackUnpublished, (pub, p) => note('TrackUnpublished', {identity: p.identity, source: pub.source}))
+    .on(E.TrackSubscribed, (track, pub, p) => {
+      note('TrackSubscribed', {identity: p.identity, source: pub.source, kind: track.kind});
+      const el = track.attach();
+      el.id = 'el-' + pub.source;
+      el.muted = true;
+      if (track.kind === 'video') { el.style.width = '320px'; el.style.height = '180px'; }
+      document.getElementById('media').appendChild(el);
+    })
+    .on(E.TrackUnsubscribed, (track, pub, p) => { note('TrackUnsubscribed', {identity: p.identity, source: pub.source}); track.detach().forEach(el => el.remove()); })
+    .on(E.TrackSubscriptionFailed, (sid, p, reason) => note('TrackSubscriptionFailed', {identity: p.identity, reason: String(reason)}))
+    .on(E.TrackMuted, (pub, p) => note('TrackMuted', {identity: p.identity, source: pub.source}))
+    .on(E.TrackUnmuted, (pub, p) => note('TrackUnmuted', {identity: p.identity, source: pub.source}))
+    .on(E.LocalTrackPublished, pub => note('LocalTrackPublished', {source: pub.source, kind: pub.kind, simulcasted: pub.simulcasted}))
+    .on(E.LocalTrackUnpublished, pub => note('LocalTrackUnpublished', {source: pub.source}))
+    .on(E.DataReceived, (payload, p, kind, topic) => note('DataReceived', {identity: p && p.identity, kind: LK.DataPacket_Kind[kind] ?? String(kind), topic, text: new TextDecoder().decode(payload)}))
+    .on(E.ActiveSpeakersChanged, speakers => note('ActiveSpeakersChanged', {identities: speakers.map(s => s.identity).sort()}))
+    .on(E.ConnectionQualityChanged, (quality, p) => note('ConnectionQualityChanged', {identity: p.identity, quality}))
+    .on(E.TrackStreamStateChanged, (pub, state, p) => note('TrackStreamStateChanged', {identity: p.identity, source: pub.source, state}))
+    .on(E.RoomMetadataChanged, m => note('RoomMetadataChanged', {metadata: m}))
+    .on(E.ParticipantMetadataChanged, (prev, p) => note('ParticipantMetadataChanged', {identity: p.identity}))
+    .on(E.ParticipantPermissionsChanged, (prev, p) => note('ParticipantPermissionsChanged', {identity: p.identity}))
+    .on(E.MediaDevicesError, e => note('MediaDevicesError', {error: String(e)}))
+    .on(E.SignalConnected, () => note('SignalConnected'));
+  await room.connect(url, token);
+  return {
+    name: room.name,
+    identity: room.localParticipant.identity,
+    sidPrefix: room.localParticipant.sid.slice(0, 3),
+    serverVersion: room.serverInfo && room.serverInfo.version,
+    serverProtocol: room.serverInfo && room.serverInfo.protocol,
+    serverEdition: room.serverInfo && room.serverInfo.edition,
+    remoteParticipants: [...room.remoteParticipants.values()].map(p => p.identity).sort(),
+    canPublish: room.localParticipant.permissions && room.localParticipant.permissions.canPublish,
+  };
+};
+
+window.publishCameraAndMicrophone = async () => {
+  const lp = window.room.localParticipant;
+  await lp.setCameraEnabled(true, {resolution: {width: 1280, height: 720, frameRate: 30}});
+  await lp.setMicrophoneEnabled(true);
+  return [...lp.trackPublications.values()].map(p => ({source: p.source, kind: p.kind, sidPrefix: p.trackSid.slice(0, 3), simulcasted: p.simulcasted, mimeType: p.mimeType}));
+};
+
+window.sendData = async (text, reliable, topic) =>
+  window.room.localParticipant.publishData(new TextEncoder().encode(text), {reliable, topic});
+
+window.setMicrophoneMuted = async muted => {
+  const pub = window.room.localParticipant.getTrackPublication(LK.Track.Source.Microphone);
+  if (muted) await pub.mute(); else await pub.unmute();
+};
+
+window.unpublishCamera = async () => {
+  const lp = window.room.localParticipant;
+  const pub = lp.getTrackPublication(LK.Track.Source.Camera);
+  await lp.unpublishTrack(pub.track);
+};
+
+window.setVideoSize = (width, height) => {
+  const el = document.getElementById('el-camera');
+  el.style.width = width + 'px'; el.style.height = height + 'px';
+};
+
+// What the receiving side's WebRTC statistics say about one kind of media.
+window.inbound = async kind => {
+  const out = [];
+  const pcs = [];
+  const engine = window.room.engine;
+  const pcm = engine.pcManager;
+  if (pcm && pcm.subscriber) pcs.push(pcm.subscriber);
+  if (pcm && pcm.publisher) pcs.push(pcm.publisher);
+  for (const t of pcs) {
+    const stats = await t.getStats();
+    stats.forEach(s => { if (s.type === 'inbound-rtp' && s.kind === kind) out.push({framesDecoded: s.framesDecoded, frameWidth: s.frameWidth, frameHeight: s.frameHeight, packetsReceived: s.packetsReceived, packetsLost: s.packetsLost, nackCount: s.nackCount, pliCount: s.pliCount, keyFramesDecoded: s.keyFramesDecoded, freezeCount: s.freezeCount, totalFreezesDuration: s.totalFreezesDuration, framesPerSecond: s.framesPerSecond, bytesReceived: s.bytesReceived}); });
+  }
+  return out;
+};
+
+window.outbound = async () => {
+  const out = [];
+  const pcm = window.room.engine.pcManager;
+  const pcs = [];
+  if (pcm && pcm.publisher) pcs.push(pcm.publisher);
+  if (pcm && pcm.subscriber) pcs.push(pcm.subscriber);
+  for (const t of pcs) {
+    const stats = await t.getStats();
+    stats.forEach(s => { if (s.type === 'outbound-rtp' && s.kind === 'video') out.push({rid: s.rid, active: s.active, frameWidth: s.frameWidth, framesSent: s.framesSent, targetBitrate: s.targetBitrate, qualityLimitationReason: s.qualityLimitationReason, nackCount: s.nackCount, pliCount: s.pliCount}); });
+  }
+  return out;
+};
+
+window.leave = async () => window.room.disconnect();
+</script>
+</body>
