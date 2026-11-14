@@ -47,6 +47,14 @@
 //   form; axum's router does not, and such a path is not found.
 // - The Prometheus listener (`promServer`) is `PromServer` of promserver.rs, made, started
 //   and stopped here where the original does it; it is stopped with the HTTP server.
+// - New, for a server that builds musivum in (`crate::embed`): `initialize_server_state` is
+//   the part of `initialize_server` before the routes; `new_server_state_with` takes a
+//   notifier that gets the webhook events beside those of the configuration; `ServerState`
+//   also keeps the room service (behind the Twirp server) for calls without HTTP.
+//   `LivekitServer::new_embedded` makes a server without the HTTP listener, whose routes the
+//   embedding server serves, and with the Prometheus listener only when asked; its `start`
+//   binds no HTTP listener and leaves `portHttp` out of its log line. `started` is the moment
+//   `start` sets `running`.
 
 use std::io;
 use std::net::SocketAddr;
@@ -134,6 +142,8 @@ pub struct ServerState {
     pub rtc_service: Arc<RtcService>,
     pub room_manager: Arc<RoomManager>,
     pub signal_server: Arc<SignalServer>,
+    /// roomservice.go: the room API, which `room_service_server` serves over HTTP.
+    pub room_service: Arc<RoomService>,
     /// The room API: roomservice.go behind the Twirp server that `NewRoomServiceServer`
     /// makes (`xtwirp.RegisterServer`).
     pub room_service_server: Arc<RoomServiceServer>,
@@ -147,11 +157,28 @@ pub fn initialize_server(
     conf: Config,
     current_node: Arc<dyn LocalNode>,
 ) -> Result<Arc<LivekitServer>, Error> {
-    let webrtc_config = rtc::WebRtcConfig::new(&conf)?;
-    let rtc_node = webrtc_config.web_rtc_config.new_node()?;
-    let state = new_server_state(conf, current_node, Arc::new(webrtc_config), rtc_node)?;
+    let state = initialize_server_state(conf, current_node, None)?;
     let mux = new_mux(state.clone());
     LivekitServer::new(state, mux)
+}
+
+/// What `initialize_server` makes before the routes: the WebRTC configuration, the node's
+/// sockets and `new_server_state_with` (see there for `notifier`). It blocks as
+/// `initialize_server` does.
+pub fn initialize_server_state(
+    conf: Config,
+    current_node: Arc<dyn LocalNode>,
+    notifier: Option<Arc<dyn webhook::QueuedNotifier>>,
+) -> Result<ServerState, Error> {
+    let webrtc_config = rtc::WebRtcConfig::new(&conf)?;
+    let rtc_node = webrtc_config.web_rtc_config.new_node()?;
+    new_server_state_with(
+        conf,
+        current_node,
+        Arc::new(webrtc_config),
+        rtc_node,
+        notifier,
+    )
 }
 
 /// What `initialize_server` makes after the WebRTC configuration and the node's sockets, in
@@ -161,6 +188,18 @@ pub fn new_server_state(
     current_node: Arc<dyn LocalNode>,
     webrtc_config: Arc<rtc::WebRtcConfig>,
     rtc_node: Node,
+) -> Result<ServerState, Error> {
+    new_server_state_with(conf, current_node, webrtc_config, rtc_node, None)
+}
+
+/// `new_server_state` with a notifier more: it gets every webhook event the telemetry service
+/// queues, beside the notifier the configuration makes (`crate::embed`).
+pub fn new_server_state_with(
+    conf: Config,
+    current_node: Arc<dyn LocalNode>,
+    webrtc_config: Arc<rtc::WebRtcConfig>,
+    rtc_node: Node,
+    notifier: Option<Arc<dyn webhook::QueuedNotifier>>,
 ) -> Result<ServerState, Error> {
     let conf = Arc::new(conf);
     let node_id = current_node.node_id();
@@ -192,11 +231,15 @@ pub fn new_server_state(
         routing::new_typed_participant_client(message_bus.clone())?,
     )?;
     let room_service_server = Arc::new(new_room_service_server(
-        room_service,
+        room_service.clone(),
         livekit_server_options(),
     ));
     let key_provider = create_key_provider(&conf)?;
-    let queued_notifier = create_webhook_notifier(&conf, key_provider.clone())?;
+    let mut queued_notifier = create_webhook_notifier(&conf, key_provider.clone())?;
+    // New: the embedding server's notifier beside it (see the header)
+    if let Some(notifier) = notifier {
+        queued_notifier = crate::embed::new_notifiers(vec![queued_notifier, notifier]);
+    }
     // telemetry.NewAnalyticsService: not ported (see the header)
     let analytics_service: Arc<dyn AnalyticsService> = Arc::new(NullAnalyticService {});
     let telemetry_service = create_telemetry_service(Some(queued_notifier), analytics_service);
@@ -240,6 +283,7 @@ pub fn new_server_state(
         rtc_service,
         room_manager,
         signal_server: Arc::new(signal_server),
+        room_service,
         room_service_server,
         turn_auth_handler,
     })
@@ -399,7 +443,8 @@ fn rtc_upgrade(
 pub struct LivekitServer {
     config: Arc<Config>,
     state: ServerState,
-    http_server: axum::Router,
+    // `None` for a server without the HTTP listener (`new_embedded`)
+    http_server: Option<axum::Router>,
     prom_server: Option<PromServer>,
     router: Arc<dyn Router>,
     room_manager: Arc<RoomManager>,
@@ -409,16 +454,37 @@ pub struct LivekitServer {
     running: atomic::Bool,
     done_chan: CancellationToken,
     closed_chan: CancellationToken,
+    // New: cancelled when `start` sets `running` (see the header)
+    started_chan: CancellationToken,
     local_addrs: Mutex<Vec<SocketAddr>>,
 }
 
 impl LivekitServer {
     /// `NewLivekitServer`, with the routes made (`new_mux`).
     pub fn new(state: ServerState, mux: axum::Router) -> Result<Arc<LivekitServer>, Error> {
-        let conf = state.config.clone();
-        let http_server = new_http_handler(&conf, Some(state.key_provider.clone()), mux);
+        let http_server = new_http_handler(&state.config, Some(state.key_provider.clone()), mux);
+        LivekitServer::new_with(state, Some(http_server), true)
+    }
 
-        let prom_server = PromServer::new(&conf, state.current_node.as_ref())?;
+    /// New: `NewLivekitServer` without the HTTP listener, for a server that serves the routes
+    /// itself (`crate::embed`), and with the Prometheus listener of the configuration only
+    /// where `metrics` is set.
+    pub fn new_embedded(state: ServerState, metrics: bool) -> Result<Arc<LivekitServer>, Error> {
+        LivekitServer::new_with(state, None, metrics)
+    }
+
+    fn new_with(
+        state: ServerState,
+        http_server: Option<axum::Router>,
+        metrics: bool,
+    ) -> Result<Arc<LivekitServer>, Error> {
+        let conf = state.config.clone();
+
+        let prom_server = if metrics {
+            PromServer::new(&conf, state.current_node.as_ref())?
+        } else {
+            None
+        };
 
         // debug_handler and webtransport are taken by the configuration and not read (see the
         // header).
@@ -438,6 +504,7 @@ impl LivekitServer {
             running: atomic::Bool::new(false),
             done_chan: CancellationToken::new(),
             closed_chan: CancellationToken::new(),
+            started_chan: CancellationToken::new(),
             local_addrs: Mutex::new(Vec::new()),
         }))
     }
@@ -464,6 +531,11 @@ impl LivekitServer {
         self.local_addrs.lock().clone()
     }
 
+    /// New: waits until `start` runs (it has set `running`).
+    pub async fn started(&self) {
+        self.started_chan.cancelled().await;
+    }
+
     /// Serves until `stop` is called. Needs a tokio runtime with I/O and time.
     pub async fn start(self: &Arc<Self>) -> Result<(), Error> {
         if self.running.load() {
@@ -486,9 +558,12 @@ impl LivekitServer {
         let mut listeners = Vec::new();
         let mut prom_listeners = Vec::new();
         for addr in &addresses {
-            let ln = listen(addr, self.config.port).await?;
-            self.local_addrs.lock().push(ln.local_addr()?);
-            listeners.push(ln);
+            // none for a server without the HTTP listener (see the header)
+            if self.http_server.is_some() {
+                let ln = listen(addr, self.config.port).await?;
+                self.local_addrs.lock().push(ln.local_addr()?);
+                listeners.push(ln);
+            }
 
             if let Some(prom_server) = &self.prom_server {
                 prom_listeners.push(prom_server.listen(addr).await?);
@@ -518,6 +593,10 @@ impl LivekitServer {
                 ("nodeIP", &node_ip),
                 ("version", &VERSION),
             ];
+            if self.http_server.is_none() {
+                // no HTTP listener (see the header)
+                values.remove(0);
+            }
             if !self.config.bind_addresses.is_empty() {
                 values.push(("bindAddresses", &self.config.bind_addresses));
             }
@@ -552,6 +631,7 @@ impl LivekitServer {
             let service = self
                 .http_server
                 .clone()
+                .expect("a listener is bound only for a server with the HTTP listener")
                 .into_make_service_with_connect_info::<SocketAddr>();
             let shutdown = shutdown.clone();
             http_group.spawn(async move {
@@ -591,6 +671,7 @@ impl LivekitServer {
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
 
         self.running.store(true);
+        self.started_chan.cancel();
 
         self.done_chan.cancelled().await;
 

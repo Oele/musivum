@@ -27,6 +27,14 @@
 //! and Go `Accept-Encoding: gzip`. `ForceIPv4` of the notifiers, a dialer for `tcp4` upstream,
 //! is a resolver that keeps the IPv4 addresses of a name, with sockets bound to an IPv4
 //! address. A `Retry-After` given as a date is not read.
+//!
+//! The TLS configuration is made here and handed to reqwest, with ring's provider named, as
+//! reqwest would make it otherwise (the system's root certificates, TLS 1.2 and 1.3, HTTP/1.1
+//! by ALPN). reqwest takes the process's default provider where one is installed and ring
+//! where none is; rustls panics where a configuration is made from the default and the build
+//! has two providers and none was installed. A server that builds musivum in may have both
+//! (`musivum_server::embed`): whatever it installs, the webhooks go out with ring, as the TLS
+//! listener of the TURN server does.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::sync::{Arc, OnceLock};
@@ -200,12 +208,28 @@ fn is_permanent(err: &reqwest::Error) -> bool {
     }
     let mut source: Option<&(dyn std::error::Error + 'static)> = Some(err);
     while let Some(e) = source {
-        if let Some(rustls::Error::InvalidCertificate(_)) = e.downcast_ref::<rustls::Error>() {
+        if invalid_certificate(e) {
             return true;
         }
         source = e.source();
     }
     false
+}
+
+// Whether the error is rustls's for a certificate it does not take. The TLS error comes inside
+// an `io::Error`, maybe in another one: the `source` of an `io::Error` is not the error it
+// carries but that error's source, so the errors carried are looked into here.
+fn invalid_certificate(e: &(dyn std::error::Error + 'static)) -> bool {
+    if let Some(rustls::Error::InvalidCertificate(_)) = e.downcast_ref::<rustls::Error>() {
+        return true;
+    }
+    match e
+        .downcast_ref::<std::io::Error>()
+        .and_then(std::io::Error::get_ref)
+    {
+        Some(carried) => invalid_certificate(carried),
+        None => false,
+    }
 }
 
 // The wait before retry `attempt_num` (from 0).
@@ -249,13 +273,46 @@ fn error_chain(err: &reqwest::Error) -> String {
 }
 
 fn build(http_client: HttpClient) -> Result<reqwest::Client, String> {
-    let mut builder = reqwest::Client::builder().http1_title_case_headers();
+    let mut builder = reqwest::Client::builder()
+        .http1_title_case_headers()
+        .use_preconfigured_tls(tls_config()?);
     if http_client.force_ipv4 {
         builder = builder
             .dns_resolver(Arc::new(Ipv4Resolver))
             .local_address(IpAddr::V4(Ipv4Addr::UNSPECIFIED));
     }
     builder.build().map_err(|err| err.to_string())
+}
+
+// The configuration reqwest makes with its `rustls-tls-native-roots`, with ring's provider
+// (see the module's description): the system's root certificates, an error only where it has
+// some and none of them can be read; the versions rustls has; HTTP/1.1, the only version the
+// client speaks.
+fn tls_config() -> Result<rustls::ClientConfig, String> {
+    let mut roots = rustls::RootCertStore::empty();
+    let native = rustls_native_certs::load_native_certs();
+    let (mut valid, mut invalid) = (0, 0);
+    for cert in native.certs {
+        match roots.add(cert) {
+            Ok(()) => valid += 1,
+            Err(_) => invalid += 1,
+        }
+    }
+    if valid == 0 && invalid > 0 {
+        if native.errors.is_empty() {
+            return Err("zero valid certificates found in native root store".to_string());
+        }
+        return Err(native.errors.iter().map(|err| format!("{err}\n")).collect());
+    }
+
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_protocol_versions(rustls::ALL_VERSIONS)
+        .map_err(|err| err.to_string())?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Ok(config)
 }
 
 // Keeps the IPv4 addresses of a name, for `ForceIPv4`.
@@ -318,5 +375,51 @@ mod tests {
                 c.http_client.timeout
             )
         );
+    }
+
+    // New for musivum: a request over TLS goes out with the configuration made here, whatever
+    // providers the build has and none installed (the workspace's tests build rustls with
+    // aws-lc-rs too, tests/embed), and is refused once for a certificate that no root of the
+    // system's signed.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_certificate_that_is_not_trusted_is_refused_without_a_retry() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        let cert = rcgen::generate_simple_self_signed(vec!["127.0.0.1".to_string()]).unwrap();
+        let server_config = rustls::ServerConfig::builder_with_provider(Arc::new(
+            rustls::crypto::ring::default_provider(),
+        ))
+        .with_protocol_versions(rustls::ALL_VERSIONS)
+        .unwrap()
+        .with_no_client_auth()
+        .with_single_cert(
+            vec![cert.cert.der().clone()],
+            rustls::pki_types::PrivateKeyDer::Pkcs8(cert.signing_key.serialize_der().into()),
+        )
+        .unwrap();
+        let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(server_config));
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let handshakes = Arc::new(AtomicUsize::new(0));
+        tokio::spawn({
+            let handshakes = handshakes.clone();
+            async move {
+                while let Ok((stream, _)) = listener.accept().await {
+                    handshakes.fetch_add(1, Ordering::SeqCst);
+                    let _ = acceptor.accept(stream).await;
+                }
+            }
+        });
+
+        let req = new_request(
+            "POST",
+            &format!("https://127.0.0.1:{port}/hook"),
+            Bytes::from_static(b"{}"),
+        )
+        .unwrap();
+        let err = new_client().r#do(&req).await.unwrap_err().to_string();
+        assert!(err.contains("giving up after 1 attempt(s)"), "{err}");
+        assert!(err.contains("certificate"), "{err}");
+        assert_eq!(1, handshakes.load(Ordering::SeqCst));
     }
 }

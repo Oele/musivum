@@ -206,8 +206,9 @@ pub struct NodeStats {
 struct Listener {
     // The same socket for writing, as the system's: tokio's `try_send_to` does not try
     // before the runtime has seen the socket writable, which a socket that was just bound
-    // has not always been, and a datagram would be lost that the system takes.
-    sender: std::net::UdpSocket,
+    // has not always been, and a datagram would be lost that the system takes. `None` once
+    // the node is closed, so that the port is let go of then.
+    sender: RwLock<Option<std::net::UdpSocket>>,
     local_addr: SocketAddr,
     /// What clients are told: the advertised addresses with the socket's port.
     candidates: Vec<SocketAddr>,
@@ -290,6 +291,9 @@ struct NodeInner {
     // Cancelled when the node is closed or dropped: the tasks that read the sockets end, and
     // so do the TCP streams (their tokens are children of this one).
     shutdown: CancellationToken,
+    // Cancelled when the last of the tasks that read the sockets and accept TCP streams has
+    // ended, and with it let go of its socket or listener (`SocketTasks`).
+    sockets_closed: CancellationToken,
 
     datagrams_received: AtomicU64,
     datagrams_without_route: AtomicU64,
@@ -305,6 +309,16 @@ impl Drop for NodeInner {
     fn drop(&mut self) {
         // The tasks that read the sockets hold no reference to this; they are told to end.
         self.shutdown.cancel();
+    }
+}
+
+// Held by every task that reads a socket or accepts TCP streams: when the last of them has
+// ended, the node's sockets and listeners are closed.
+struct SocketTasks(CancellationToken);
+
+impl Drop for SocketTasks {
+    fn drop(&mut self) {
+        self.0.cancel();
     }
 }
 
@@ -442,6 +456,8 @@ impl Node {
         }
 
         let shutdown = CancellationToken::new();
+        let sockets_closed = CancellationToken::new();
+        let socket_tasks = Arc::new(SocketTasks(sockets_closed.clone()));
         let inner = Arc::new(NodeInner {
             logger: config.logger,
             listeners,
@@ -453,6 +469,7 @@ impl Node {
             next_stream: AtomicU64::new(1),
             connections: AtomicUsize::new(0),
             shutdown: shutdown.clone(),
+            sockets_closed,
             datagrams_received: AtomicU64::new(0),
             datagrams_without_route: AtomicU64::new(0),
             datagrams_queue_full: AtomicU64::new(0),
@@ -463,15 +480,20 @@ impl Node {
             tcp_streams_refused: AtomicU64::new(0),
         });
         for (i, socket) in sockets.into_iter().enumerate() {
-            io_runtime().spawn(receive(socket, i, Arc::downgrade(&inner), shutdown.clone()));
+            let tasks = socket_tasks.clone();
+            let receiving = receive(socket, i, Arc::downgrade(&inner), shutdown.clone());
+            io_runtime().spawn(async move {
+                receiving.await;
+                drop(tasks);
+            });
         }
         for (i, listener) in tcp_listeners.into_iter().enumerate() {
-            io_runtime().spawn(accept(
-                listener,
-                i,
-                Arc::downgrade(&inner),
-                shutdown.clone(),
-            ));
+            let tasks = socket_tasks.clone();
+            let accepting = accept(listener, i, Arc::downgrade(&inner), shutdown.clone());
+            io_runtime().spawn(async move {
+                accepting.await;
+                drop(tasks);
+            });
         }
         Ok(Node { inner })
     }
@@ -588,9 +610,13 @@ impl Node {
 
     /// Stops reading the socket and the TCP listener, closes the TCP streams and lets go of
     /// the connections: each of them that is still open finds its queue closed and closes
-    /// itself.
+    /// itself. The sockets and listeners are closed as soon as the tasks that read them have
+    /// ended ([`Node::closed`]), whoever still holds the node; nothing is sent after.
     pub fn close(&self) {
         self.inner.shutdown.cancel();
+        for listener in &self.inner.listeners {
+            listener.sender.write().take();
+        }
         let mut routes = self.inner.routes.write();
         routes.by_addr.clear();
         routes.by_ufrag.clear();
@@ -598,6 +624,12 @@ impl Node {
         let streams = std::mem::take(&mut routes.streams);
         drop(routes);
         drop(streams);
+    }
+
+    /// Waits until the node's sockets and TCP listeners are closed, after [`Node::close`]:
+    /// their ports can then be bound again.
+    pub async fn closed(&self) {
+        self.inner.sockets_closed.cancelled().await;
     }
 
     /// Makes room for a connection: its number, and the queue its datagrams are put in.
@@ -722,7 +754,11 @@ impl Node {
             Some(listener) => listener,
             None => self.inner.listener_for(transport),
         };
-        match listener.sender.send_to(data, transport.peer_addr) {
+        let sent = match &*listener.sender.read() {
+            Some(sender) => sender.send_to(data, transport.peer_addr),
+            None => Err(io::ErrorKind::NotConnected.into()),
+        };
+        match sent {
             Ok(_) => {
                 self.inner.datagrams_sent.fetch_add(1, Ordering::Relaxed);
             }
@@ -1171,7 +1207,7 @@ fn bind_udp(local: SocketAddr, ips: &[IpAddr]) -> io::Result<(UdpSocket, Listene
         UdpSocket::from_std(socket)?
     };
     let listener = Listener {
-        sender,
+        sender: RwLock::new(Some(sender)),
         local_addr,
         candidates: ips
             .iter()

@@ -1,0 +1,30 @@
+[package]
+name = "musivum-embed-test"
+description = "musivum built into another server's process as asaroton builds it in: musivum_server::embed nested in an axum application, in a build with both of rustls's crypto providers"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
+futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+musivum = { version = "0.0.0", path = "../../crates/musivum" }
+musivum-protocol = { version = "0.0.0", path = "../../crates/musivum-protocol" }
+musivum-server = { version = "0.0.0", path = "../../crates/musivum-server" }
+# The certificate of the TURN server's TLS listener. Already in the build through rtc.
+rcgen = "0.14.10"
+# rustls with aws-lc-rs as well as ring (which musivum has): the two providers in one build,
+# with none installed for the process, as in asaroton's build. Apache-2.0 OR ISC OR MIT;
+# aws-lc-rs 1.19 is ISC AND (Apache-2.0 OR ISC); aws-lc-sys 0.47 (built with cmake and a C
+# compiler) is ISC, Apache-2.0, MIT and BSD-3-Clause in parts. A test-only dependency.
+rustls = { version = "0.23.46", default-features = false, features = ["aws_lc_rs", "ring", "std", "tls12"] }
+serde_json = "1.0.154"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "sync", "time"] }
+tokio-tungstenite = "0.29.0"
+tokio-util = "0.7.20"

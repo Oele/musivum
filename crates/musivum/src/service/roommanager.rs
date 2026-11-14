@@ -49,6 +49,10 @@
 // - `rtc.Recover` in `rtcSessionWorker` is `rtc::recover_async` around the worker's loop.
 // - `participantReq` is the trait `ParticipantReq`, implemented for the four requests the
 //   original passes as one.
+// - New, a deliberate difference: `set_advertised_turn_tls_port`. The `turns:` URL of the ICE
+//   servers names port 443 whatever `turn.tls_port` is, as upstream (which expects a load
+//   balancer on 443), unless a server that builds musivum in names another port: it has no
+//   proxy in front of it to rewrite the URL (`musivum_server::embed`).
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -65,6 +69,7 @@ use crate::clientconfiguration::{
     ClientConfigurationManager, STATIC_CONFIGURATIONS, StaticClientConfigurationManager,
 };
 use crate::config::{self, Config};
+use crate::go::atomic;
 use crate::go::time::{self, Duration, Time};
 use crate::mediatransportutil::rtcconfig;
 use crate::protocol::auth::AccessToken;
@@ -133,6 +138,9 @@ pub struct RoomManager {
 
     // New: the node every participant's connections are on (see the header).
     node: Node,
+
+    // New: the port the `turns:` URL names, 0 for upstream's 443 (see the header).
+    advertised_turn_tls_port: atomic::Uint32,
 }
 
 // `defer room.Release()`
@@ -195,6 +203,7 @@ impl RoomManager {
             },
             config: conf,
             node,
+            advertised_turn_tls_port: atomic::Uint32::new(0),
         });
 
         // `rpc.NewTypedRoomManagerServer(r, bus, ...)` and its `RegisterAllNodeTopics`
@@ -203,6 +212,13 @@ impl RoomManager {
         // Not here: `newWhipService` and its server, WHIP is not ported.
 
         Ok(r)
+    }
+
+    /// New: the port the `turns:` URL of the ICE servers names; `None` for 443, as upstream
+    /// names whatever `turn.tls_port` is (see the header).
+    pub fn set_advertised_turn_tls_port(&self, port: Option<u16>) {
+        self.advertised_turn_tls_port
+            .store(port.map_or(0, u32::from));
     }
 
     fn arc(&self) -> Arc<RoomManager> {
@@ -1273,8 +1289,13 @@ impl RoomManager {
                 }
             }
             if self.config.turn.tls_port > 0 {
+                // 443 upstream; another port where one is set (see the header)
+                let port = match self.advertised_turn_tls_port.load() {
+                    0 => 443,
+                    port => port,
+                };
                 urls.push(format!(
-                    "turns:{}:443?transport=tcp",
+                    "turns:{}:{port}?transport=tcp",
                     self.config.turn.domain
                 ));
             }
