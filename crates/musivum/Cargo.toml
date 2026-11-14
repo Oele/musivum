@@ -1,0 +1,13 @@
+[package]
+name = "musivum"
+description = "A media server for calls that speaks LiveKit's protocol: a port of LiveKit's selective forwarding unit to Rust"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Nothing to publish yet.
+publish = false
+
+[lints]
+workspace = true

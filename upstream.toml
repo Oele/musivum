@@ -1,0 +1,8 @@
+# The version of LiveKit that musivum is ported from. Every ported file names this tag at
+# its top; moving the pin means going through what changed upstream between the two tags
+# for the files that were ported (see docs/PORTING.md).
+[livekit]
+repository = "https://github.com/livekit/livekit"
+tag = "v1.13.11"
+commit = "385aa40f9292fe1db8caad87301e4b285b7c198a"
+license = "Apache-2.0"
