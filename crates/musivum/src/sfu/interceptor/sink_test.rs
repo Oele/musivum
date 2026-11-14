@@ -20,7 +20,7 @@ use crate::testutils::eventually_async;
 use crate::webrtc::peerconnection::{
     Configuration, DtlsRole, MediaEngine, Node, NodeConfig, PeerConnection, PeerConnectionState,
     RtpReceiver, RtpTransceiverDirection, RtpTransceiverInit, SdpType, SessionDescription,
-    SettingEngineBuilder, TrackRemote, register_codec, register_header_extension,
+    SettingEngine, TrackRemote, register_codec, register_header_extension,
 };
 use crate::webrtc::rtcp::extended_report::{ExtendedReport, ReceiverReferenceTimeReportBlock};
 use crate::webrtc::rtcp::payload_feedbacks::picture_loss_indication::PictureLossIndication;
@@ -820,10 +820,11 @@ impl Server {
             &node,
             Configuration {
                 media_engine: media_engine(),
-                setting_engine: SettingEngineBuilder::new()
-                    .with_lite(true)
-                    .with_answering_dtls_role(DtlsRole::Server)
-                    .build(),
+                setting_engine: SettingEngine {
+                    lite: true,
+                    answering_dtls_role: DtlsRole::Server,
+                    ..Default::default()
+                },
                 packet_sink: Some(sink.clone()),
                 ..Default::default()
             },
@@ -914,7 +915,7 @@ impl Client {
             &node,
             Configuration {
                 media_engine: media_engine(),
-                setting_engine: SettingEngineBuilder::new().build(),
+                setting_engine: SettingEngine::default(),
                 ..Default::default()
             },
         )
