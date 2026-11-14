@@ -30,15 +30,13 @@
 //!
 //! - [`new_turn_server`] (`turn.rs`, with `turnrelay.rs` and `turnquota.rs`): the embedded TURN
 //!   server, pion/turn's (`webrtc::turn`) as LiveKit configures it, and [`TurnAuthHandler`],
-//!   the credentials the room manager hands to clients for it. `base62.rs` is jxskiss/base62
-//!   as far as those credentials use it; `proxyproto.rs` (written new) the PROXY protocol
-//!   listener in front of TURN over TLS.
+//!   the credentials the room manager hands to clients for it; `proxyproto.rs` (written new)
+//!   the PROXY protocol listener in front of TURN over TLS.
 //!
 //! [`useragent`] is written new: it stands in for the user agent parser the original uses. So
 //! is `protojson.rs`: the JSON form of the room API's messages as Go's `protojson` writes them.
 
 mod auth;
-mod base62;
 mod errors;
 mod interfaces;
 mod localstore;

@@ -1,7 +1,6 @@
 //! Parts of `github.com/livekit/protocol/utils`, ported function by function as files need
 //! them.
 
-mod base62;
 mod bitmap;
 mod connectionquality;
 mod data_channel_rpc;
@@ -17,6 +16,7 @@ mod timed_aggregator;
 mod timed_version;
 mod timeoutqueue;
 
+pub mod base62;
 pub mod guid;
 pub mod hwstats;
 pub mod mono;

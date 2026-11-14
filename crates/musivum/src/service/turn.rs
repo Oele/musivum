@@ -12,7 +12,7 @@
 //   `InvalidUpstream` error (go-proxyproto's `ErrInvalidUpstream`).
 // - pion's logger factory (`pionlogger`) is the server's logger.
 // - `getTURNAuthHandlerFunc` gives the handler as pion's `AuthHandler` (an `Arc` of a function).
-// - base62 is jxskiss/base62 as ported (`base62.rs`).
+// - base62 is jxskiss/base62 as ported (`protocol/utils/base62.rs`).
 
 use std::net::IpAddr;
 use std::sync::Arc;
@@ -20,7 +20,6 @@ use std::sync::Arc;
 use sha2::{Digest, Sha256};
 
 use super::Error;
-use super::base62;
 use super::proxyproto::{self, ConnPolicyFunc, ConnPolicyOptions, Policy, PolicyError};
 use super::turnquota::new_turn_allocation_quota;
 use super::turnrelay::{
@@ -33,6 +32,7 @@ use crate::go::time::{self, Duration, Time};
 use crate::protocol::auth::KeyProvider;
 use crate::protocol::livekit;
 use crate::protocol::logger;
+use crate::protocol::utils::base62;
 use crate::telemetry::{self, prometheus};
 use crate::webrtc::stun::message::METHOD_ALLOCATE;
 use crate::webrtc::turn::net::{self, Addr, IpNet, Listener, PacketConn, is_ipv4};
