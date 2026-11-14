@@ -515,6 +515,14 @@ out the TCP network types (no TCP candidates were offered), and TCP candidates l
 priority offset. What still differed then: no IPv6 candidates (added since), and candidate lines
 without pion's `ufrag` attribute.
 
+## Behind asaroton
+
+On 2026-11-14 asaroton's lab ran musivum in place of `livekit-server`, with the configuration
+asaroton writes for LiveKit: a call of two Element Web peers in Element Call (90 s) worked as
+with LiveKit (both over UDP, each receiving both 720p videos for the whole call). It found
+one bug: no webhook ever left the server binary, because the senders ran on musivum's own
+runtime, which had no network IO (fixed, with a test of the server made as `main` makes it).
+
 ## On a degraded network
 
 The seven scenarios of `tests/netem` (one run each, 2026-11-14), musivum against LiveKit's
