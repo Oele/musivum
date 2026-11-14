@@ -40,8 +40,11 @@ at v1.13.11 (`upstream.toml`), file by file, with LiveKit's own tests ported alo
   uses about half of LiveKit's memory, and from 13% less CPU (50 subscribers in a room) to
   8% more (calls of four).
 
-Not tested yet: Safari and WebKit (so Element X on iOS), LiveKit's native SDKs, more than one
-machine, real networks with address translation. It has not run in production. Expect rough
+Also in Firefox and in WebKit's engine (Playwright's builds) the scripted call behaves as
+against LiveKit. Not tested yet: Safari itself, LiveKit's native SDKs (but Go's, in the load
+generator), more than one machine. It runs in one homeserver's production since November 2026,
+where the first real networks with address translation found two bugs in the WebRTC library
+it stands on (fixed in patched copies). Expect rough
 edges; `docs/port-status.md` has the details, file by file and measurement by measurement.
 
 It was written by one person working with an AI coding assistant, Claude, which wrote most

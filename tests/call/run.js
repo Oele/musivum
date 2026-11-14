@@ -5,7 +5,8 @@
 //   node run.js <name> <ws url> <api key> <api secret>
 //
 // <name> names the output: out/<name>.json. The browser is $CHROME, or the first of
-// google-chrome, chromium, chromium-browser found.
+// google-chrome, chromium, chromium-browser found; with BROWSER=firefox or webkit it is
+// Playwright's build of that browser instead (browsers.js).
 //
 // With RELAY=1 the clients connect with iceTransportPolicy 'relay': they reach the server's
 // media only through the TURN servers the join response names (LiveKit's embedded one, see
@@ -89,7 +90,8 @@ const has = (log, name, match) => events(log, name, match).length > 0;
 
 (async () => {
   const pageServer = await servePage();
-  const browser = await puppeteer.launch({
+  const other = process.env.BROWSER && process.env.BROWSER !== 'chrome';
+  const browser = other ? await require('./browsers').launch(process.env.BROWSER) : await puppeteer.launch({
     executablePath: chrome,
     headless: true,
     args: [
@@ -194,7 +196,8 @@ const has = (log, name, match) => events(log, name, match).length > 0;
       return v && v.frameWidth === 1280 ? v : null;
     }, 30000);
     observe('a large video element gets the high layer', large ? large.frameWidth : (await bob.evaluate(() => window.inbound('video')))[0], 1280);
-    observe('alice sends three simulcast layers', (await alice.evaluate(() => window.outbound())).filter(o => o.active && o.framesSent > 0).map(o => o.rid).sort(),
+    // `active` is Chrome's (Firefox's statistics have no such field): absent counts as active
+    observe('alice sends three simulcast layers', (await alice.evaluate(() => window.outbound())).filter(o => o.active !== false && o.framesSent > 0).map(o => o.rid).sort(),
       v => v.length === 3);
 
     // Data messages, both kinds.

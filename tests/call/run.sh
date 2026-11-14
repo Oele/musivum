@@ -30,7 +30,7 @@ if [ -n "${NETEM:-}" ]; then PORT=39521; export PAGE_PORT=39538; fi
 
 CONF_REFERENCE=reference-livekit.yaml
 CONF_MUSIVUM=musivum.yaml
-NAME=$TARGET
+NAME=$TARGET${BROWSER:+-$BROWSER}
 if [ "${TURN:-}" = 1 ]; then
   CONF_REFERENCE=turn-livekit.yaml
   CONF_MUSIVUM=turn-musivum.yaml

@@ -209,6 +209,18 @@ out the TCP network types (no TCP candidates were offered), and TCP candidates l
 priority offset. What still differed then: no IPv6 candidates (added since), and candidate lines
 without pion's `ufrag` attribute.
 
+## Other browsers
+
+On 2026-11-15 the same scripted call ran with both participants in Firefox and in WebKit
+(Playwright's builds, `BROWSER=firefox|webkit tests/call/run.sh`, `tests/call/browsers.js`).
+Firefox: 20 of 20 against both servers (one check had read a statistic only Chrome has, and
+reads it as Firefox gives it now). WebKit (Playwright's Linux build, WebKit's WebRTC, not
+Safari): 17 of 20 against both servers, failing the same three checks, because that build
+sends one of the three simulcast layers it announces; everything else (join, media both
+ways, data, speakers, mute, leave) as with LiveKit, and over four runs each the same 2 to 3
+key frames per call (one early musivum run had 15, which did not repeat). Safari itself and
+iOS remain untested here.
+
 ## Behind asaroton
 
 On 2026-11-14 asaroton's lab ran musivum in place of `livekit-server`, with the configuration
@@ -220,6 +232,18 @@ after the fix asaroton received the same 14 webhooks as from LiveKit, and its de
 events went out 2 ms after a participant closed). Also as with LiveKit: a three-way browser
 call (the tiles drop to 360p with three and return to 720p when one leaves), and Element X
 26.10.1 on Android in a call with Element Web (video both ways, the hang-up seen at once).
+
+In production (asaroton, from the evening of 2026-11-14) calls worked from the LAN, from
+Android on a mobile network over IPv6 and IPv4, and from iOS on the LAN; an iPhone behind a
+phone's Wi-Fi hotspot connected ICE but never the connection, over UDP. Two causes found and
+fixed: `rtc`'s controlled ICE agent kept the first nominated pair when the client nominated
+another (`third_party/rtc-ice`, `docs/webrtc-library.md` item 6; confirmed with a capture in
+asaroton's lab, where media now goes to the address the browser sends from), and DTLS sent a
+lost flight again only after a second (item 7; with 30% loss during set-up musivum did not
+connect where LiveKit did, and now connects in 0.9 s). The iPhone over the hotspot has not
+been tried again yet. Open: a call forced through musivum's own TURN on that path, with the
+relay reached by the router's hairpin, completed ICE and DTLS but no media came from the
+iPhone; not compared with LiveKit.
 Then, each against LiveKit on the same configuration: a relay-only call (Chrome kept off
 direct UDP, ICE over TCP off, TURN over TLS on a name of the lab's own CA): both peers on
 relay over UDP and TLS, two 720p videos each for the whole call, as with LiveKit; the relay
