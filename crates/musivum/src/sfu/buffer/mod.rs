@@ -41,10 +41,6 @@ pub enum Error {
     DdStructureAttachedToNonFirstPacket,
     #[error("dependency descriptor extension not found")]
     DdExtentionNotFound,
-    // vp9keyframe.rs (new for musivum)
-    #[error("VP9 packet has no frame behind its payload descriptor")]
-    Vp9DescriptorOnly,
-
     // an error of the reader of the dependency descriptor, which the parser passes on
     #[error(transparent)]
     DependencyDescriptor(#[from] crate::sfu::rtpextension::dependencydescriptor::Error),
