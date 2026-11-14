@@ -224,20 +224,15 @@ mod tests {
                 .with_label_values([rate])
                 .snapshot()
         };
-        let (before_zero, before_late) = (
-            of("a rate of this test"),
-            of("another rate of this test"),
-        );
+        let (before_zero, before_late) =
+            (of("a rate of this test"), of("another rate of this test"));
 
         record_subscribe_pace_shadow(&HashMap::from([
             ("a rate of this test".to_string(), Duration::ZERO),
             ("another rate of this test".to_string(), SECOND + SECOND / 2),
         ]));
 
-        let (after_zero, after_late) = (
-            of("a rate of this test"),
-            of("another rate of this test"),
-        );
+        let (after_zero, after_late) = (of("a rate of this test"), of("another rate of this test"));
         // no wait counts in the bucket of zero
         assert_eq!(before_zero.le(0.0) + 1, after_zero.le(0.0));
         // 1500 ms: above 1000, not above 2000

@@ -735,11 +735,7 @@ impl SubscriptionManager {
                                 "failed to subscribe, triggering error handler", err,
                                 "attempt" => s.get_num_attempts(),
                             );
-                            s.maybe_record_error(
-                                participant.get_telemetry_listener(),
-                                &err,
-                                false,
-                            );
+                            s.maybe_record_error(participant.get_telemetry_listener(), &err, false);
                             (self.params.on_subscription_error)(&s.track_id, true, &err);
                         } else {
                             debugw!(
@@ -1756,6 +1752,7 @@ impl<T> TrackSubscription<T> {
         true
     }
 
+    #[allow(dead_code)] // called by the tests only upstream too
     fn get_has_permission(&self) -> bool {
         let s = self.lock.read();
         s.has_permission

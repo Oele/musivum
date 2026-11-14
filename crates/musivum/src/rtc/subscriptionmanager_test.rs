@@ -618,7 +618,8 @@ async fn test_settings_kept_for_subscribe() {
         eventually_async(
             || {
                 let m = sm.lock.read();
-                !m.subscriptions.contains_key(&livekit::TrackId::from("other"))
+                !m.subscriptions
+                    .contains_key(&livekit::TrackId::from("other"))
             },
             SUB_SETTLE_TIMEOUT,
             SUB_CHECK_INTERVAL,
@@ -1185,9 +1186,9 @@ async fn test_subscribe_revoked_in_flight() {
             let tracks = tracks.clone();
             move |sub, track_id| {
                 let res = resolver.resolve(sub, track_id);
-                tracks
-                    .lock()
-                    .push(fakes::downcast::<FakeMediaTrack>(res.track.clone().unwrap()));
+                tracks.lock().push(fakes::downcast::<FakeMediaTrack>(
+                    res.track.clone().unwrap(),
+                ));
                 res
             }
         });
@@ -1309,7 +1310,10 @@ impl TestSubscriptionManager {
     }
 
     // sm.params.OnTrackSubscribed = f
-    fn set_on_track_subscribed(&self, f: impl Fn(Arc<dyn SubscribedTrack>) + Send + Sync + 'static) {
+    fn set_on_track_subscribed(
+        &self,
+        f: impl Fn(Arc<dyn SubscribedTrack>) + Send + Sync + 'static,
+    ) {
         *self.test_params.on_track_subscribed.lock() = Arc::new(f);
     }
 
@@ -1639,8 +1643,10 @@ type CallbackTable<F, C> = LazyLock<Mutex<HashMap<usize, (Weak<F>, C)>>>;
 
 static SUBSCRIBED_TRACK_CALLBACKS: CallbackTable<FakeSubscribedTrack, SubscribedTrackCallbacks> =
     LazyLock::new(Default::default);
-static DATA_DOWN_TRACK_CALLBACKS: CallbackTable<FakeDataDownTrack, Vec<Option<OnDataDownTrackClose>>> =
-    LazyLock::new(Default::default);
+static DATA_DOWN_TRACK_CALLBACKS: CallbackTable<
+    FakeDataDownTrack,
+    Vec<Option<OnDataDownTrackClose>>,
+> = LazyLock::new(Default::default);
 
 // &typesfakes.FakeSubscribedTrack{}, for a test that calls what the track was given
 fn new_fake_subscribed_track() -> Arc<FakeSubscribedTrack> {
