@@ -98,7 +98,7 @@ hard-coded.
    padding of up to 255 bytes and counts padding received. `third_party/rtc-rtp` is the
    crate with one field more (`Header::padding_size`, as pion has it), used through
    `[patch.crates-io]`; the whole of `rtc` builds against it unchanged. To be proposed
-   upstream; not proposed yet.
+   upstream: proposed as webrtc-rs/rtc#327 and #328 (issues; pull requests after a reply).
 2. **RTCP stops at the interceptors.** By design: an application gets RTCP when one of its
    own interceptors marks it (`Attribute::DeliverToApplication`). musivum's own interceptor
    is where the ported code takes RTP and RTCP anyway.
@@ -124,7 +124,7 @@ hard-coded.
    media section, where `rtc` used the preferences it had set from it (pion uses its media
    engine's negotiated codecs). It cannot be done above the crate: its media engine cannot
    be read once a connection has it, and a local description has to be set as the crate
-   wrote it. To be proposed upstream; not proposed yet.
+   wrote it. To be proposed upstream: proposed as webrtc-rs/rtc#327 and #328 (issues; pull requests after a reply).
 
 None of these changes the structure of the port.
 

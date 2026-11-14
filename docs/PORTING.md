@@ -230,7 +230,8 @@ close to their originals so that each release can be followed as a diff. Per rel
 
 ## Open questions
 
-- Proposing the padding size field and a transceiver's codec handling to webrtc-rs, so that
-  `third_party/rtc-rtp` and `third_party/rtc` can go.
+- The padding size field and a transceiver's codec handling are proposed to webrtc-rs
+  (webrtc-rs/rtc#327 and #328); when they land, `third_party/rtc-rtp` and `third_party/rtc`
+  can go.
 - The remaining CPU difference under load (4 to 18% more than LiveKit): most of it is in the
   write of each packet through `rtc`'s pipeline (`docs/port-status.md`, "Under load").
