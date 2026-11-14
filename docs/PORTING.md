@@ -52,6 +52,10 @@ was checked:
 
 - **jxskiss/base62 v1.1.0** (MIT), which LiveKit's protocol uses for hashed ids and
   secrets: its encoder is ported in `protocol/utils/base62.rs`. Its notice is in `NOTICE`.
+- **elliotchance/orderedmap v3.1.1** (MIT), which LiveKit's VP8 munger keeps its caches
+  in, and **counterfeiter** (MIT), which generates the fakes LiveKit's tests use: both read
+  to see what they do, nothing copied (`sfu/codecmunger/orderedmap.rs` and
+  `crates/musivum-fakes` are written new).
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers

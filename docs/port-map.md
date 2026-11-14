@@ -111,8 +111,9 @@ Kept the same everywhere, so that a ported file reads like its original:
 - `logger.Logger` with its key and value pairs is `protocol::logger::Logger`, written to
   `tracing`; arguments are only formatted when the level is enabled.
 - Counterfeiter fakes (`sfufakes`, `typesfakes`, `transportfakes`, `routingfakes`) are not
-  ported as generated code: a test gets a hand-written fake of the trait it needs, in
-  `testutils`.
+  ported as generated code: `#[cfg_attr(test, musivum_fakes::fake)]` on a trait makes its
+  fake at compile time, with counterfeiter's calls (`docs/porting-guide.md`, "Fakes of
+  interfaces").
 - Prometheus counters (`pkg/telemetry/prometheus`) become calls into one small `metrics`
   module that counts and can be read; no Prometheus dependency in the library.
 
@@ -318,7 +319,8 @@ the code is written against the Rust library. X = left out.
 - **Fakes of interfaces** (`sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`,
   `telemetryfakes`): `receiver_test.go`, `redreceiver_test.go`, and nearly all tests of
   `pkg/rtc` (`room_test.go`, `participant_internal_test.go`, `subscriptionmanager_test.go`,
-  `uptrackmanager_test.go`, `dynacast`, `supervisor`, `signalling`). Hand-written fakes.
+  `uptrackmanager_test.go`, `dynacast`, `supervisor`, `signalling`). Fakes made by
+  `musivum_fakes::fake`.
 - **Two peer connections in one process**: `transport_test.go`, `transport_fec_test.go`,
   `transport_media_sections_test.go`. Ported onto the chosen library.
 - **A simulated network** (`pion/transport/vnet`):

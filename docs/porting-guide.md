@@ -201,6 +201,87 @@ lazily is not needed, since the macros do not evaluate values when the level is 
   report. Do not leave it out silently and do not write a different test under the same
   name.
 
+## Fakes of interfaces
+
+`counterfeiter:generate` on an interface becomes `#[cfg_attr(test, musivum_fakes::fake)]` on
+the trait (`#[musivum_fakes::fake]` in a test-only module). Next to the trait, with its
+visibility, that makes `FakeTrait` (`Default`, `Send + Sync`, `Debug`, implements the trait)
+and `FakeTraitState`. A test makes `Arc::new(FakeTrait::default())`, hands a clone to the
+code under test as `Arc<dyn Trait>` and keeps the `Arc` to configure and question the fake.
+The full text and compiled examples are in the rustdoc of `musivum_fakes::fake`.
+
+For every method `x` (returning `R`), all on `&self`:
+
+    x_returns(&self, value: R)               // all later calls; takes a stub away
+    x_returns_with(&self, value: impl Fn() -> R + Send + Sync + 'static)
+    x_returns_on_call(&self, i: usize, value: R)      // call i, from 0; takes a stub away
+    x_calls(&self, stub: impl Fn(args..) -> R + Send + Sync + 'static)
+    x_stub(&self, stub: ..)                  // the same: Go's `fake.XStub = f`
+    x_call_count(&self) -> usize
+    x_args_for_call(&self, i: usize) -> A    // the argument if one, a tuple if several
+
+No `x_args_for_call` for a method without parameters, no `x_returns*` for one that returns
+nothing. `r#type` gives `type_returns`. A call is recorded first; then the stub answers if
+set, else the value for this call, else the value for all calls, else the zero value. A stub
+runs with no lock held and may call back into the fake.
+
+| Go | Rust |
+|---|---|
+| `p := &typesfakes.FakeLocalParticipant{}` | `let p = Arc::new(FakeLocalParticipant::default());` |
+| `p.IdentityReturns("alice")` | `p.identity_returns("alice".into());` |
+| `p.GetAudioLevelReturns(20, true)` | `p.get_audio_level_returns((20.0, true));` |
+| `r.ReadRTPReturns(0, io.EOF)` | `r.read_rtp_returns(Err(Error::Eof));` or `r.read_rtp_returns_with(\|\| Err(Error::Eof));` |
+| `r.AddOnReadyCalls(func(f func()) { f() })` | `r.add_on_ready_calls(\|f\| f());` |
+| `p.CloseStub = func(bool, types.ParticipantCloseReason, bool) error { ...; return nil }` | `p.close_stub(move \|_, _, _\| { ...; Ok(()) });` |
+| `require.Equal(t, 2, p.SubscribeToTrackCallCount())` | `assert_eq!(2, p.subscribe_to_track_call_count());` |
+| `require.Equal(t, req.Key, publisher.GetDataBlobArgsForCall(0))` | `assert_eq!(req.key, publisher.get_data_blob_args_for_call(0));` |
+| `_, got, _, _ := fp.SendDataMessageArgsForCall(0)` | `let (_, got, _, _) = fp.send_data_message_args_for_call(0);` |
+| `p := participants[0].(*typesfakes.FakeLocalParticipant)` | `let p = fakes::downcast::<FakeLocalParticipant>(participants[0].clone());` (the trait needs `Any` as a supertrait) |
+
+Arguments (what `x_args_for_call` gives a clone of):
+- `T` by value: `T`. An `Arc<dyn Trait>`, `Option<Arc<..>>` or `Arc<dyn Fn..>` is the same
+  object, which the test can call.
+- `&T`: `T` (by `Clone`). `&str`: `String`. `&[T]`: `Vec<T>`. `Option<&T>`, `Option<&str>`,
+  `Option<&[T]>`: the `Option` of those.
+- Not recorded: `&mut ..`, `&dyn ..`, `Box<dyn ..>` (also in `Option` or `Pin`), a type that
+  still borrows (`&[&str]`, `Cow<'_, str>`), and a parameter marked
+  `#[cfg_attr(test, fake(skip))]`. Its place in the tuple holds
+  `testutils::fakes::NotRecorded`. A stub still gets every argument as the method got it.
+- A recorded type must be `Clone + Send + 'static`. Otherwise the compiler says "the fake
+  cannot record an argument of type `X`" at the parameter; mark it with `fake(skip)`, or
+  make the type `Clone`, or pass it in an `Arc`.
+
+Return values:
+- Nothing set: `Default::default()`; for `Result<T, E>` it is `Ok(T::default())` (Go's nil
+  error). A type with neither (`Arc<dyn Trait>`, `Box<dyn ..>`, an enum without a default)
+  compiles, and the call panics with a message that names the fake, the method and the
+  calls that set a value.
+- `x_returns(value)` takes `R` itself. A `Clone` value is returned on every call; so is an
+  `Ok(v)` with `v: Clone`, whatever the error type. Anything else (a non-`Clone` `Err`, a
+  `Box<dyn ..>`) is returned once, and a second call panics naming `x_returns_with`.
+- `x_returns_with(|| ..)` makes a value per call. Error types need not be `Clone`.
+- A return type that borrows is kept as `'static`: `fn name(&self) -> &str` takes
+  `name_returns("a name")`.
+
+Supertraits (Go's embedded interfaces):
+- `trait LocalParticipant: Participant` needs `Participant` faked too. The fake of the
+  subtrait implements both, and the inherited methods are configured directly on it
+  (`p.identity_returns(..)`). The traits may be in different modules, any number of levels
+  deep; upcasting is unaffected.
+- Passed over: `Send`, `Sync`, `Sized`, `Unpin`, `Any`, `Debug`, lifetimes, and paths
+  starting with `std`, `core` or `alloc`. Every other supertrait is taken to be faked;
+  `#[cfg_attr(test, musivum_fakes::fake(extends(A, B)))]` names the ones to embed instead.
+- With several faked supertraits, the first is configured directly; the others are reached
+  with `fake.embedded::<FakeOtherState>().x_returns(..)`. Two faked supertraits that share
+  a faked ancestor do not compile.
+
+Not faked, each with a compile error that says so: generic traits and methods, `impl Trait`
+in a signature, associated types, methods without `self` or with `Self` in a signature. A
+method with a default body can keep it with `#[cfg_attr(test, fake(keep))]`. The fakes are
+for traits of the `musivum` crate (the macro refers to `crate::testutils::fakes`). A trait
+whose fakes a test has to get back from an `Arc<dyn Trait>` has `Any` as a supertrait.
+Counterfeiter's `Invocations()` has no counterpart.
+
 ## Running things
 
 - Everything cargo runs here (test binaries, `cargo run`) goes through

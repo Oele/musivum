@@ -44,6 +44,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/bwe/remotebwe/` (four files) | `sfu/bwe/remotebwe/` (same names) | none upstream | 22 tests added, their expected values printed by the Go original for the same calls with the same sleeps. The config `Default`s are Go's zero values; the original's defaults are the `DEFAULT_...` constants. |
 | `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
 | `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
+| `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
 | `pkg/sfu/rtpmunger.go` | `sfu/rtpmunger.rs` | 9 / 9 | `update_and_get_sn_ts` returns the parameters together with the error, as the original does. Also run against the original: 6,000 operations, 13,548 lines of results and state, identical. |
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
@@ -71,6 +72,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
 | `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
 | `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
+| (new, in place of `sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`) | `crates/musivum-fakes`, `testutils/fakes.rs` | | A procedural macro that makes a trait's fake at compile time, with counterfeiter's calls. 18 tests of its own; the uses of fakes in `downtrack_downstream_integration_test.go` and `room_test.go` were written out with it line for line as a check. A trait of 150 methods adds about a third of a second to a check of the tests. |
 | (new) | `webrtc/track.rs`, `webrtc/peerconnection/` | | Written new: the traits `pkg/sfu` meets the WebRTC library through, and musivum's peer connection on `rtc`. Twelve tests. See `docs/webrtc-library.md`. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
@@ -201,6 +203,10 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `codecmunger/vp8.go`: a late packet gets the cached picture id offset but the current
+  TL0PICIDX and KEYIDX offsets; the wrap handler is moved before the out-of-order check, so
+  a late packet that then misses the cache still moves it; on a jump of N picture ids, N
+  cache entries are inserted under the forwarder's lock before the cache is trimmed to 50.
 - `rtpmunger.go`: `updateSnOffset` sets the offset to 0 when the range map lookup fails,
   where the sequencer's keeps the old one. `sequencer.go`: a packet with source and target
   sequence number 0 in the sequencer's first millisecond reads as an invalid slot.
@@ -230,9 +236,7 @@ work in progress committed (not reviewed, not merged):
 
 | What | Branch | State when stopped |
 |---|---|---|
-| `sfu/codecmunger` | `worktree-agent-af38123cbb04c7d54` | Partly written. |
 | `sfu/streamtrackermanager.go` | `worktree-agent-a4f0b6a686c461dee` | Just begun. |
-| `crates/musivum-fakes`: fakes of traits for tests, in the manner of counterfeiter | `worktree-agent-a7e87e6e01374d5a6` | The macro and its tests exist; a test with the port's real types was being added. |
 
 Next after these, in this order: `sfu/rtpstats` and `sfu/bwe/sendsidebwe` (what they
 waited for, the utilities, is merged); `sfu/pacer` (the seam traits are merged); then the
