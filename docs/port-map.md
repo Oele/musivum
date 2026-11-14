@@ -61,7 +61,7 @@ gives them. "Tests" is the `_test.go` file next to a source file where there is 
    identifiers, the signalling message encoding, and the Protocol Buffers definitions).
 
 6. **Upstream's own tests pass here.** `go test ./pkg/sfu/... ./pkg/rtc/...` at the pin, Go
-   1.26.8, on this machine: see "The reference run" at the end.
+   1.26.8: see "The reference run" at the end.
 
 ## Corrections to the plan
 

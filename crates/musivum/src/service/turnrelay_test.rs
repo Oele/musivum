@@ -2,7 +2,7 @@
 // Copyright 2026 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust. The client is the TURN tests' (`webrtc::turn::testclient`,
 // in place of pion's). The relay range of the servers the tests make is 39545..=39559 (ports
-// this machine leaves to the tests) instead of 40000..=40100. The fake generator has no
+// kept for the tests) instead of 40000..=40100. The fake generator has no
 // `AllocateListener` and `AllocateConn` (see `turnrelay.rs`); TestRejectTCPRelayAddressGenerator
 // asks the wrapper's own refusals. TestNewTurnServer_RejectsTCPRelay sends the Allocate of a TCP
 // relay itself (pion's client has `AllocateTCP`). The tests that make servers on the fixed

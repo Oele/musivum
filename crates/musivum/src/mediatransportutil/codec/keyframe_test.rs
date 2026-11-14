@@ -218,4 +218,3 @@ fn vp9_key_frame_of_a_packet_that_is_parsed_already() {
         assert_eq!(want, is_vp9_key_frame(None, &p), "{payload}");
     }
 }
-

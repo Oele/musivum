@@ -186,7 +186,7 @@ port the changed tests, move the pin. Ported files stay close to their originals
 ## Open questions
 
 - (Settled 2026-11-14: LiveKit's embedded TURN server is ported, from pion/turn, so that
-  musivum stays a drop-in replacement; the owner's deployment uses it.)
+  musivum stays a drop-in replacement for deployments that enable it.)
 - Proposing the padding size field and a sender's codecs to webrtc-rs, so that
   `third_party/rtc-rtp` and `third_party/rtc` can go.
 - (Settled: the server reads LiveKit's own configuration file, `crate::config`. Sections for

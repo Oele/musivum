@@ -1,7 +1,7 @@
 // Ported from pion/turn, lt_cred_test.go at v5.0.13.
 // Copyright (c) The Pion community <https://pion.ly>. Licensed under the MIT License.
 // Changes: translated from Go to Rust. The server listens on an ephemeral port of the loopback
-// interface, not on 127.0.0.1:3478 (a TURN server of this machine may have it); the client is
+// interface, not on 127.0.0.1:3478 (a TURN server may already run on the machine); the client is
 // the tests' (`testclient.rs`).
 
 use std::net::IpAddr;

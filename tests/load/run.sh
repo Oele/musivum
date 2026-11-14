@@ -22,7 +22,7 @@ TARGET=${1:?usage: run.sh reference|musivum [scenario ...]}
 shift
 SCENARIOS=${*:-a b c}
 LK=${LK:-$HOME/.cache/musivum/gobin/lk}
-# lk must never find the live server: no LIVEKIT_* from the environment, and every call to it
+# lk must never reach another LiveKit on the machine: no LIVEKIT_* from the environment, and every call to it
 # names its URL and key (load.py).
 unset LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET
 

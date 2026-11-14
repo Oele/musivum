@@ -325,19 +325,20 @@ implements or calls these traits; the header of the file has them at greater len
   binary 30 minutes at most. A loop that allocates without end, by mistake or by a
   mutation made on purpose, then fails instead of taking the machine's memory. It happened:
   a mutation check without a cap had a 45 GB test binary killed by the kernel on a machine
-  that also runs a live server.
+  that also runs other services.
 - Anything run outside cargo that could run away (a Go harness, a script that replays
   generated inputs) gets the same by hand: `ulimit -d 8388608` in the shell that starts it
   (`-d`, not `-v`: a limit on address space keeps programs with many threads from starting
   them), and `timeout`.
 - Scratch files go in the repository's `target/` or under `~/.cache/musivum`, not in `/tmp`.
 - Test servers listen on the loopback interface, on ephemeral ports or ports from 39000 to
-  39999 that are free; never 7880, 7881, 5349, 50000 to 60000 or 38000 to 38999.
+  39999 that are free; never LiveKit's default ports (7880, 7881, 5349, 3478, 50000 to
+  60000), so that a LiveKit on the same machine is not disturbed.
 
 ## What not to do on the way
 
-- Do not fix what looks wrong in the original. Port it as it is and note it for
-  `docs/port-status.md` ("Noted on the way").
+- Do not fix what looks wrong in the original. Port it as it is and say so in the file's
+  header, where it explains the code.
 - Do not improve: no different data structure because it is nicer in Rust, no merged or
   split functions, no reordering. The exception is what Rust forces (ownership, a lock that
   cannot be held across a call), and that goes in the header's "Changes".

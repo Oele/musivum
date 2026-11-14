@@ -146,3 +146,8 @@ service. Twirp's notice:
 
     Twirp
     Copyright 2018 Twitch Interactive, Inc.  All Rights Reserved.
+
+third_party/rtc and third_party/rtc-rtp are copies of the crates `rtc` and `rtc-rtp` of
+webrtc-rs (https://github.com/webrtc-rs/rtc), under the MIT License or the Apache License,
+Version 2.0, with small changes of musivum's (their MUSIVUM.md and MUSIVUM.patch). Their
+licence files are in those directories.

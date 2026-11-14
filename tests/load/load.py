@@ -6,7 +6,7 @@ the server's CPU, memory and threads, the machine's load and the CPU temperature
 run.sh is the way in (it builds or checks the server first). The results go to
 results/<target>-<scenario>.json, the logs (server, lk) to target/load/ of the repository.
 
-Safety, as this machine is also a live server:
+Safety, as the machine may also run other services, a LiveKit among them:
 - the server and lk talk on 127.0.0.1, ports 39560 to 39562 only (the configurations here);
   every lk call gets an explicit --url, --api-key and --api-secret, and LIVEKIT_* is removed
   from its environment;

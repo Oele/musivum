@@ -4,9 +4,9 @@
 // - The client is the tests' (`testclient.rs`, in place of pion's): what is asserted on pion's
 //   error texts ("Allocate error response (error 400: )") is asserted on the error codes.
 // - The servers listen on ephemeral ports of the loopback interface, never on 3478 (a TURN
-//   server of this machine may have it); the second client of "Filter on client address and
+//   server may already run on the machine); the second client of "Filter on client address and
 //   peer IP" has an ephemeral port as well. TestRelayAddressGeneratorPortRange allocates in
-//   39545..=39559 (ports this machine leaves to the tests, held while it runs:
+//   39545..=39559 (a range kept for the tests, held while it runs:
 //   `testutils::lock_fixed_turn_ports`), its one port is 39545, and "Range"
 //   makes 5 relays where the original makes 25 in a range of a thousand ports.
 // - pion's `test.TimeOut` and `test.CheckRoutines` have no counterpart.
