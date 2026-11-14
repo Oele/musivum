@@ -204,6 +204,22 @@ in between, `on_track` again). A user of the layer that counts announcements has
 that; a transceiver stopped between a renegotiation and the stream's next packet unbinds
 nothing at the sink.
 
+Found when the transport was ported onto the layer (`rtc/transport_impl.rs`), each with a
+stand-in on the transport's side:
+
+- **A sender's codecs.** pion's `RTPSender.GetParameters().Codecs` are the transceiver's
+  codecs; `rtc` leaves a sender's empty until codec preferences are set, and a transceiver
+  made from a kind has no sender in the layer. The transport reads the codecs from the
+  receiver, which works for send-and-receive transceivers. `rtc` also writes the media
+  engine's codec into the description, not the preferred one, so parameters set on a
+  preference (`sprop-stereo`, NACK removed) may not reach the description.
+- **No ICE transport object.** The selected pair comes from the layer's event; the RTT from
+  the statistics, which have none under ICE lite.
+- **Gathering is synchronous**, so the transport's paths that wait for gathering to end are
+  kept and never taken.
+- **Settings `rtc` lacks:** DTLS curves, skipping HelloVerify, DTLS retransmission interval
+  and handshake timeout, closing by DTLS, SRTP replay protection off, SCTP zero checksum.
+
 ## Not tested
 
 - Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
