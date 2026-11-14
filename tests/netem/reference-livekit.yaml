@@ -1,0 +1,21 @@
+# The reference server for the degraded-network runs (NETEM=... ../call/run.sh reference):
+# LiveKit as in ../call/reference-livekit.yaml, but with its media behind the impairment
+# relay. It listens for media on 127.0.0.1:39522 and advertises 127.0.0.2:39522, a candidate
+# the clients point at the relay (../call/netem.js), which forwards to 127.0.0.1:39522. ICE
+# over TCP is off: the clients would drop its candidates anyway, since the relay passes UDP.
+port: 39521
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  udp_port: 39522
+  tcp_port: 0
+  use_external_ip: false
+  node_ip: 127.0.0.2
+  enable_loopback_candidate: true
+  ips:
+    includes:
+      - 127.0.0.1/32
+keys:
+  calltestkey: calltestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info

@@ -1,0 +1,16 @@
+[package]
+name = "musivum-netem"
+description = "A user-space impairment relay for the call test: loss, delay with jitter and a bandwidth cap between the browsers and the server under test"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[[bin]]
+name = "netem-relay"
+path = "src/main.rs"
+
+[lints]
+workspace = true

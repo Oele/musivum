@@ -1,0 +1,19 @@
+# musivum for the degraded-network runs (NETEM=... ../call/run.sh musivum): the same as
+# reference-livekit.yaml here. The relay forwards to 127.0.0.1:39522, so the media socket
+# has to listen there (on that address only or on all of them).
+port: 39521
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  udp_port: 39522
+  tcp_port: 0
+  use_external_ip: false
+  node_ip: 127.0.0.2
+  enable_loopback_candidate: true
+  ips:
+    includes:
+      - 127.0.0.1/32
+keys:
+  calltestkey: calltestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info
