@@ -112,6 +112,7 @@ pub struct SubscriptionManagerParams {
     pub track_resolver: MediaTrackResolver,
     pub on_track_subscribed: Box<dyn Fn(Arc<dyn SubscribedTrack>) + Send + Sync>,
     pub on_track_unsubscribed: Box<dyn Fn(Arc<dyn SubscribedTrack>) + Send + Sync>,
+    #[allow(clippy::type_complexity)]
     pub on_subscription_error: Box<dyn Fn(&livekit::TrackId, bool, &Error) + Send + Sync>,
 
     pub subscription_limit_video: i32,
@@ -555,6 +556,7 @@ impl SubscriptionManager {
     // OnSubscribeStatusChanged callback will be notified when a participant subscribes or unsubscribes to another participant
     // it will only fire once per publisher. If current participant is subscribed to multiple tracks from another, this
     // callback will only fire once.
+    #[allow(clippy::type_complexity)]
     pub fn on_subscribe_status_changed(
         &self,
         f: Box<dyn Fn(&livekit::ParticipantId, bool) + Send + Sync>,
@@ -992,6 +994,7 @@ impl SubscriptionManager {
         }
     }
 
+    #[allow(clippy::collapsible_match)] // the shape of the original's switch
     fn has_capacity_for_subscription(&self, kind: livekit::TrackType) -> bool {
         match kind {
             livekit::TrackType::Video => {
@@ -2179,7 +2182,7 @@ impl DataTrackSubscription {
             let mut s = self.lock.write();
             let old_data_down_track =
                 std::mem::replace(&mut s.outer.data_down_track, data_down_track.clone());
-            (old_data_down_track, s.outer.subscription_options.clone())
+            (old_data_down_track, s.outer.subscription_options)
         };
 
         if let Some(data_down_track) = &data_down_track {
@@ -2202,7 +2205,7 @@ impl DataTrackSubscription {
     ) {
         let data_down_track = {
             let mut s = self.lock.write();
-            s.outer.subscription_options = subscription_options.cloned();
+            s.outer.subscription_options = subscription_options.copied();
             s.outer.data_down_track.clone()
         };
         if let Some(data_down_track) = data_down_track {
