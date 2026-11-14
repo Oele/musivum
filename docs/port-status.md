@@ -17,6 +17,9 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | mtu `pkg/utils/wraparound.go` | `mediatransportutil/utils/wraparound.rs` | 6 / 6 | |
 | mtu `pkg/bucket/bucket.go`, `errors.go` | `mediatransportutil/bucket/` | 6 / 6 | `GetPacket` on a nil bucket is the caller's `None`. Also run against the Go original: 288,000 operations, identical. |
 | mtu `pkg/nack/nack.go` | `mediatransportutil/nack/nack.rs` | 3 / 3 | Also run against the Go original, identical. |
+| mtu `pkg/latency/owd_estimator.go` | `mediatransportutil/latency/owd_estimator.rs` | none upstream | Four tests added, their expected values printed by the Go original for the same series. |
+| mtu `pkg/twcc/twcc.go` | `mediatransportutil/twcc/twcc.rs` | 1 / 1 | One of the six cases of upstream's test fails upstream too (see below); the port asserts what the original does. One test added that compares 27 marshalled feedback packets with pion's bytes. |
+| pion/interceptor `pkg/twcc/twcc.go`, `arrival_time_map.go`, `internal/sequencenumber/unwrapper.go` | `webrtc/interceptor/twcc/`, `webrtc/interceptor/internal/sequencenumber/` | 15 / 15 | Only the recorder and what it stands on, not pion's interceptors around it. The assertion on allocations in one test is replaced by one on the buffer not moving. Two benchmarks left out. |
 | mtu `helpers.go` | `mediatransportutil/helpers.rs` | 1 / 1 | Two tests added (the way back from NTP time, RTT from a receiver report). |
 | pion/rtp `packet.go`, `error.go` | `webrtc/rtp/packet.rs`, `error.rs` | 43 / 43 | Four tests added. Benchmarks left out. Run against pion with 432,008 generated inputs: every output identical, error texts and the cases where pion panics included. |
 | pion/rtp `abssendtimeextension.go`, `audiolevelextension.go`, `transportccextension.go`, `playoutdelayextension.go`, `abscapturetimeextension.go` | `webrtc/rtp/` (same names) | 20 / 20 | Benchmarks left out. |
@@ -82,5 +85,19 @@ What looked wrong or fragile upstream and was ported as it is:
   the other way round is not), and parameters without `=` are ignored. protocol
   `mimetype.go`: `IsMimeTypeStringAudio` and `...Video` compare the prefix with case while
   everything else folds case.
+- mtu `twcc_test.go`, `TestBuildFeedbackOnPush`: the case "should not build when mSSRC is
+  invalid" expects no feedback and gets one, at the versions LiveKit is built with (run:
+  "expected: 0, actual: 1"). Nothing in the responder or in pion's recorder looks at the
+  media SSRC.
+- pion/interceptor `twcc_test.go`: two tests have inputs that depend on Go's order of
+  evaluation inside a slice literal; the port uses the values Go actually produces.
+- mtu `owd_estimator.go`: after a perfectly steady phase the estimator does not follow a
+  lasting rise of 20 to 100 ms even after 600 reports (seen in the port; follows from the
+  same lines upstream, not run there).
+- `rtc-rtcp` against pion/rtcp, for transport-wide feedback: the bytes agree. Differences
+  that code reading subscribers' feedback has to know: a delta that does not fit its type
+  fails the whole marshal (pion skips it); when unmarshalling a truncated packet, a large
+  delta with one byte left is read as a small one (pion: "packet too short"; read, not
+  tested).
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
