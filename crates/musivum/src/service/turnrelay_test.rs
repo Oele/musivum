@@ -5,7 +5,8 @@
 // this machine leaves to the tests) instead of 40000..=40100. The fake generator has no
 // `AllocateListener` and `AllocateConn` (see `turnrelay.rs`); TestRejectTCPRelayAddressGenerator
 // asks the wrapper's own refusals. TestNewTurnServer_RejectsTCPRelay sends the Allocate of a TCP
-// relay itself (pion's client has `AllocateTCP`).
+// relay itself (pion's client has `AllocateTCP`). The tests that make servers on the fixed
+// relay range take turns (`testutils::lock_fixed_turn_ports`), as do pion's tests of it.
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -267,6 +268,7 @@ async fn allocate_test_turn_relay(
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_new_turn_server_relay_policy() {
+    let _ports = crate::testutils::lock_fixed_turn_ports().await;
     let media_peer = listen_udp();
     let other_peer = listen_udp();
     let (server, mut relay_conn, _) =
@@ -304,6 +306,7 @@ async fn test_new_turn_server_relay_policy() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_new_turn_server_standalone_relay_policy() {
+    let _ports = crate::testutils::lock_fixed_turn_ports().await;
     let media_peer = listen_udp();
     let other_peer = listen_udp();
     let (server, mut relay_conn, _) =
@@ -325,6 +328,7 @@ async fn test_new_turn_server_standalone_relay_policy() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_new_turn_server_rejects_tcp_relay() {
+    let _ports = crate::testutils::lock_fixed_turn_ports().await;
     for standalone in [false, true] {
         let ln = net::listen("tcp4", "127.0.0.1:0").unwrap();
         let turn_addr = net::Listener::addr(&ln).socket_addr();

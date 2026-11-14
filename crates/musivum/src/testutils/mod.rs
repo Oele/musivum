@@ -56,6 +56,15 @@ pub fn eventually_async(
     }
 }
 
+/// New for musivum: the tests that bind the fixed relay ports of the TURN server
+/// (39545..=39559, the ports this machine leaves to the tests) hold this while they run, so
+/// that the tests of one binary, which run at the same time, do not take each other's ports.
+/// It is tokio's mutex: the tests hold it across awaits, each on a runtime of its own.
+pub async fn lock_fixed_turn_ports() -> tokio::sync::MutexGuard<'static, ()> {
+    static FIXED_TURN_PORTS: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+    FIXED_TURN_PORTS.lock().await
+}
+
 /// `ConnectTimeout` of LiveKit's `pkg/testutils`: how long [`with_timeout`] waits when it is
 /// given no timeout.
 pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);

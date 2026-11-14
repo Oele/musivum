@@ -6,7 +6,8 @@
 // - The servers listen on ephemeral ports of the loopback interface, never on 3478 (a TURN
 //   server of this machine may have it); the second client of "Filter on client address and
 //   peer IP" has an ephemeral port as well. TestRelayAddressGeneratorPortRange allocates in
-//   39545..=39559 (ports this machine leaves to the tests), its one port is 39545, and "Range"
+//   39545..=39559 (ports this machine leaves to the tests, held while it runs:
+//   `testutils::lock_fixed_turn_ports`), its one port is 39545, and "Range"
 //   makes 5 relays where the original makes 25 in a range of a thousand ports.
 // - pion's `test.TimeOut` and `test.CheckRoutines` have no counterpart.
 // - Not ported: what tests RFC 6062's TCP relays (`AllocateListener` in TestServerConfig,
@@ -1149,6 +1150,7 @@ async fn test_tls_handshake_connection_state() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_relay_address_generator_port_range() {
+    let _ports = crate::testutils::lock_fixed_turn_ports().await;
     let mut relay_address_generator_port_range = RelayAddressGeneratorPortRange::default();
 
     // Validate
