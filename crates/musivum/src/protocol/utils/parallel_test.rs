@@ -31,3 +31,30 @@ fn test_parallel() {
         assert_eq!(send_slice, recv_slice, "{cs}");
     }
 }
+
+// New for musivum: the workers of `parallel_exec` run on a fixed set of threads, as the
+// original's goroutines run on Go's, and not on threads started for each call. Every call
+// above the threshold has at least one worker that runs `f`, so threads of each call's own
+// would show more than `num_cpu() + 1` of them over `num_cpu() + 2` calls.
+#[test]
+fn test_parallel_reuses_threads() {
+    let vals: Vec<i64> = (0..100).collect();
+    let threads = parking_lot::Mutex::new(std::collections::HashSet::new());
+    let count = atomic::Uint64::new(0);
+
+    let calls = num_cpu() + 2;
+    for _ in 0..calls {
+        parallel_exec(&vals, 10, 2, |_: &i64| {
+            threads.lock().insert(std::thread::current().id());
+            count.add(1);
+        });
+    }
+
+    assert_eq!((calls * vals.len()) as u64, count.load());
+    let num_threads = threads.lock().len();
+    assert!(
+        num_threads <= num_cpu() + 1,
+        "{num_threads} threads ran f over {calls} calls, num_cpu is {}",
+        num_cpu()
+    );
+}

@@ -7,8 +7,10 @@
 // params are inside the lock, as `SetThreshold` changes them under it; the threshold is
 // unsigned. The functions called with the lock held take the locked state. The writer of
 // `broadcast` and `write_rtp` get the down track and the packet by reference. The workers of
-// `broadcast_rtp` are scoped threads of the operating system where the original starts
-// goroutines, and the end of the scope is the wait that the `sync.WaitGroup` is.
+// `broadcast_rtp` are jobs on rayon's pool of threads where the original starts goroutines on
+// Go's threads: the caller spawns them into a `rayon::in_place_scope` and does not run one
+// itself, as the original's does not, and the end of the scope is the wait that the
+// `sync.WaitGroup` is.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -229,9 +231,9 @@ where
         next: atomic::Uint64::new(0),
         written: atomic::Int32::new(0),
     };
-    std::thread::scope(|s| {
+    rayon::in_place_scope(|s| {
         for _ in 0..num_workers {
-            s.spawn(|| b.run());
+            s.spawn(|_| b.run());
         }
     });
 

@@ -154,3 +154,59 @@ fn test_down_track_spreader_rejects_store_after_close() {
     assert!(!spreader.try_store(late));
     assert_eq!(0, spreader.down_track_count());
 }
+
+// New for musivum: the workers of `broadcast_rtp` run on a fixed set of threads, as the
+// original's goroutines run on Go's, and not on threads started for each packet. Every call
+// above the threshold has at least one worker that writes, so threads of each call's own
+// would show more than `num_cpu() + 1` of them over `num_cpu() + 2` calls.
+#[test]
+fn test_broadcast_rtp_reuses_threads() {
+    struct ThreadSender {
+        id: ParticipantId,
+        threads: Arc<parking_lot::Mutex<std::collections::HashSet<std::thread::ThreadId>>>,
+        writes: Arc<atomic::Int32>,
+    }
+
+    impl Sender for ThreadSender {
+        fn subscriber_id(&self) -> ParticipantId {
+            self.id.clone()
+        }
+    }
+
+    impl RtpWriter<TestPacket> for ThreadSender {
+        fn write_rtp(&self, _pkt: &TestPacket, _layer: i32) -> i32 {
+            self.threads.lock().insert(std::thread::current().id());
+            self.writes.add(1);
+            1
+        }
+    }
+
+    const NUM_DOWN_TRACKS: usize = 50;
+    let d = DownTrackSpreader::<Arc<ThreadSender>>::new(DownTrackSpreaderParams {
+        threshold: 20,
+        ..Default::default()
+    });
+    let threads = Arc::new(parking_lot::Mutex::new(std::collections::HashSet::new()));
+    let writes = Arc::new(atomic::Int32::new(0));
+    for i in 0..NUM_DOWN_TRACKS {
+        d.store(Arc::new(ThreadSender {
+            id: ParticipantId::from(format!("p{i}")),
+            threads: threads.clone(),
+            writes: writes.clone(),
+        }));
+    }
+
+    let calls = utils::num_cpu() + 2;
+    let pkt = TestPacket { seq: 0 };
+    for _ in 0..calls {
+        assert_eq!(NUM_DOWN_TRACKS as i32, broadcast_rtp(&d, &pkt, 0));
+    }
+
+    assert_eq!((calls * NUM_DOWN_TRACKS) as i32, writes.load());
+    let num_threads = threads.lock().len();
+    assert!(
+        num_threads <= utils::num_cpu() + 1,
+        "{num_threads} threads wrote over {calls} calls, num_cpu is {}",
+        utils::num_cpu()
+    );
+}

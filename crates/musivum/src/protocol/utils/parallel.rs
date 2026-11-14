@@ -1,10 +1,11 @@
 // Ported from LiveKit's protocol, utils/parallel.go at v1.53.1-0.20261023175527-46332a036e25.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust; the workers are scoped threads of the operating system
-// where the original starts goroutines, and the end of the scope is the wait that the
-// original's `sync.WaitGroup` is; the state is on the caller's stack and borrowed by the
-// workers; `fn` (here `f`) gets each element by reference. `num_cpu` stands in for Go's
-// `runtime.NumCPU()` and is written new.
+// Changes: translated from Go to Rust; the workers are jobs on rayon's pool of threads where
+// the original starts goroutines on Go's threads: the caller spawns them into a
+// `rayon::in_place_scope` and does not run one itself, as the original's does not, and the
+// end of the scope is the wait that the original's `sync.WaitGroup` is; the state is on the
+// caller's stack and borrowed by the workers; `fn` (here `f`) gets each element by reference.
+// `num_cpu` stands in for Go's `runtime.NumCPU()` and is written new.
 
 use std::sync::LazyLock;
 
@@ -75,9 +76,9 @@ where
         start: atomic::Uint64::new(0),
     };
 
-    std::thread::scope(|s| {
+    rayon::in_place_scope(|s| {
         for _ in 0..num_cpu {
-            s.spawn(|| st.run());
+            s.spawn(|_| st.run());
         }
     });
 }

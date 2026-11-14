@@ -27,6 +27,9 @@ pbjson-types = "0.9"
 # its Twirp server reads and writes (service/protojson.rs). Already in the build through protox.
 prost-reflect = { version = "0.16.5", default-features = false }
 rand = "0.10.3"
+# The pool of threads the workers of `parallel_exec` and `broadcast_rtp` run on, where LiveKit
+# starts goroutines on Go's threads (protocol/utils/parallel.rs, sfu/utils/downtrackspreader.rs).
+rayon = "1.12.0"
 # The HTTP client webhooks are sent with (protocol/webhook/httpclient.rs): rustls with ring and
 # the system's root certificates, no OpenSSL.
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots"] }
