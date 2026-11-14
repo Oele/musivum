@@ -12,6 +12,7 @@ mod errors;
 pub mod flexfec;
 mod forwarder;
 mod forwardstats;
+pub mod interceptor;
 mod interfaces;
 pub mod pacer;
 pub mod packettrailer;
