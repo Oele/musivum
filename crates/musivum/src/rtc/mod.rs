@@ -32,6 +32,7 @@ mod subscriptionmanager;
 pub mod testutils;
 // transport.go: under another name, as `transport` is the subpackage `pkg/rtc/transport`
 mod transport_impl;
+mod transportmanager;
 mod updatatrackmanager;
 mod uptrackmanager;
 mod user_packet_deduper;
@@ -56,6 +57,7 @@ pub use subscribedtrack::*;
 pub use subscribepacer::*;
 pub use subscriptionmanager::*;
 pub use transport_impl::*;
+pub use transportmanager::*;
 pub use updatatrackmanager::*;
 pub use uptrackmanager::*;
 pub use user_packet_deduper::*;
