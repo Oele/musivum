@@ -139,3 +139,10 @@ crates/musivum/src/go/core/ follows `Throttle` and `QueuePool` of frostbyte73/co
 crates/musivum/src/protocol/utils/hwstats/osstat.rs follows the Linux readers of
 mackerelio/go-osstat (https://github.com/mackerelio/go-osstat), under the Apache License,
 Version 2.0, Copyright Hatena Co., Ltd.
+
+crates/musivum/src/service/twirp.rs follows Twirp (https://github.com/twitchtv/twirp, under
+the Apache License, Version 2.0) and the code protoc-gen-twirp generates for LiveKit's room
+service. Twirp's notice:
+
+    Twirp
+    Copyright 2018 Twitch Interactive, Inc.  All Rights Reserved.

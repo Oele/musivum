@@ -100,6 +100,15 @@ was checked:
 - **gorilla/websocket v1.5.3**, further: the read limit (`ErrReadLimit`, close 1009) and
   `handleProtocolError` (close 1002) are followed in `musivum-server/src/service/axumws.rs`.
 - **Howard Hinnant's `civil_from_days`** (public domain), for the date in the health check.
+- **twitchtv/twirp v8.1.3** (Apache-2.0, Twitch), the RPC protocol of LiveKit's room API:
+  its specification (`PROTOCOL.md`) and `errors.go`, `server_options.go`, `context.go`,
+  `interceptors.go`, with the code protoc-gen-twirp generated in LiveKit's protocol
+  (`livekit_room.twirp.go` and its shared helpers), are followed in `service/twirp.rs`. Its
+  notice is in `NOTICE`.
+- **google.golang.org/protobuf v1.36.12** (BSD-3-Clause): `encoding/protojson` read for how
+  the room API's JSON is written and read; nothing copied (`service/protojson.rs`, new).
+- **google.golang.org/grpc v1.84.0** (Apache-2.0): `status.FromError` read for how LiveKit's
+  `xtwirp` maps an error.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
@@ -128,9 +137,21 @@ was checked:
 - **Real clients against both servers.** The same scripted call (LiveKit's JavaScript SDK in
   a headless browser, LiveKit's Rust SDK, Element Call) against LiveKit and against musivum;
   what the clients observe has to match.
-- **A degraded network.** Loss, delay and a bandwidth cap between client and server; freezes,
-  the quality that is chosen and the time to recover are measured for both servers. Until
-  musivum is as good here, LiveKit stays the default wherever both can be used.
+- **A degraded network.** `NETEM=all tests/call/run.sh <target>` runs the scripted call with
+  all media through an impairment relay in user space (`tests/netem`, `netem-relay`): loss
+  at random and in bursts, delay with jitter, and a bandwidth cap with a queue, per client
+  and direction, from a fixed seed. The server advertises 127.0.0.2:39522, the clients point
+  that candidate at the relay and keep their own candidates back, and each scenario ends by
+  checking the browsers' packet counts against the relay's. Seven scenarios of 60 s: clean,
+  2% loss, 5% loss in bursts, 150 ± 30 ms delay, the subscriber's downlink capped to
+  500 kbit/s for 20 s, the publisher's uplink capped to 1000 kbit/s for 20 s, a 3 s
+  blackout. Once a second Chrome's statistics give the layer and frame rate a subscriber
+  receives, its freezes, losses, NACKs, PLIs, jitter buffer delay and round-trip time, and
+  from those the time to get back to its layer and frame rate. LiveKit's results are in
+  `tests/netem/baseline/`; `node tests/netem/compare.js baseline/reference musivum` marks
+  where musivum freezes more, recovers later, or gets a lower layer or frame rate. Until
+  nothing is marked, LiveKit stays the default wherever both can be used. A run on a busy
+  machine is flagged and says little.
 
 ## Following upstream
 
