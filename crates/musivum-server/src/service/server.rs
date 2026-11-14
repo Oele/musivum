@@ -3,7 +3,8 @@
 // Changes: translated from Go to Rust, on tokio and axum, for one node.
 // - The services are not injected one by one (`NewLivekitServer` takes eighteen). What the
 //   routes share is `ServerState`; the routes are made by `new_mux` (the original's `mux`,
-//   built inside `NewLivekitServer`), where the room API will be added, and handed to
+//   built inside `NewLivekitServer`), with the room API under Twirp's prefix and the
+//   signalling endpoint, and handed to
 //   `LivekitServer::new`. `initialize_server` stands in for wire's `InitializeServer`
 //   (wire_gen.go) for what is ported: the bus of the process, the signal and room manager
 //   clients, the router of one node (with the defaults of the node's statistics, as
@@ -60,8 +61,9 @@ use musivum::protocol::utils::new_default_timed_version_generator;
 use musivum::protocol::{logger, webhook};
 use musivum::routing::{self, LocalNode, MessageBus, Router};
 use musivum::service::{
-    self as mservice, ApiKeyAuthMiddleware, LocalStore, RemoteAddr, RoomManager, RtcService,
-    RtcUpgrade, SignalServer, new_room_allocator,
+    self as mservice, ApiKeyAuthMiddleware, LocalStore, RemoteAddr, RoomManager, RoomService,
+    RoomServiceServer, RtcService, RtcUpgrade, SignalServer, livekit_server_options,
+    new_room_allocator, new_room_service_server,
 };
 use musivum::sfu;
 use musivum::telemetry::{self, AnalyticsService, NullAnalyticService, TelemetryService};
@@ -120,6 +122,9 @@ pub struct ServerState {
     pub rtc_service: Arc<RtcService>,
     pub room_manager: Arc<RoomManager>,
     pub signal_server: Arc<SignalServer>,
+    /// The room API: roomservice.go behind the Twirp server that `NewRoomServiceServer`
+    /// makes (`xtwirp.RegisterServer`).
+    pub room_service_server: Arc<RoomServiceServer>,
 }
 
 /// wire's `InitializeServer`, for what is ported (see the header): the router of one node and
@@ -160,6 +165,23 @@ pub fn new_server_state(
     // createStore without Redis
     let object_store = LocalStore::new();
     let room_allocator = new_room_allocator(conf.clone(), object_store.clone());
+    // NewRoomService, with the store as its OSS service store, and the room and participant
+    // clients of the bus
+    let room_service = RoomService::new(
+        conf.limit.clone(),
+        conf.api,
+        router.clone(),
+        room_allocator.clone(),
+        object_store.clone(),
+        Some(object_store.clone()),
+        routing::new_topic_formatter(),
+        routing::new_typed_room_client(message_bus.clone())?,
+        routing::new_typed_participant_client(message_bus.clone())?,
+    )?;
+    let room_service_server = Arc::new(new_room_service_server(
+        room_service,
+        livekit_server_options(),
+    ));
     let key_provider = create_key_provider(&conf)?;
     let queued_notifier = create_webhook_notifier(&conf, key_provider.clone())?;
     // telemetry.NewAnalyticsService: not ported (see the header)
@@ -203,6 +225,7 @@ pub fn new_server_state(
         rtc_service,
         room_manager,
         signal_server: Arc::new(signal_server),
+        room_service_server,
     })
 }
 
@@ -274,9 +297,12 @@ pub fn new_mux(state: ServerState) -> axum::Router {
     // In development mode the original adds pprof, /debug/goroutine and /debug/rooms: not
     // here (see the header).
     axum::Router::new()
-        // HERE GOES THE ROOM API, as routes of this router: `xtwirp.RegisterServer(mux,
-        // roomServer)`, roomservice.go over Twirp, under `/twirp/livekit.RoomService/`.
-        // Egress, ingress, SIP, agent dispatch, WHIP and `/agent` are left out.
+        // `xtwirp.RegisterServer(mux, roomServer)`: the room API over Twirp, every method under
+        // its path prefix. Egress, ingress, SIP, agent dispatch, WHIP and `/agent` are left out.
+        .route(
+            &format!("{}{{*method}}", mservice::ROOM_SERVICE_PATH_PREFIX),
+            any(room_service),
+        )
         // rtcService.SetupRoutes(mux)
         .route("/rtc", any(rtc_v0))
         .route("/rtc/validate", any(rtc_v0_validate))
@@ -284,6 +310,21 @@ pub fn new_mux(state: ServerState) -> axum::Router {
         .route("/rtc/v1/validate", any(rtc_v1_validate))
         .fallback(default_handler)
         .with_state(state)
+}
+
+// The room API: the Twirp server takes the request's parts, with the grants the API key
+// middleware put there, and its body. A call may wait (`PerformRpc`, `UpdateRoomMetadata`
+// wait for the room), so it runs where blocking is allowed.
+async fn room_service(State(s): State<ServerState>, r: Request) -> Response {
+    let (parts, body) = r.into_parts();
+    let Ok(body) = axum::body::to_bytes(body, usize::MAX).await else {
+        return StatusCode::BAD_REQUEST.into_response();
+    };
+    let server = s.room_service_server.clone();
+    match tokio::task::spawn_blocking(move || server.serve_http(&parts, &body)).await {
+        Ok(res) => res.map(axum::body::Body::from),
+        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 
 // The handlers of `/rtc` and `/rtc/v1`: `RtcService::v0` and `v1`, and the session on the

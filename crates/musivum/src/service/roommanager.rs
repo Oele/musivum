@@ -17,10 +17,11 @@
 //   constants `VERSION` and `AGENT_CURRENT_PROTOCOL` here, with the original's values.
 // - The servers of psrpc that the original makes per room and per participant
 //   (`roomServers`, `participantServers`: the room API's `rpc.RoomServer` and
-//   `rpc.ParticipantServer`, which the room manager implements) are not made here: the
-//   room-side operations are methods of `RoomManager` with the original's names and
-//   messages, and whoever serves the room API calls them. A comment stands where the
-//   original registers and kills them. Not here at all: the WHIP servers (`whipServer`,
+//   `rpc.ParticipantServer`) are the room manager itself, registered on the bus under the
+//   room's and the participant's topic (`routing::RoomServerImpl`,
+//   `routing::ParticipantServerImpl`, implemented at the end of this file). The bus replaces
+//   a server on the same topic as `MultitonService.Replace` does; the two maps keep what was
+//   registered, so that `Stop` can kill them all. Not here at all: the WHIP servers (`whipServer`,
 //   `whipParticipantServers`, `httpSignalParticipantServers`; WHIP is not ported), the agents'
 //   (`agentDispatchServers`, `ListDispatch`, `CreateDispatch`, `DeleteDispatch`), the start
 //   of a room composite egress at the end of `getOrCreateRoom`, the session reporter and the
@@ -57,7 +58,7 @@ use std::sync::{Arc, Weak};
 
 use base64::Engine as _;
 use hmac::{Hmac, KeyInit, Mac};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use sha1::Sha1;
 use tokio::sync::mpsc;
 
@@ -121,8 +122,11 @@ pub struct RoomManager {
     // Not here: `turnAuthHandler`, musivum has no embedded TURN server.
     bus: Arc<MessageBus>,
 
-    // Not here: `roomServers`, `agentDispatchServers`, `participantServers`,
-    // `httpSignalParticipantServers`, `whipParticipantServers` (see the header).
+    // `roomServers`, `participantServers`: what is registered on the bus under each topic
+    // (see the header). Not here: `agentDispatchServers`, `httpSignalParticipantServers`,
+    // `whipParticipantServers`.
+    room_servers: Mutex<HashMap<routing::RoomTopic, routing::ServerId>>,
+    participant_servers: Mutex<HashMap<routing::ParticipantTopic, routing::ServerId>>,
     ice_config_cache: sutils::IceConfigCache<IceConfigCacheKey>,
 
     forward_stats: Option<Arc<sfu::ForwardStats>>,
@@ -173,6 +177,8 @@ impl RoomManager {
             )),
             version_generator,
             bus: bus.clone(),
+            room_servers: Mutex::new(HashMap::new()),
+            participant_servers: Mutex::new(HashMap::new()),
             forward_stats,
             subscribe_pacer: rtc::SubscribePacer::new(&conf.limit.subscribe_pace_shadow_rates),
 
@@ -255,7 +261,17 @@ impl RoomManager {
         // `r.roomManagerServer.Kill()`
         self.bus
             .deregister_room_manager_server(&self.current_node.node_id());
-        // Not here: the WHIP, room, agent dispatch and participant servers (see the header).
+        // Not here: the WHIP servers.
+        // `r.roomServers.Kill()`
+        for (topic, id) in self.room_servers.lock().drain() {
+            self.bus.deregister_room_server(&topic, id);
+        }
+        // Not here: the agent dispatch servers.
+        // `r.participantServers.Kill()`
+        for (topic, id) in self.participant_servers.lock().drain() {
+            self.bus.deregister_participant_server(&topic, id);
+        }
+        // Not here: the HTTP signal and WHIP participant servers.
 
         // `r.rtcConfig.UDPMux.Close()` and `r.rtcConfig.TCPMuxListener.Close()`: the node's
         // sockets
@@ -655,10 +671,12 @@ impl RoomManager {
             return Err(err.into());
         }
 
-        // Not here: the participant's server of psrpc on its topic
-        // (`rpc.FormatParticipantTopic`, `participantServers.Replace`,
-        // `RegisterAllParticipantTopics`) and, in one-shot signalling mode, its WHIP
-        // participant server, with the closers that its `OnClose` calls: see the header.
+        let participant_topic =
+            routing::format_participant_topic(&room.name(), &participant.identity());
+        // `participantServers.Replace(participantTopic, participantServer)` with its
+        // `RegisterAllParticipantTopics`, which cannot fail on the bus of one process. Not here:
+        // the WHIP participant server of one-shot signalling mode (see the header).
+        let participant_server_id = self.replace_participant_server(&participant_topic);
 
         if let Err(err) = self
             .room_store
@@ -694,10 +712,14 @@ impl RoomManager {
             let room_name = room.name();
             let weak_room = Arc::downgrade(&room);
             let p_logger = p_logger.clone();
+            let weak_r = self.this.clone();
             participant.add_on_close(
                 types::PARTICIPANT_CLOSE_KEY_NORMAL,
                 Some(Box::new(move |p: Arc<dyn types::LocalParticipant>| {
-                    // `participantServerClosers.Close()`: see above
+                    // `participantServerClosers.Close()`
+                    if let Some(r) = weak_r.upgrade() {
+                        r.kill_participant_server(&participant_topic, participant_server_id);
+                    }
 
                     if let Err(err) = room_store.delete_participant(&room_name, &p.identity()) {
                         errorw!(p_logger, "could not delete participant", err);
@@ -814,16 +836,20 @@ impl RoomManager {
             self.telemetry.clone(),
         );
 
-        // Not here: the room's server of psrpc on its topic (`rpc.FormatRoomTopic`,
-        // `roomServers.Replace`, `RegisterAllRoomTopics`) and its agent dispatch server, with
-        // `killRoomServer` and `killDispServer` (see the header).
+        let room_topic = routing::format_room_topic(&room_name);
+        // `roomServers.Replace(roomTopic, roomServer)` with its `RegisterAllRoomTopics`, which
+        // cannot fail on the bus of one process. Not here: the agent dispatch server.
+        let room_server_id = self.replace_room_server(&room_topic);
 
         {
             let weak_r = self.this.clone();
             let weak_room = Arc::downgrade(&new_room);
             let room_name = room_name.clone();
             new_room.on_close(move |reason: types::RoomCloseReason| {
-                // `killRoomServer()`, `killDispServer()`: see above
+                // `killRoomServer()`; not here: `killDispServer()`
+                if let Some(r) = weak_r.upgrade() {
+                    r.kill_room_server(&room_topic, room_server_id);
+                }
 
                 let (Some(r), Some(new_room)) = (weak_r.upgrade(), weak_room.upgrade()) else {
                     return;
@@ -1358,6 +1384,137 @@ impl RoomManager {
             return Ok((key.clone(), secret.clone()));
         }
         Err(Error::NoApiKeysConfigured)
+    }
+}
+
+impl RoomManager {
+    // `MultitonService.Replace` for the room's topic: registers the room manager as the room's
+    // server, in place of one registered before.
+    fn replace_room_server(&self, topic: &routing::RoomTopic) -> routing::ServerId {
+        let this = self
+            .this
+            .upgrade()
+            .expect("the room manager is alive while it works");
+        let id = self.bus.register_room_server(topic, this);
+        self.room_servers.lock().insert(topic.clone(), id);
+        id
+    }
+
+    // The kill function that `Replace` returns: it kills only the server it registered.
+    fn kill_room_server(&self, topic: &routing::RoomTopic, id: routing::ServerId) {
+        self.bus.deregister_room_server(topic, id);
+        let mut servers = self.room_servers.lock();
+        if servers.get(topic) == Some(&id) {
+            servers.remove(topic);
+        }
+    }
+
+    fn replace_participant_server(&self, topic: &routing::ParticipantTopic) -> routing::ServerId {
+        let this = self
+            .this
+            .upgrade()
+            .expect("the room manager is alive while it works");
+        let id = self.bus.register_participant_server(topic, this);
+        self.participant_servers.lock().insert(topic.clone(), id);
+        id
+    }
+
+    fn kill_participant_server(&self, topic: &routing::ParticipantTopic, id: routing::ServerId) {
+        self.bus.deregister_participant_server(topic, id);
+        let mut servers = self.participant_servers.lock();
+        if servers.get(topic) == Some(&id) {
+            servers.remove(topic);
+        }
+    }
+}
+
+// `rpc.RoomServerImpl`, which the room manager implements upstream with the methods above.
+impl routing::RoomServerImpl for RoomManager {
+    fn delete_room(
+        &self,
+        req: &livekit::DeleteRoomRequest,
+    ) -> Result<livekit::DeleteRoomResponse, routing::PsrpcError> {
+        RoomManager::delete_room(self, req).map_err(Into::into)
+    }
+
+    fn send_data(
+        &self,
+        req: &livekit::SendDataRequest,
+    ) -> Result<livekit::SendDataResponse, routing::PsrpcError> {
+        RoomManager::send_data(self, req).map_err(Into::into)
+    }
+
+    fn update_room_metadata(
+        &self,
+        req: &livekit::UpdateRoomMetadataRequest,
+    ) -> Result<livekit::Room, routing::PsrpcError> {
+        RoomManager::update_room_metadata(self, req).map_err(Into::into)
+    }
+
+    fn list_participants(
+        &self,
+        req: &livekit::ListParticipantsRequest,
+    ) -> Result<livekit::ListParticipantsResponse, routing::PsrpcError> {
+        RoomManager::list_participants(self, req).map_err(Into::into)
+    }
+
+    fn get_participant(
+        &self,
+        req: &livekit::RoomParticipantIdentity,
+    ) -> Result<livekit::ParticipantInfo, routing::PsrpcError> {
+        RoomManager::get_participant(self, req).map_err(Into::into)
+    }
+}
+
+// `rpc.ParticipantServerImpl`, likewise.
+impl routing::ParticipantServerImpl for RoomManager {
+    fn remove_participant(
+        &self,
+        req: &livekit::RoomParticipantIdentity,
+    ) -> Result<livekit::RemoveParticipantResponse, routing::PsrpcError> {
+        RoomManager::remove_participant(self, req).map_err(Into::into)
+    }
+
+    fn mute_published_track(
+        &self,
+        req: &livekit::MuteRoomTrackRequest,
+    ) -> Result<livekit::MuteRoomTrackResponse, routing::PsrpcError> {
+        RoomManager::mute_published_track(self, req).map_err(Into::into)
+    }
+
+    fn update_participant(
+        &self,
+        req: &livekit::UpdateParticipantRequest,
+    ) -> Result<livekit::ParticipantInfo, routing::PsrpcError> {
+        RoomManager::update_participant(self, req).map_err(Into::into)
+    }
+
+    fn update_subscriptions(
+        &self,
+        req: &livekit::UpdateSubscriptionsRequest,
+    ) -> Result<livekit::UpdateSubscriptionsResponse, routing::PsrpcError> {
+        RoomManager::update_subscriptions(self, req).map_err(Into::into)
+    }
+
+    fn forward_participant(
+        &self,
+        req: &livekit::ForwardParticipantRequest,
+    ) -> Result<livekit::ForwardParticipantResponse, routing::PsrpcError> {
+        RoomManager::forward_participant(self, req).map_err(Into::into)
+    }
+
+    fn move_participant(
+        &self,
+        req: &livekit::MoveParticipantRequest,
+    ) -> Result<livekit::MoveParticipantResponse, routing::PsrpcError> {
+        RoomManager::move_participant(self, req).map_err(Into::into)
+    }
+
+    fn perform_rpc(
+        &self,
+        req: &livekit::PerformRpcRequest,
+    ) -> Result<livekit::PerformRpcResponse, routing::PsrpcError> {
+        RoomManager::perform_rpc(self, req).map_err(Into::into)
     }
 }
 

@@ -227,3 +227,88 @@ async fn a_shutdown_waits_five_seconds_at_most() {
         "{elapsed:?}"
     );
 }
+
+// A POST of JSON with a bearer token on a connection of its own: the status and the body.
+async fn post_json(addr: SocketAddr, path: &str, token: &str, body: &str) -> (u16, String) {
+    let mut conn = TcpStream::connect(addr).await.unwrap();
+    conn.write_all(
+        format!(
+            "POST {path} HTTP/1.1\r\nHost: test\r\nConnection: close\r\nAuthorization: Bearer {token}\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{body}",
+            body.len()
+        )
+        .as_bytes(),
+    )
+    .await
+    .unwrap();
+    let mut response = String::new();
+    conn.read_to_string(&mut response).await.unwrap();
+    let status = response[9..12].parse().unwrap();
+    let body = response
+        .split_once("\r\n\r\n")
+        .map(|(_, body)| body.to_string())
+        .unwrap_or_default();
+    (status, body)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_room_api_is_routed_to_the_room_manager() {
+    let s = new_server(axum::Router::new());
+    let (addr, started) = start(&s).await;
+    let token = musivum::protocol::auth::AccessToken::new(
+        "key1",
+        "a-secret-of-at-least-thirty-two-characters",
+    )
+    .set_video_grant(musivum::protocol::auth::VideoGrant {
+        room_create: true,
+        room_list: true,
+        room_admin: true,
+        room: "a-room".to_string(),
+        ..Default::default()
+    })
+    .to_jwt()
+    .unwrap();
+    let call = |method: &str| format!("/twirp/livekit.RoomService/{method}");
+
+    // the room is created through the router and the room manager
+    let (status, body) = post_json(addr, &call("CreateRoom"), &token, r#"{"name":"a-room"}"#).await;
+    assert_eq!(200, status, "{body}");
+    let room: serde_json::Value = serde_json::from_str(&body).unwrap();
+    assert_eq!("a-room", room["name"]);
+    assert!(room["sid"].as_str().unwrap().starts_with("RM_"), "{body}");
+
+    let (status, body) = post_json(addr, &call("ListRooms"), &token, "{}").await;
+    assert_eq!(200, status, "{body}");
+    assert!(body.contains(r#""name":"a-room""#), "{body}");
+
+    // the room's server on the bus is the room manager: it answers for the room
+    let (status, body) = post_json(
+        addr,
+        &call("ListParticipants"),
+        &token,
+        r#"{"room":"a-room"}"#,
+    )
+    .await;
+    assert_eq!(200, status, "{body}");
+    let (status, body) = post_json(
+        addr,
+        &call("GetParticipant"),
+        &token,
+        r#"{"room":"a-room","identity":"nobody"}"#,
+    )
+    .await;
+    assert_eq!(404, status, "{body}");
+    assert!(body.contains(r#""code":"not_found""#), "{body}");
+
+    let (status, body) = post_json(addr, &call("DeleteRoom"), &token, r#"{"room":"a-room"}"#).await;
+    assert_eq!(200, status, "{body}");
+    let (status, body) = post_json(addr, &call("ListRooms"), &token, "{}").await;
+    assert_eq!(200, status, "{body}");
+    assert!(!body.contains("a-room"), "{body}");
+
+    // without a token: Twirp's unauthenticated error
+    let (status, body) = post_json(addr, &call("ListRooms"), "not-a-token", "{}").await;
+    assert_eq!(401, status, "{body}");
+
+    s.stop(false).await;
+    started.await.unwrap().unwrap();
+}
