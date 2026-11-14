@@ -53,6 +53,9 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender` and `DownTrackListener` as traits with fakes. `DownTrackStreamAllocatorListener` follows with the down track. |
 | `pkg/sfu/pacer/` (six files) | `sfu/pacer/` (same names) | 2 / 2 | Ten tests added: what each of the three pacers stamps and tells the estimator, compared with a run of the original (header bytes, sizes, send times where LiveKit's rounding differs from pion's). A packet owns its parts: no pools and no scratch buffers, at the cost of two small allocations per send for the stamped extensions. `Pacer` has a fake. One assertion on allocations left out. |
 | `pkg/sfu/redreceiver.go`, `redprimaryreceiver.go` | `sfu/redreceiver.rs`, `redprimaryreceiver.rs` | 4 / 4 | The methods that forward to the wrapped receiver are what Go's embedding was. Seven assertions that compare with `ReceiverBase` are left out until the receiver is ported, and `TestRedReceiverReusedReadBuffer` runs with a stand-in for the buffer: both to be redone then. The state `ForwardRTP` changes has a lock the original does not need. `close_track_senders` of `receiver_base.go` is in `redreceiver.rs` until the receiver is ported. |
+| `pkg/sfu/forwarder.go` | `sfu/forwarder.rs` | 34 / 34 | Every subtest and table case. A selector is swapped by taking the old one out of its field (a null selector stands in until the new one is assigned). `GetTranslationParams` returns the parameters together with the error, as the original does. The 400 random pairs of one subtest are written out from a run of Go's generator. |
+| `pkg/sfu/playoutdelay.go` | `sfu/playoutdelay.rs` | 1 / 1 | |
+| `pkg/sfu/connectionquality/scorer.go`, `connectionstats.go` | `sfu/connectionquality/` (same names) | 3 / 3 | Every table case. The providers of statistics are traits held weakly. Also run against the original: 728 lines from the scorer over six kinds of track (score bit for bit, quality) and 18 from `get_stat`, identical; 58 pinned. `f64::ln` agreed with Go's `math.Log` on every input of the run, which nothing guarantees in general. |
 | `pkg/sfu/rtpmunger.go` | `sfu/rtpmunger.rs` | 9 / 9 | `update_and_get_sn_ts` returns the parameters together with the error, as the original does. Also run against the original: 6,000 operations, 13,548 lines of results and state, identical. |
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
@@ -255,6 +258,17 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `forwarder.go`: three log lines log `"targetLayer"` with the current layer;
+  `GetNextHigherTransition` takes the write lock though it only reads; a state with more
+  than three sender reports panics in `SeedState`. `TestForwarderGetTranslationParamsMuted`
+  would pass without the mute check, since a video forwarder without a target drops anyway.
+- `connectionquality`: the discounted jitter is written into the remote view as a side
+  effect of `toAggregateDeltaInfo`, which is not called on the early return for a receiver
+  report from before the start, so the analytics then carry the undiscounted jitter.
+  `updateScoreFromReceiverReport` uses the wall clock also when a time is passed in.
+- `videolayerselector`, `TestSelectorDecisionCacheJumpIsBounded`: asserts a wall-clock bound
+  of one second; the port allows ten in a build without optimisation (it went over the
+  second on a loaded machine).
 - `redreceiver.go`: a repeated packet goes into the history again, so the next RED packet
   carries it twice. `redprimaryreceiver.go`, `ReadRTP`: ignores the error of the unmarshal,
   and the packet written back keeps the RED payload type. Upstream's tests never reach the

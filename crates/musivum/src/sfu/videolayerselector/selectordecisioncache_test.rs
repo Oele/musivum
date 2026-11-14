@@ -2,7 +2,9 @@
 // Copyright 2026 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust; the function given to `expect_decision` writes to a
 // list behind a lock, since it has to be `Send + Sync`; `require.NoError` followed by
-// `require.Equal` on the decision is one comparison with `Ok(..)`.
+// `require.Equal` on the decision is one comparison with `Ok(..)`; the time bound of
+// `test_selector_decision_cache_jump_is_bounded` is ten seconds in a build without
+// optimisation, see there.
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -71,5 +73,9 @@ fn test_selector_decision_cache_jump_is_bounded() {
         entity += 65535;
         s.add_dropped(entity);
     }
-    assert!(start.elapsed() < Duration::from_secs(1));
+    // The original's bound is one second, for optimised code. A build without optimisation
+    // takes about 0.4 s here on an idle machine and went over the second on a loaded one, so
+    // it gets ten: uncapped, the loop walks 256 times as far and takes about 100 s.
+    let bound = if cfg!(debug_assertions) { 10 } else { 1 };
+    assert!(start.elapsed() < Duration::from_secs(bound));
 }
