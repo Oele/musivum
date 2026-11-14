@@ -539,31 +539,53 @@ through TURN, more than three participants, federation, more than one machine.
 
 ## On a degraded network
 
-The seven scenarios of `tests/netem` (one run each, 2026-11-14), musivum against LiveKit's
-baseline. Equal or close in five: a clean network, 5% loss in bursts (2 freezes against 4),
-150 ms delay with jitter (both drop to 360p and stay there), the publisher's uplink capped
-(recovered in 21 s against 18 s; LiveKit's own runs vary between 17 and 20 s), a 3 s
-blackout (the same freeze and 10 s to recover). Marked by `compare.js`: under 2% random loss
-musivum froze three times (0.72 s) where LiveKit froze once (0.24 s), with the same losses,
-NACKs and frames dropped; with the subscriber's downlink capped to 500 kbit/s musivum went
-down to the lowest layer (180p) where LiveKit stayed at 360p, though it froze for less
-(2.6 s against 4.6 s); in the blackout it received no frame at all where LiveKit received
-0.3 a second. Single runs: repeated runs of both are needed before any of these counts as a
-difference.
+The seven scenarios of `tests/netem`, three runs of each against each server (2026-11-14,
+musivum after the fan-out change; the two taken in turn, each run started below a load
+average of 2, none flagged busy; `tests/netem/runs/`,
+`node tests/netem/compare.js 'runs/*/reference' 'runs/*/musivum'`). The relay's loss has the
+same seed in every run, so the spread is that of timing. Medians [ranges], LiveKit against
+musivum: a clean network, no freeze in either. 2% random loss: 1 [0–1] freeze in each, 720p
+throughout. 5% loss in bursts: 5 [4–5] freezes against 4 [3–4] (1.7 against 1.3 s), 720p
+throughout. 150 ms delay with jitter: 2 [2–3] freezes in each, both down to 360p (musivum once
+to 180p); back at 720p within the run in none of LiveKit's runs, in two of musivum's (22 and
+23 s). Subscriber's downlink capped: both down to 180p in all six runs, 2 [1–4] against
+2 [1–2] freezes (3.2 [3.0–7.3] against 2.5 [2.5–2.6] s). Publisher's uplink capped: 360p
+during, recovered in 18 [18–21] against 20 [17–21] s. 3 s blackout: one freeze of 3.2 s and
+11 s to recover in both (LiveKit once not at all).
+
+The differences the single runs suggested were noise: musivum's freezes under 2% loss did not
+repeat, and the other two were LiveKit's baseline being the odd one out (its three new runs
+also go down to 180p under the capped downlink and also receive no frame in the blackout).
+What holds up (ranges apart in all three runs, which happens by chance one time in ten for a
+metric): at the end of the capped-downlink run the subscriber has 720p at 5 fps from musivum
+and at 10 fps from LiveKit. Both climb the same way (360p at 10 fps, 720p at 5, 720p at 10);
+musivum reaches 720p sooner, LiveKit takes the next step within the run (once only after 24 s
+at 720p/5). musivum may step up the frame rate more slowly; a longer run would tell. Smaller
+and consistent: under the 150 ms delay musivum keeps 11 fps where LiveKit drops to 7–10, but
+conceals more audio (434 against 327 ms) and has a 9 ms higher round trip; under loss its
+subscriber counts about 10% fewer lost packets.
 
 ## Under load
 
-`tests/load` (2026-11-14, LiveKit's `lk load-test`, one run per scenario): both servers
-give every subscriber all its media with no loss and no join errors, up to 100 subscribers
-of one track and 10 calls of 4. musivum's memory is lower (an idle 13 MB against 49 MB,
-about 2 MB per participant against 3). Steady CPU in cores, LiveKit against musivum:
+`tests/load` (LiveKit's `lk load-test`), three runs of each scenario against each server
+(2026-11-14, the two taken in turn, each run started below a load average of 2;
+`tests/load/runs/`, `python3 -I tests/load/compare.py 'runs/*/reference' 'runs/*/musivum'`).
+In all 24 runs every subscriber gets all its media, with no loss and no join errors, up to
+100 subscribers of one track and 10 calls of 4. musivum's memory is lower in every run (idle
+13 MB against 50; at the peak 49 to 63% of LiveKit's). Its CPU is higher in every run, by 4
+to 18%; the ranges are within 4% of each median, so the difference is real. Steady CPU in
+cores, median [range]:
 
-| Scenario | LiveKit | musivum at first | musivum now |
+| Scenario | LiveKit | musivum at first (one run) | musivum now |
 |---|---|---|---|
-| a: one room, 2 publishers, 10 subscribers | 0.051 | 0.054 | 0.056 |
-| b: the same with 50 subscribers | 0.222 | 0.838 | 0.269 |
-| c: 10 calls of 4 | 0.282 | 0.340 | 0.327 |
-| d: one publisher, 100 subscribers | 0.223 | 0.467 | 0.249 |
+| a: one room, 2 publishers, 10 subscribers | 0.049 [0.048–0.050] | 0.054 | 0.051 [0.051–0.053] |
+| b: the same with 50 subscribers | 0.202 [0.201–0.206] | 0.838 | 0.236 [0.235–0.237] |
+| c: 10 calls of 4 | 0.286 [0.281–0.286] | 0.340 | 0.309 [0.307–0.314] |
+| d: one publisher, 100 subscribers | 0.190 [0.189–0.194] | 0.467 | 0.225 [0.223–0.225] |
+
+The load generator itself uses more CPU against musivum (b: 0.31 against 0.24 cores, d: 0.28
+against 0.25) while receiving the same media packets, so musivum sends it something more
+(RTCP, padding or probes); not looked into yet.
 
 What closed the gap, found with `perf` on both servers: the ported fan-out of a packet to
 its down tracks started a thread of the operating system per worker for every packet, then
