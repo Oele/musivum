@@ -7,6 +7,8 @@
 //! - [`rtc`], from LiveKit's `pkg/rtc`: rooms, participants, tracks and subscriptions.
 //! - [`mediatransportutil`], from `livekit/mediatransportutil`.
 //! - [`protocol`], from `livekit/protocol`.
+//! - [`telemetry`]: the counters of LiveKit's `pkg/telemetry/prometheus` that the ported code
+//!   reports to, without Prometheus.
 //! - [`webrtc`]: the packet types and small descriptions that LiveKit takes from pion.
 //! - [`go`]: stand-ins for what the ported code uses of Go's standard library.
 
@@ -18,6 +20,7 @@ pub mod mediatransportutil;
 pub mod protocol;
 pub mod rtc;
 pub mod sfu;
+pub mod telemetry;
 pub mod utils;
 pub mod webrtc;
 
