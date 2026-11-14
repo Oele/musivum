@@ -509,6 +509,20 @@ out the TCP network types (no TCP candidates were offered), and TCP candidates l
 priority offset. What still differed then: no IPv6 candidates (added since), and candidate lines
 without pion's `ufrag` attribute.
 
+## On a degraded network
+
+The seven scenarios of `tests/netem` (one run each, 2026-11-14), musivum against LiveKit's
+baseline. Equal or close in five: a clean network, 5% loss in bursts (2 freezes against 4),
+150 ms delay with jitter (both drop to 360p and stay there), the publisher's uplink capped
+(recovered in 21 s against 18 s; LiveKit's own runs vary between 17 and 20 s), a 3 s
+blackout (the same freeze and 10 s to recover). Marked by `compare.js`: under 2% random loss
+musivum froze three times (0.72 s) where LiveKit froze once (0.24 s), with the same losses,
+NACKs and frames dropped; with the subscriber's downlink capped to 500 kbit/s musivum went
+down to the lowest layer (180p) where LiveKit stayed at 360p, though it froze for less
+(2.6 s against 4.6 s); in the blackout it received no frame at all where LiveKit received
+0.3 a second. Single runs: repeated runs of both are needed before any of these counts as a
+difference.
+
 ## In progress, not on `main`
 
 LiveKit's embedded
