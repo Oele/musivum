@@ -1,1 +1,5 @@
-//! LiveKit's `pkg/sfu/packettrailer`. Not ported yet.
+//! LiveKit's `pkg/sfu/packettrailer`.
+
+mod packet_trailer;
+
+pub use packet_trailer::*;
