@@ -2,7 +2,9 @@
 # Fetches the pinned version of LiveKit (upstream.toml) into reference/livekit, which is what
 # the port is made from and checked against. The directory is not part of this repository.
 set -euo pipefail
+# The reference is kept in the main checkout, also when this runs from a git worktree of it.
 cd "$(dirname "$0")/.."
+cd "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 value() { sed -n "s/^$1 = \"\(.*\)\"$/\1/p" upstream.toml | head -n 1; }
 REPO=$(value repository); TAG=$(value tag); COMMIT=$(value commit)
 DIR=reference/livekit

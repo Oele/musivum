@@ -1,4 +1,22 @@
 //! musivum: a media server for calls that speaks LiveKit's protocol.
 //!
-//! Nothing is here yet. See `docs/PORTING.md` in the repository for what is being ported from
-//! LiveKit, in which order, and how it is checked.
+//! A port to Rust of the media-forwarding part of LiveKit's server. The modules mirror the
+//! paths of what they are ported from (`docs/port-map.md` in the repository):
+//!
+//! - [`sfu`], from LiveKit's `pkg/sfu`: receiving, buffering and forwarding media.
+//! - [`mediatransportutil`], from `livekit/mediatransportutil`.
+//! - [`protocol`], from `livekit/protocol`.
+//! - [`webrtc`]: the packet types and small descriptions that LiveKit takes from pion.
+//! - [`go`]: stand-ins for what the ported code uses of Go's standard library.
+
+// The original uses fields of the protocol that are deprecated there, and so does the port.
+#![allow(deprecated)]
+
+pub mod go;
+pub mod mediatransportutil;
+pub mod protocol;
+pub mod sfu;
+pub mod webrtc;
+
+#[cfg(test)]
+pub mod testutils;

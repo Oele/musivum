@@ -2,6 +2,7 @@
 
 musivum is a port to Rust of the media-forwarding part of LiveKit's server. Read
 `docs/PORTING.md` first: it has the scope, the order of work and how each step is checked.
+`docs/port-map.md` says what every upstream file becomes, `docs/port-status.md` what is done.
 
 ## Rules of origin
 
@@ -35,6 +36,8 @@ What goes into this repository has to be free to be here under the Apache Licens
   A behaviour of the original that looks wrong is ported as it is and noted, not fixed on the
   way.
 - A file that is written new for musivum has no such header.
+- `docs/porting-guide.md` has the craft: how Go's types, locks, arithmetic, logging and tests
+  are written in Rust here, so that the ported files read alike.
 
 ## Other rules
 

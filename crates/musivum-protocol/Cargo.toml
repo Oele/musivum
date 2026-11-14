@@ -1,0 +1,26 @@
+[package]
+name = "musivum-protocol"
+description = "LiveKit's protocol definitions (Protocol Buffers) as Rust types, for musivum"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+prost = "0.14"
+pbjson = "0.9"
+pbjson-types = "0.9"
+serde = { version = "1", features = ["derive"] }
+
+[build-dependencies]
+prost-build = "0.14"
+pbjson-build = "0.9"
+protox = "0.10"
+
+[lints]
+workspace = true
+
+[dev-dependencies]
+serde_json = "1.0.154"

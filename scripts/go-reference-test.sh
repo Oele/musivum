@@ -5,7 +5,9 @@
 # The Go modules LiveKit depends on are kept under reference/gomod, apart from the user's
 # own module cache, so that what is read as a reference is what the pin names.
 set -euo pipefail
+# The reference is kept in the main checkout, also when this runs from a git worktree of it.
 cd "$(dirname "$0")/.."
+cd "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")"
 [ -d reference/livekit ] || scripts/fetch-reference.sh
 export GOMODCACHE="$PWD/reference/gomod"
 export GOCACHE="${XDG_CACHE_HOME:-$HOME/.cache}/musivum/gocache"
