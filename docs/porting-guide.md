@@ -75,6 +75,7 @@ file it comes from. A file written new for musivum has no header.
 | `map[K]V` | `HashMap<K, V>`; Go's iteration order is random, so nothing depends on it |
 | `[]T`, `[N]T` | `Vec<T>` or `&[T]`, `[T; N]` |
 | a pointer that may be nil | `Option<Arc<T>>`, `Option<Box<T>>` or `Option<&T>`, whichever the ownership is |
+| a struct embedded in another (`type ExtPacket struct { VideoLayer; ... }`) | a field named after the type in snake case (`video_layer: VideoLayer`); `ep.Spatial` is `ep.video_layer.spatial` |
 | `error` | `Result<T, Error>` with one `Error` enum per package (`thiserror`), its variants the package's `ErrX` values, its messages the original's |
 | `interface{ ... }` | a trait, `Send + Sync`; held as `Arc<dyn Trait>` |
 | `func(...)` fields and parameters | `Box<dyn Fn(...) + Send + Sync>` kept, `impl Fn(...)` taken |

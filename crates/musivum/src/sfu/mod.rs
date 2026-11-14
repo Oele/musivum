@@ -13,5 +13,7 @@ pub mod packettrailer;
 pub mod rtpextension;
 pub mod rtpstats;
 pub mod streamtracker;
+#[cfg(test)]
+pub mod testutils;
 pub mod utils;
 pub mod videolayerselector;
