@@ -43,6 +43,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/bwe/bwe.go`, `null_bwe.go` | `sfu/bwe/bwe.rs`, `null_bwe.rs` | none upstream | Two tests added. `Bwe` and `BweListener` are traits; `NullBwe` does not implement `Bwe` (upstream's has no `Type()` either) and is held by the estimators for the calls they do not define. |
 | `pkg/sfu/utils/helpers.go` | `sfu/utils/helpers.rs` | none upstream | Five tests added. pion's `interceptor.RTPHeaderExtension` is `webrtc::interceptor::RtpHeaderExtension`. |
 | `pkg/sfu/bwe/remotebwe/` (four files) | `sfu/bwe/remotebwe/` (same names) | none upstream | 22 tests added, their expected values printed by the Go original for the same calls with the same sleeps. The config `Default`s are Go's zero values; the original's defaults are the `DEFAULT_...` constants. |
+| `pkg/sfu/bwe/sendsidebwe/` (eight files) | `sfu/bwe/sendsidebwe/` (same names) | 1 / 1 | At the pin the congestion detector handles a feedback report in the call, under its lock, and calls the listener after unlocking: no worker. Also run against the original with a session of 13,822 packets and 429 feedback reports (delay rising, loss, recovery, a pause, probes, reports out of order and repeated, the wraps of the sequence number and of the reference time): 439 lines of state, identical; 46 of them pinned in `reference_test.rs`. Left out of the comparison, because the original reads the clock there: the detector's own estimate of the feedback interval, finalizing a probe by settle wait. |
 | `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
 | `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
 | `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
@@ -185,6 +186,15 @@ What looked wrong or fragile upstream and was ported as it is:
   are compared). `ProbeClusterFinalize` after a congesting probe sets the state back to
   none without telling the listener. While congested, the committed capacity follows the
   estimate up as well as down. The NACK window's maximum only ends in `Add`.
+- `bwe/sendsidebwe`: `ProbeClusterIsGoalReached` is true only when the probe signal is
+  not "not congesting", which reads inverted, and its validity check uses a result that is
+  only set when the cluster is done, so the goal cannot be reached while the probe runs. A
+  repeated feedback report counts its packets as acknowledged again, and a packet reported
+  lost in two overlapping reports is counted lost twice. A receive time of 0 means "not
+  received", which is also the relative receive time of the first packet ever received.
+  The YAML key `estimaton_window_duration` is spelled so upstream. `math.Exp` and
+  `math.Log10` are Rust's `exp` and `log10`, which may differ in the last bit (no
+  difference showed in the session).
 - `streamtracker`: the tracker from dependency descriptors keeps layer 0 active on a mask
   without active decode targets, and reports nothing when paused (it reports "stopped" for
   all layers when unpaused). `StreamTracker.Stop()` leaves the status as it was. The
