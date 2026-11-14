@@ -34,9 +34,10 @@
 //   candidates, the node's. `GatheringCompletePromise` has nothing to wait for, and the
 //   gathering state is never "gathering" when the events worker looks, so the paths that
 //   defer an ICE restart until gathering is done are kept and not taken.
-// - ICE over TCP and TURN are not in the layer: the paths for TCP candidates, "prefer TCP"
-//   and the TCP ICE connect timer are ported as logic and reach nothing. mDNS candidates
-//   are filtered as upstream.
+// - TURN is not in the layer: the paths for relay candidates are ported as logic and reach
+//   nothing. TCP candidates exist when the node has a TCP listener (`rtc.tcp_port`), and
+//   "prefer TCP" and the TCP ICE connect timer act on them. mDNS candidates are filtered as
+//   upstream.
 // - Data channels are not detached: the writers of `sfu::datachannel` take the layer's
 //   channel, and the reading goroutine is the channel's `on_message`, set when it opens. A
 //   message longer than the original's read buffer ends the reading with the warning and

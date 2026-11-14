@@ -41,7 +41,7 @@ use rand::RngExt;
 
 use crate::go::time::Duration;
 use crate::protocol::logger;
-use crate::webrtc::peerconnection::{IceServer, NodeConfig, SettingEngine};
+use crate::webrtc::peerconnection::{IceServer, Node, NodeConfig, SettingEngine};
 use crate::{infow, warnw};
 
 use super::config::{DEFAULT_UDP_BUFFER_SIZE, parse_ip};
@@ -70,8 +70,24 @@ pub struct WebRtcConfig {
     pub setting_engine: SettingEngineConfig,
     /// What the node's socket is made from (`Node::new`): it stands where `UDPMux` did.
     pub node_config: NodeConfig,
+    /// The port of the node's TCP listener for ICE over TCP (`rtc.tcp_port`), where the
+    /// original opens its `TCPMux`; 0 for none. [`WebRtcConfig::new_node`] passes it on.
+    pub tcp_port: u16,
     pub nat_1to1_ips: Vec<String>,
     pub use_mdns: bool,
+}
+
+impl WebRtcConfig {
+    /// The node the connections of this configuration run on: its UDP socket, and its TCP
+    /// listener when `tcp_port` is set. Upstream `NewWebRTCConfig` opens both itself; here
+    /// whoever owns the connections makes the node once, from this.
+    pub fn new_node(&self) -> std::io::Result<Node> {
+        if self.tcp_port != 0 {
+            Node::new_with_tcp(self.node_config.clone(), self.tcp_port)
+        } else {
+            Node::new(self.node_config.clone())
+        }
+    }
 }
 
 /// What `new_webrtc_config` sets on pion's `SettingEngine`, each field under the name of its
@@ -202,8 +218,8 @@ fn not_applied(option: &str, value: &dyn fmt::Debug, reason: &str) {
 /// |---|---|
 /// | `udp_port` | the port of the node's socket (`node_config.bind_address`); of a range the first port only (logged) |
 /// | `port_range_start`, `port_range_end` | kept (`setting_engine.ephemeral_udp_port_range`) and logged: the node has one socket for all connections, bound to the first port of the range |
-/// | `tcp_port` | logged: no listener; the TCP network types are kept and not given to `rtc` |
-/// | `force_tcp` | logged: UDP stays on; without `tcp_port` it is the original's error |
+/// | `tcp_port` | the port of the node's TCP listener (`tcp_port`, made by `new_node`); the TCP network types |
+/// | `force_tcp` | the UDP network types are left out, as in the original; without `tcp_port` it is the original's error |
 /// | `use_stun_port_as_ice` | logged: no second socket on port 3478 |
 /// | `node_ip` | set by hand: the address every local address is advertised as (a rewrite rule for all); found by `validate`: as below |
 /// | `use_external_ip`, `stun_servers`, `skip_external_ip_validation` | the external address of every local address is asked from the STUN servers and advertised in its place (`nat_1to1_ips`, a rewrite rule each) |
@@ -311,74 +327,68 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
 
     let mut network_types = Vec::with_capacity(4);
 
-    if rtc_conf.force_tcp {
-        not_applied(
-            "force_tcp",
-            &rtc_conf.force_tcp,
-            "ICE over TCP is not there: UDP stays on",
-        );
-    }
-    // The original leaves all of this out when TCP is forced.
-    network_types.extend([NetworkType::Udp4, NetworkType::Udp6]);
     // The port of the node's socket. With neither a port nor a range (a configuration that
-    // was not validated) pion takes any port, and so does the node.
+    // was not validated) pion takes any port, and so does the node. With TCP forced the
+    // node still has its UDP socket, on any port, and no connection gathers on it.
     let mut port: u16 = 0;
-    if rtc_conf.ice_port_range_start != 0 && rtc_conf.ice_port_range_end != 0 {
-        s.set_ephemeral_udp_port_range(
-            rtc_conf.ice_port_range_start as u16,
-            rtc_conf.ice_port_range_end as u16,
-        )?;
-        port = rtc_conf.ice_port_range_start as u16;
-        not_applied(
-            "port_range_start, port_range_end",
-            &(rtc_conf.ice_port_range_start, rtc_conf.ice_port_range_end),
-            "the node has one socket for all connections: it is bound to the first port of the range",
-        );
-    } else if rtc_conf.udp_port.valid() {
-        port = u16::try_from(rtc_conf.udp_port.start).map_err(|_| Error::Port)?;
-        not_applied(
-            "the socket buffers of the UDP mux",
-            &DEFAULT_UDP_BUFFER_SIZE,
-            "the node's socket keeps the sizes the system gives it",
-        );
-        if rtc_conf.batch_io.batch_size > 0 {
+    if !rtc_conf.force_tcp {
+        network_types.extend([NetworkType::Udp4, NetworkType::Udp6]);
+        if rtc_conf.ice_port_range_start != 0 && rtc_conf.ice_port_range_end != 0 {
+            s.set_ephemeral_udp_port_range(
+                rtc_conf.ice_port_range_start as u16,
+                rtc_conf.ice_port_range_end as u16,
+            )?;
+            port = rtc_conf.ice_port_range_start as u16;
             not_applied(
-                "batch_io",
-                &rtc_conf.batch_io,
-                "the node writes every datagram at once",
+                "port_range_start, port_range_end",
+                &(rtc_conf.ice_port_range_start, rtc_conf.ice_port_range_end),
+                "the node has one socket for all connections: it is bound to the first port of the range",
             );
-        }
-        if rtc_conf.udp_port.to_slice().len() > 1 {
+        } else if rtc_conf.udp_port.valid() {
+            port = u16::try_from(rtc_conf.udp_port.start).map_err(|_| Error::Port)?;
             not_applied(
-                "udp_port",
-                &rtc_conf.udp_port,
-                "the node has one socket: of a range of ports the first is used",
+                "the socket buffers of the UDP mux",
+                &DEFAULT_UDP_BUFFER_SIZE,
+                "the node's socket keeps the sizes the system gives it",
             );
-        }
+            if rtc_conf.batch_io.batch_size > 0 {
+                not_applied(
+                    "batch_io",
+                    &rtc_conf.batch_io,
+                    "the node writes every datagram at once",
+                );
+            }
+            if rtc_conf.udp_port.to_slice().len() > 1 {
+                not_applied(
+                    "udp_port",
+                    &rtc_conf.udp_port,
+                    "the node has one socket: of a range of ports the first is used",
+                );
+            }
 
-        if rtc_conf.use_stun_port_as_ice {
-            not_applied(
-                "use_stun_port_as_ice",
-                &rtc_conf.use_stun_port_as_ice,
-                "the node has one socket: none is bound to port 3478",
-            );
-        }
+            if rtc_conf.use_stun_port_as_ice {
+                not_applied(
+                    "use_stun_port_as_ice",
+                    &rtc_conf.use_stun_port_as_ice,
+                    "the node has one socket: none is bound to port 3478",
+                );
+            }
 
-        #[cfg(unix)]
-        if !development {
-            super::rtc_unix::check_udp_read_buffer();
+            #[cfg(unix)]
+            if !development {
+                super::rtc_unix::check_udp_read_buffer();
+            }
         }
     }
     let node_config = node_config_for(&s, port, rtc_conf.enable_loopback_candidate)?;
 
     // use TCP mux when it's set
+    let mut tcp_port: u16 = 0;
     if rtc_conf.tcp_port != 0 {
         network_types.extend([NetworkType::Tcp4, NetworkType::Tcp6]);
-        not_applied(
-            "tcp_port",
-            &rtc_conf.tcp_port,
-            "ICE over TCP is not there: no listener is opened",
-        );
+        // `net.ListenTCP` refuses a port that is not one; the node is made later, so the
+        // check is here.
+        tcp_port = u16::try_from(rtc_conf.tcp_port).map_err(|_| Error::Port)?;
     }
 
     if rtc_conf.force_tcp && rtc_conf.tcp_port == 0 {
@@ -428,6 +438,7 @@ pub fn new_webrtc_config(rtc_conf: &RtcConfig, development: bool) -> Result<WebR
         ice_servers,
         setting_engine: s,
         node_config,
+        tcp_port,
         nat_1to1_ips,
         use_mdns: rtc_conf.use_mdns,
     })

@@ -173,8 +173,6 @@ the library. The layer has fifteen tests of its own now.
 
 Still not there, each with what it would take:
 
-- **ICE over TCP**: an accept loop in the node, RFC 4571 framing (`rtc` has it), a route
-  per TCP stream, passive TCP host candidates, a write buffer per stream.
 - **A port range**, **IPv6**, **the STUN port as an ICE port**: more listeners in the node;
   the routing already keys on family and port.
 - **Server reflexive and relay candidates** from ICE servers: a gatherer (a STUN and TURN
@@ -204,6 +202,28 @@ in between, `on_track` again). A user of the layer that counts announcements has
 that; a transceiver stopped between a renegotiation and the stream's next packet unbinds
 nothing at the sink.
 
+Added since: **ICE over TCP** (RFC 6544), with no change to `rtc`. Its ICE agent tells TCP
+from UDP by the protocol it is given, answers a check that came over a stream as a
+peer-reflexive candidate of that stream, and marks everything it sends (DTLS, SRTP and SCTP
+included) with the selected pair's protocol. A node made with `Node::new_with_tcp`
+(LiveKit's `rtc.tcp_port`; `WebRtcConfig::new_node` does it from the configuration) listens
+on a TCP port as well; its connections advertise passive TCP host candidates there unless
+their network types leave TCP out (`force_tcp` leaves UDP out). A stream goes to the
+connection named in its first binding request, and its packets then take the same way as
+datagrams. Framing (RFC 4571) and limits are pion's TCP mux's: a first frame of at most 512
+bytes within 30 s, later frames of at most 8192, and a write buffer of 4 MiB per stream; a
+stream that breaks them is closed without touching the others, and a connection's streams
+close with it. Active TCP (dialling the other side's passive candidates, once each) is there
+for clients and the layer's tests; it is off unless `SettingEngine::active_tcp` is set,
+where pion's is on unless disabled (LiveKit disables it on servers). Not there:
+simultaneous-open, TCP over a second address family (the listener is on the node's bind
+address only, where LiveKit listens on all), and keeping a stream with an unknown user name
+until a connection asks for it (pion's mux does; here it is refused, which is safe because a
+connection's user name is registered before its description is signalled). `rtc`'s agent
+finds a remote candidate by address alone (`find_remote_candidate`), so a peer whose UDP
+candidate and TCP stream share address and port is reported with a mixed pair. `rtc-shared`'s
+own framing helper (`tcp_framing`) has no frame limit, which is why the layer has its own.
+
 Found when the transport was ported onto the layer (`rtc/transport_impl.rs`), each with a
 stand-in on the transport's side:
 
@@ -225,8 +245,8 @@ stand-in on the transport's side:
 - Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
   signalling in place (step 5).
 - A network that is not the loopback interface: address translation, loss and delay, ICE
-  restarts when the address changes, TCP candidates, TURN. `rtc` has examples for ICE
-  restart and for ICE over TCP; a TURN server that LiveKit embeds is a separate matter and
+  restarts when the address changes, TURN, ICE over TCP with a browser. `rtc` has an
+  example for ICE restart; a TURN server that LiveKit embeds is a separate matter and
   stays an open question of the plan.
 - Load: many connections and tracks on one socket, CPU per packet.
 - H.264, VP9 and AV1 with their layer modes, RED and FlexFEC: the library carries them as

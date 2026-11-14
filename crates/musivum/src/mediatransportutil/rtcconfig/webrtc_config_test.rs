@@ -697,8 +697,8 @@ fn test_new_webrtc_config_ports() {
             .to_string()
     );
 
-    // TCP alone cannot be had: without a TCP port it is the original's error, with one UDP
-    // stays on.
+    // TCP forced: without a TCP port it is the original's error, with one only the TCP
+    // network types are left, and the node's UDP socket takes any port.
     let mut rtc_conf = loopback_only(validated(true));
     rtc_conf.force_tcp = true;
     assert_eq!(
@@ -710,7 +710,18 @@ fn test_new_webrtc_config_ports() {
     );
     rtc_conf.tcp_port = 7881;
     let conf = new_webrtc_config(&rtc_conf, true).unwrap();
+    assert_eq!(0, conf.node_config.bind_address.port());
+    assert_eq!(7881, conf.tcp_port);
+    assert_eq!(
+        vec![NetworkType::Tcp4, NetworkType::Tcp6],
+        conf.setting_engine.network_types
+    );
+
+    // A TCP port beside UDP.
+    rtc_conf.force_tcp = false;
+    let conf = new_webrtc_config(&rtc_conf, true).unwrap();
     assert_eq!(7882, conf.node_config.bind_address.port());
+    assert_eq!(7881, conf.tcp_port);
     assert_eq!(
         vec![
             NetworkType::Udp4,
@@ -720,6 +731,19 @@ fn test_new_webrtc_config_ports() {
         ],
         conf.setting_engine.network_types
     );
+
+    // No TCP port: no TCP.
+    rtc_conf.tcp_port = 0;
+    let conf = new_webrtc_config(&rtc_conf, true).unwrap();
+    assert_eq!(0, conf.tcp_port);
+    assert_eq!(
+        vec![NetworkType::Udp4, NetworkType::Udp6],
+        conf.setting_engine.network_types
+    );
+
+    // A TCP port that is not one is refused, as `net.ListenTCP` refuses it.
+    rtc_conf.tcp_port = 70000;
+    assert!(new_webrtc_config(&rtc_conf, true).is_err());
 
     // A filter that is no network.
     let mut rtc_conf = loopback_only(validated(true));
@@ -731,6 +755,28 @@ fn test_new_webrtc_config_ports() {
             .unwrap()
             .to_string()
     );
+}
+
+#[test]
+fn test_new_node_listens_on_the_tcp_port() {
+    // New for musivum: `new_node` opens the TCP listener of `tcp_port`, and none without.
+    // A free port is found by binding port 0 and letting it go.
+    let free_port = std::net::TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let mut rtc_conf = loopback_only(validated(true));
+    rtc_conf.udp_port = PortRange::default();
+    rtc_conf.tcp_port = u32::from(free_port);
+    let mut conf = new_webrtc_config(&rtc_conf, true).unwrap();
+    conf.node_config.bind_address = "127.0.0.1:0".parse().unwrap();
+    let node = conf.new_node().unwrap();
+    assert_eq!(free_port, node.tcp_local_addr().unwrap().port());
+
+    conf.tcp_port = 0;
+    let node = conf.new_node().unwrap();
+    assert!(node.tcp_local_addr().is_none());
 }
 
 #[test]
@@ -746,7 +792,6 @@ fn test_new_webrtc_config_says_what_is_not_applied() {
         new_webrtc_config(&rtc_conf, true).unwrap();
     });
     for option in [
-        "tcp_port",
         "use_stun_port_as_ice",
         "batch_io",
         "sctp_min_cwnd",
@@ -761,7 +806,13 @@ fn test_new_webrtc_config_says_what_is_not_applied() {
             "{option} is not in:\n{log}"
         );
     }
-    for option in ["force_tcp", "use_mdns", "port_range_start", "interfaces"] {
+    for option in [
+        "tcp_port",
+        "force_tcp",
+        "use_mdns",
+        "port_range_start",
+        "interfaces",
+    ] {
         assert!(
             !log.contains(&format!("option=\"{option}")),
             "{option} is in:\n{log}"

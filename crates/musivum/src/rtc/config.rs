@@ -93,7 +93,8 @@ impl WebRtcConfig {
         let web_rtc_config = rtcconfig::new_webrtc_config(&rtc_conf.rtc_config, conf.development)?;
 
         // we don't want to use active TCP on a server, clients should be dialing
-        // (`webRTCConfig.SettingEngine.DisableActiveTCP(true)`: the layer has no ICE over TCP)
+        // (`webRTCConfig.SettingEngine.DisableActiveTCP(true)`: the layer's `active_tcp` is off
+        // unless set, so there is nothing to do)
 
         let mut answering_dtls_role = DtlsRole::Unspecified;
         if rtc_conf.rtc_config.use_ice_lite {

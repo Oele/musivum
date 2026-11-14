@@ -22,11 +22,11 @@
 //   `get_ice_config` gives `Some` of a copy where the original checks for nil. The preferences
 //   of `livekit.ICEConfig` are compared as the protocol's `i32`, as Go compares its int32
 //   enum, so that a value the enum does not know equals none of the known ones.
-// - ICE over TCP and TURN are not in the connection layer (docs/webrtc-library.md). The
-//   fallback decisions are ported as logic and made as upstream makes them; what they would
-//   change in a transport (`set_prefer_tcp`) is called as upstream calls it and changes only
-//   the transport's own TCP ICE timer, and a preference for TURN goes to the client (through
-//   `on_ice_config_changed`) and finds no relay candidate here. Comments at the places.
+// - TURN is not in the connection layer (docs/webrtc-library.md). The fallback decisions
+//   are made as upstream makes them; a preference for TCP reaches the transports
+//   (`set_prefer_tcp`), which then keep their TCP candidates (passive, on the node's TCP
+//   listener when it has one), and a preference for TURN goes to the client (through
+//   `on_ice_config_changed`) and finds no relay candidate here.
 // - `AddICECandidate` takes the target as the enum: the original's arm for an unknown target
 //   cannot be reached and is a comment. The participant converts the request's `i32`.
 // - `PingTimeoutSeconds` (participant.go), which is not ported yet, is written out here for
@@ -1033,9 +1033,8 @@ impl TransportManager {
             self.media_loss_proxy.on_media_loss_update(None);
         }
 
-        // The transport keeps the preference for TCP and arms its TCP ICE connect timer with
-        // it; the connection layer has no ICE over TCP, so the candidates and the connection
-        // stay as they are (see the header).
+        // The transport keeps the preference for TCP: its candidate filter and its TCP ICE
+        // connect timer act on it (see the header).
         // `if t.publisher != nil`: it always is
         self.publisher.set_prefer_tcp(
             ice_config.preference_publisher == livekit::IceCandidateType::IctTcp as i32,
@@ -1203,7 +1202,7 @@ impl TransportManager {
         };
 
         // What the preference makes of the connections: see `configure_ice`. A client told to
-        // prefer TCP or TURN (`on_ice_config_changed`) gets only UDP host candidates here.
+        // prefer TURN (`on_ice_config_changed`) finds no relay candidate here.
         match livekit::IceCandidateType::try_from(prefer_next) {
             Ok(livekit::IceCandidateType::IctTcp) => {
                 debugw!(
