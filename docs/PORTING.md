@@ -71,6 +71,13 @@ was checked:
   reads it (which scalars are bools and numbers, decoding onto defaults, strict mode). Its
   files that derive from libyaml (MIT) were not used; the YAML syntax is read by
   `saphyr-parser`. Its notice is in `NOTICE`.
+- **gorilla/websocket v1.5.3** (BSD-2-Clause), the WebSocket library LiveKit's signalling
+  endpoint uses: how it answers control frames, what it does at a close and the texts of
+  its close errors are followed in `service/wsprotocol.rs` and `service/errors.rs`, so that
+  a client sees the same. Its notice is in `NOTICE`.
+- **ua-parser/uap-go** (Apache-2.0; its `uaparser/` MIT): read for the shapes of its results
+  and `ToVersionString`. Its regular expressions (uap-core) are not used: `service/useragent.rs`
+  is a small recogniser written new, held against the original's answers for 41 user agents.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
