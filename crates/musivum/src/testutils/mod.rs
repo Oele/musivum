@@ -3,6 +3,11 @@
 
 use std::time::{Duration, Instant};
 
+/// What the fakes that `#[musivum_fakes::fake]` makes of traits are built from. How a fake
+/// is used is written down at the macro.
+pub mod fakes;
+mod fakes_test;
+
 /// testify's `require.InDelta(t, expected, actual, delta)`.
 #[track_caller]
 pub fn assert_in_delta(expected: f64, actual: f64, delta: f64) {
