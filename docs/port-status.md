@@ -544,18 +544,28 @@ difference.
 ## Under load
 
 `tests/load` (2026-11-14, LiveKit's `lk load-test`, one run per scenario): both servers
-gave every subscriber all its media with no loss and no join errors, up to 100 subscribers
+give every subscriber all its media with no loss and no join errors, up to 100 subscribers
 of one track and 10 calls of 4. musivum's memory is lower (an idle 13 MB against 49 MB,
-about 2 MB per participant against 3). Its CPU was LiveKit's while a track had fewer than
-20 subscribers, and 2 to 4 times LiveKit's above that: the ported fan-out of a packet to
-its down tracks started a thread of the operating system per worker for every packet,
-where LiveKit starts goroutines on Go's fixed set of threads. Since the fan-out runs on
-rayon's persistent pool (`in_place_scope`, the caller waiting as on the original's
-`WaitGroup`), musivum used 0.44 cores in scenario b (was 0.84; LiveKit 0.22) and 0.31 in d
-(was 0.47; LiveKit 0.22), on a quieter machine than the first runs. What is left of the gap
-is not measured yet; a run with the fan-out made serial took b to 0.17 cores. Not measured yet: latency and freezes under load, runs of minutes,
-joins and leaves during a run. Each ops queue is a thread of its own (four per
-participant).
+about 2 MB per participant against 3). Steady CPU in cores, LiveKit against musivum:
+
+| Scenario | LiveKit | musivum at first | musivum now |
+|---|---|---|---|
+| a: one room, 2 publishers, 10 subscribers | 0.051 | 0.054 | 0.056 |
+| b: the same with 50 subscribers | 0.222 | 0.838 | 0.269 |
+| c: 10 calls of 4 | 0.282 | 0.340 | 0.327 |
+| d: one publisher, 100 subscribers | 0.223 | 0.467 | 0.249 |
+
+What closed the gap, found with `perf` on both servers: the ported fan-out of a packet to
+its down tracks started a thread of the operating system per worker for every packet, then
+ran on rayon's pool, whose idle threads spin between packets. It now runs as Go runs it: the
+caller is the first worker and starts more only while work is left, on a small pool of its
+own whose threads sleep as soon as the queue is empty (`go/sync.rs`, with Go's
+`sync.WaitGroup`). What is left is in the write of each packet: `rtc`'s sans-I/O pipeline
+passes it through every handler with queues and copies (19 to 25% of musivum's CPU in b),
+where pion writes straight through; closing that means changing the connection layer or
+`rtc`. Not measured yet: latency and freezes under load, runs of minutes, joins and leaves
+during a run. Each ops queue is a thread of its own (four per participant): they cost
+threads, not CPU.
 
 ## In progress, not on `main`
 
