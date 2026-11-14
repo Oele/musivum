@@ -2,7 +2,7 @@
 
 Step 3 of `docs/PORTING.md`. Decided on 2026-11-14: musivum stands on **`rtc`**, the
 protocol core of webrtc-rs (0.21.1, MIT or Apache-2.0), with its RTP crate patched by one
-field and two functions of its own patched. This page says why, what was run to find out, and what was not.
+field and five places of its own patched. This page says why, what was run to find out, and what was not.
 
 ## What the library has to do
 
@@ -107,17 +107,23 @@ hard-coded.
    where musivum takes them: the counterpart of pion's buffer factory.
 4. **`RTCRtpSender::write_rtp` takes only the track's own SSRC.** RTX and padding on the
    repair SSRC go through `RTCPeerConnection::handle_write`, which takes them.
-5. **A sender's codecs are not pion's.** `rtc` gives a sender no codecs until codec
+5. **A transceiver's codecs are not pion's.** `rtc` gives a sender no codecs until codec
    preferences are set (pion: the transceiver's, the media engine's of its kind until
-   then), and writes into the description, and gives a receiver, the media engine's codec
-   that matches a preference instead of the preference, so what LiveKit sets on one
+   then); writes into the description, and gives a receiver, the media engine's codec that
+   matches a preference instead of the preference, so what LiveKit sets on one
    (`sprop-stereo=1` in Opus's fmtp line, NACK taken away, the payload type an offer gave)
-   did not reach the description. `third_party/rtc` is `rtc` 0.21.1 with
-   `RTCRtpReceiverInternal::get_codecs` and `RTCRtpSenderInternal::get_parameters` changed
-   as pion has them (`MUSIVUM.md`, `MUSIVUM.patch`), used through `[patch.crates-io]`. It
-   cannot be done above the crate: its media engine cannot be read once a connection has
-   it, and a local description has to be set as the crate wrote it. To be proposed
-   upstream, when the owner says so.
+   did not reach the description; adds the media engine's repair codecs (RTX of a kept
+   codec, FEC, RED) to preferences that leave them out (pion adds none, and drops an RTX
+   whose codec is gone); and replaces a transceiver's preferences with the other side's
+   codecs at every remote description, offer or answer (pion only for a transceiver a
+   remote offer creates), so preferences did not outlive a renegotiation. `third_party/rtc`
+   is `rtc` 0.21.1 with all of this as pion has it, in five places of about 150 changed
+   lines (`MUSIVUM.md`, `MUSIVUM.patch`), used through `[patch.crates-io]`. Incoming payload
+   types are mapped through the codecs the latest remote description gave the receiver's
+   media section, where `rtc` used the preferences it had set from it (pion uses its media
+   engine's negotiated codecs). It cannot be done above the crate: its media engine cannot
+   be read once a connection has it, and a local description has to be set as the crate
+   wrote it. To be proposed upstream, when the owner says so.
 
 None of these changes the structure of the port.
 
@@ -240,13 +246,15 @@ done since, the others each with a stand-in on the transport's side:
 
 - **A sender's codecs** (done since): a transceiver made from a kind to send has a sender
   without a track (pion's has a track of its own that writes nothing), which `replace_track`
-  can give one; a sender's codecs and the description are pion's through the patch above.
-  Still different: `rtc` replaces a transceiver's codec preferences with the other side's
-  codecs at every remote description, offer or answer (pion only for a transceiver a remote
-  offer creates), so preferences do not outlive a renegotiation (a later offer or answer
-  carries what the other side had: no `sprop-stereo` from a browser, NACK from a client's
-  re-offer); and it adds back the media engine's repair codecs (RTX of a kept codec, FEC,
-  RED) that preferences leave out.
+  can give one; a sender's codecs and the description are pion's through the patch above,
+  also across renegotiations (preferences outlive later offers and answers; repair codecs
+  they leave out stay out; checked against what pion writes for the same steps, and media
+  sent after a renegotiation arrives with its codec). Still different:
+  `get_rtp_parameters_by_payload_type` answers from the transceivers' codecs, so where
+  preferences are set it gives the preferred codec, where pion's media engine gives the
+  negotiated one; and, as with pion, a sender keeps its RTX and FEC streams where the media
+  engine has those codecs, so preferences without them give a description with
+  `a=ssrc-group:FID` or `FEC-FR` and no such codec.
 - **No ICE transport object.** The selected pair comes from the layer's event; the RTT from
   the statistics, which have none under ICE lite.
 - **Gathering is synchronous**, so the transport's paths that wait for gathering to end are
