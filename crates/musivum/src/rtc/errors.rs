@@ -90,6 +90,10 @@ pub enum Error {
     // returns
     #[error(transparent)]
     Supervisor(#[from] crate::rtc::supervisor::Error),
+    // of package `transport` (transport/handler.go), which the methods of its `Handler`
+    // return where nothing handles them
+    #[error(transparent)]
+    Transport(#[from] crate::rtc::transport::Error),
 }
 
 #[cfg(test)]

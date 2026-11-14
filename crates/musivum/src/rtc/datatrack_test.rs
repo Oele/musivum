@@ -4,7 +4,8 @@
 // data tracks: the fake has none to return by itself, where counterfeiter's returns nil.
 // `GetReporterReturns` is left out with the reporter. The tests after the first are new:
 // upstream's one test does not reach the down tracks. What they expect is the original's:
-// it is what a Go test laid over `pkg/rtc` at v1.13.11 printed for the same calls.
+// it is what a Go test laid over `pkg/rtc` at v1.13.11 printed for the same calls. The
+// counts of the byte statistics follow from the sizes of the packets.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -12,12 +13,14 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use bytes::Bytes;
 
 use super::*;
+use crate::go::time::{MILLISECOND, SECOND};
 use crate::protocol::logger;
 use crate::rtc::datatrack_stats::DataTrackStatsInner;
 use crate::rtc::types::{
     FakeDataTrackTransport, FakeLocalParticipant, FakeParticipantTelemetryListener, Participant,
 };
-use crate::testutils::fakes;
+use crate::telemetry;
+use crate::testutils::{eventually, fakes};
 
 fn new_test_data_track_subscriber(
     id: &str,
@@ -43,6 +46,7 @@ fn test_data_track_revoke_disallowed_subscribers() {
             logger: logger::get_logger(),
             participant_id: Box::new(|| "pubID".into()),
             participant_identity: "pub".into(),
+            bytes_track_stats: None,
         },
         &livekit::DataTrackInfo {
             pub_handle: 1,
@@ -94,7 +98,9 @@ const IN_1: &str =
 
 struct Subscribed {
     dt: Arc<DataTrack>,
+    bytes: Arc<BytesTrackStats>,
     sub1: Arc<FakeLocalParticipant>,
+    tl1: Arc<FakeParticipantTelemetryListener>,
     tr1: Arc<FakeDataTrackTransport>,
     ddt1: Arc<dyn types::DataDownTrack>,
     tr2: Arc<FakeDataTrackTransport>,
@@ -113,14 +119,18 @@ fn new_subscriber_with_transport(
     sub
 }
 
-// A data track under the handle 7 with two subscribers, whose down tracks have the handles
-// 0x1234 and 0x00ab.
+// A data track under the handle 7 with byte statistics and two subscribers, whose down
+// tracks have the handles 0x1234 and 0x00ab.
 fn new_subscribed_data_track() -> Subscribed {
+    let bytes = BytesTrackStats::new("", &"DTR_test".into(), &"pubID".into(), || {
+        Arc::new(FakeParticipantTelemetryListener::default())
+    });
     let dt = DataTrack::new(
         DataTrackParams {
             logger: logger::get_logger(),
             participant_id: Box::new(|| "pubID".into()),
             participant_identity: "pub".into(),
+            bytes_track_stats: Some(bytes.clone()),
         },
         &livekit::DataTrackInfo {
             pub_handle: 7,
@@ -133,12 +143,16 @@ fn new_subscribed_data_track() -> Subscribed {
     let tr1 = Arc::new(FakeDataTrackTransport::default());
     let tr2 = Arc::new(FakeDataTrackTransport::default());
     let sub1 = new_subscriber_with_transport("sub1ID", "sub1", 0x1234, &tr1);
+    let tl1 = Arc::new(FakeParticipantTelemetryListener::default());
+    sub1.get_telemetry_listener_returns(tl1.clone());
     let sub2 = new_subscriber_with_transport("sub2ID", "sub2", 0x00ab, &tr2);
     let ddt1 = dt.add_subscriber(sub1.clone()).unwrap().unwrap();
     let ddt2 = dt.add_subscriber(sub2).unwrap().unwrap();
     Subscribed {
         dt,
+        bytes,
         sub1,
+        tl1,
         tr1,
         ddt1,
         tr2,
@@ -209,6 +223,36 @@ fn a_packet_arrives_at_each_subscribed_down_track_under_its_handle() {
     assert_eq!(0, stats.num_packets_out_of_order);
     assert_eq!(1, stats.num_frames);
     assert_eq!(63, stats.num_bytes);
+
+    // the bytes are counted as they came, by the track's statistics,
+    let totals = s.bytes.get_traffic_totals();
+    assert_eq!(63, totals.recv_bytes);
+    assert_eq!(2, totals.recv_messages);
+    assert_eq!(0, totals.send_bytes);
+    assert_eq!(0, totals.send_messages);
+    // and as they went, by the statistics of each down track, which tell the subscriber's
+    // telemetry when the down track is closed
+    s.ddt1.close();
+    eventually(
+        || s.tl1.on_track_stats_call_count() == 1,
+        (5 * SECOND).to_std(),
+        (10 * MILLISECOND).to_std(),
+    );
+    let (key, stat) = s.tl1.on_track_stats_args_for_call(0);
+    assert_eq!(
+        telemetry::stats_key_for_data(
+            "",
+            livekit::StreamType::Downstream,
+            "sub1ID".into(),
+            "DTR_test".into()
+        ),
+        key
+    );
+    assert_eq!(1, stat.streams.len());
+    assert_eq!(63, stat.streams[0].primary_bytes);
+    assert_eq!(2, stat.streams[0].primary_packets);
+    s.ddt2.close();
+    s.dt.close();
 
     assert_eq!(7, s.dt.pub_handle());
     assert_eq!("DTR_test", s.dt.id().as_str());
@@ -309,7 +353,13 @@ fn a_closed_down_track_gets_nothing_more() {
 // subscribers and down tracks in it, and a down track that is still held outlives it.
 #[test]
 fn a_down_track_does_not_keep_its_data_track() {
-    let Subscribed { dt, ddt1, ddt2, .. } = new_subscribed_data_track();
+    let Subscribed {
+        dt,
+        bytes,
+        ddt1,
+        ddt2,
+        ..
+    } = new_subscribed_data_track();
     let weak = Arc::downgrade(&dt);
     drop(dt);
     assert!(weak.upgrade().is_none());
@@ -328,6 +378,7 @@ fn a_down_track_does_not_keep_its_data_track() {
     ddt1.close();
     assert_eq!(1, closed.load(Ordering::SeqCst));
     ddt2.close();
+    bytes.stop();
 
     // and no down track is made for a track that is gone
     let res = DataDownTrack::new(DataDownTrackParams {
@@ -336,6 +387,7 @@ fn a_down_track_does_not_keep_its_data_track() {
         publish_data_track: weak,
         handle: 1,
         transport: Arc::new(FakeDataTrackTransport::default()),
+        bytes_track_stats: None,
     });
     assert_eq!(Some(Error::ReceiverClosed), res.err());
 }

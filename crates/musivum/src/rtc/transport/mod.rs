@@ -1,6 +1,8 @@
 //! LiveKit's `pkg/rtc/transport`: what a transport tells its owner, and the states of a
-//! negotiation. `handler.go`, what a transport tells its owner, is not ported yet.
+//! negotiation.
 
+mod handler;
 mod negotiationstate;
 
+pub use handler::*;
 pub use negotiationstate::*;

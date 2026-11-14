@@ -7,19 +7,20 @@
 // a cancellation token. The spreader holds `Arc<dyn DataTrackSender>`s, for which the two
 // lines after the track say that a data track sender is a sender of `sfu/utils`.
 // `errAlreadySubscribed` and `errReceiverClosed` are `Error::AlreadySubscribed` and
-// `Error::ReceiverClosed`. Not here yet, each with a comment at its place:
-// - `BytesTrackStats` of `signalanddatastats.go`, which is not ported: the field of the
-//   params, `Stop` in `close`, `AddBytes` in `handle_packet`, and the one `add_subscriber`
-//   makes for the down track (with `sub.GetCountry()`, `Kind()`, `KindDetails()`,
-//   `GetTelemetryListener` and the reporter it is made from).
-// - `IsParticipantExemptFromTrackPermissionsRestrictions` of `room.go`, which is not ported:
-//   it stands at the end of this file until `room.rs` has it.
+// `Error::ReceiverClosed`. The `BytesTrackStats` of the params, a pointer that may be nil,
+// is an `Option`; the one `add_subscriber` makes for a down track is made without the
+// subscriber's `Kind()`, `KindDetails()` and reporter (see signalanddatastats.rs), and with a
+// function that asks the subscriber for its telemetry listener through a `Weak` (the stats
+// would otherwise hold the subscriber, which holds its down tracks); once the subscriber is
+// gone it gives a listener that does nothing. Not here yet, with a comment at its place:
+// `IsParticipantExemptFromTrackPermissionsRestrictions` of `room.go`, which is not ported:
+// it stands at the end of this file until `room.rs` has it.
 // Who holds whom: the track holds its subscribers (the participants) and their down tracks
 // strongly, the down tracks a second time in the spreader, until `remove_subscriber` or a
 // down track's `close` takes them out; `close` of the track itself takes nothing out, as
 // upstream. A down track holds the track weakly. The callback `participant_id` of the
 // params is held for as long as the track: the publisher hands in one that does not hold
-// the publisher strongly.
+// the publisher strongly. The byte statistics of a down track hold its subscriber weakly.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
@@ -29,6 +30,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::datadowntrack::{DataDownTrack, DataDownTrackParams};
 use super::datatrack_stats::{DataTrackStats, DataTrackStatsParams};
+use super::signalanddatastats::BytesTrackStats;
 use crate::infow;
 use crate::protocol::datatrack;
 use crate::protocol::livekit;
@@ -41,7 +43,7 @@ pub struct DataTrackParams {
     pub logger: Logger,
     pub participant_id: Box<dyn Fn() -> livekit::ParticipantId + Send + Sync>,
     pub participant_identity: livekit::ParticipantIdentity,
-    // BytesTrackStats     *BytesTrackStats: signalanddatastats.go is not ported yet
+    pub bytes_track_stats: Option<Arc<BytesTrackStats>>,
 }
 
 struct SubscribedDataTrack {
@@ -106,7 +108,9 @@ impl DataTrack {
         self.closed.cancel();
 
         self.stats.close();
-        // `d.params.BytesTrackStats.Stop()`: signalanddatastats.go is not ported yet
+        if let Some(bytes_track_stats) = &self.params.bytes_track_stats {
+            bytes_track_stats.stop();
+        }
     }
 
     pub fn publisher_id(&self) -> livekit::ParticipantId {
@@ -143,17 +147,30 @@ impl DataTrack {
             return Err(Error::AlreadySubscribed);
         }
 
-        // `bytesStats := NewBytesTrackStats(sub.GetCountry(), d.ID(), sub.ID(), sub.Kind(),
-        // sub.KindDetails(), sub.GetTelemetryListener, sub.GetReporter())`, which goes to the
-        // down track as its `BytesTrackStats` and is stopped when the down track cannot be
-        // made: signalanddatastats.go is not ported yet
-        let data_down_track = DataDownTrack::new(DataDownTrackParams {
+        let bytes_stats = BytesTrackStats::new(&sub.get_country(), &self.id(), &sub.id(), {
+            // `sub.GetTelemetryListener`: see the header
+            let sub = Arc::downgrade(&sub);
+            move || -> Arc<dyn types::ParticipantTelemetryListener> {
+                match sub.upgrade() {
+                    Some(sub) => sub.get_telemetry_listener(),
+                    None => Arc::new(types::NullParticipantTelemetryListener {}),
+                }
+            }
+        });
+        let data_down_track = match DataDownTrack::new(DataDownTrackParams {
             logger: sub.get_logger().with_values(&[("trackID", &self.id())]),
             subscriber_id: sub.id(),
             publish_data_track: self.this.clone(),
             handle: sub.get_next_subscribed_data_track_handle(),
             transport: sub.get_data_track_transport(),
-        })?;
+            bytes_track_stats: Some(bytes_stats.clone()),
+        }) {
+            Ok(data_down_track) => data_down_track,
+            Err(err) => {
+                bytes_stats.stop();
+                return Err(err);
+            }
+        };
 
         subscribed_tracks.insert(
             sub.id(),
@@ -244,8 +261,9 @@ impl DataTrack {
 
     pub fn handle_packet(&self, data: &[u8], packet: &datatrack::Packet, arrival_time: i64) {
         self.stats.update(packet, arrival_time, data.len());
-        // `d.params.BytesTrackStats.AddBytes(uint64(len(data)), false)`: signalanddatastats.go
-        // is not ported yet
+        if let Some(bytes_track_stats) = &self.params.bytes_track_stats {
+            bytes_track_stats.add_bytes(data.len() as u64, false);
+        }
 
         self.down_track_spreader.broadcast(|dts| {
             dts.write_packet(data, packet, arrival_time);

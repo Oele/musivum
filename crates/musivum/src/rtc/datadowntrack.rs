@@ -6,17 +6,18 @@
 // `PublishDataTrack` of the params is a `Weak` (see below), so `publish_data_track` is an
 // `Option`, `id` and `name` are empty once the track is gone, `new` fails with
 // `Error::ReceiverClosed` for a track that is gone as it does for one that is closed, and
-// `close` leaves out what it would tell the track. Not here yet: `BytesTrackStats` of
-// `signalanddatastats.go`, which is not ported; a comment stands at each of its places (the
-// field of the params, `Stop` in `close`, `AddBytes` in `write_packet`).
+// `close` leaves out what it would tell the track. The `BytesTrackStats` of the params, a
+// pointer that may be nil, is an `Option`.
 // Who holds whom: the published data track holds its down tracks strongly (as subscriptions
 // and in its spreader), so a down track holds the data track weakly. It holds the
-// subscriber's transport strongly, and the callback of `on_close` until it is replaced.
+// subscriber's transport strongly, and the callback of `on_close` until it is replaced. It
+// holds its byte statistics, whose task holds them until `close` stops them.
 
 use std::sync::{Arc, Weak};
 
 use parking_lot::Mutex;
 
+use super::signalanddatastats::BytesTrackStats;
 use crate::go::time;
 use crate::protocol::datatrack;
 use crate::protocol::livekit;
@@ -31,7 +32,7 @@ pub struct DataDownTrackParams {
     pub publish_data_track: Weak<dyn types::DataTrack>,
     pub handle: u16,
     pub transport: Arc<dyn types::DataTrackTransport>,
-    // BytesTrackStats  *BytesTrackStats: signalanddatastats.go is not ported yet
+    pub bytes_track_stats: Option<Arc<BytesTrackStats>>,
 }
 
 pub struct DataDownTrack {
@@ -89,7 +90,9 @@ impl DataDownTrack {
         };
 
         infow!(self.logger, "closing data down track");
-        // `d.params.BytesTrackStats.Stop()`: signalanddatastats.go is not ported yet
+        if let Some(bytes_track_stats) = &self.params.bytes_track_stats {
+            bytes_track_stats.stop();
+        }
         if let Some(publish_data_track) = self.publish_data_track() {
             publish_data_track.delete_data_down_track(&self.subscriber_id());
         }
@@ -148,9 +151,11 @@ impl DataDownTrack {
         };
         if let Err(err) = self.params.transport.send_data_track_message(&buf) {
             warnw!(self.logger, "could not send data track message", err);
+            return;
         }
-        // and when it was sent, `d.params.BytesTrackStats.AddBytes(uint64(len(buf)), true)`:
-        // signalanddatastats.go is not ported yet
+        if let Some(bytes_track_stats) = &self.params.bytes_track_stats {
+            bytes_track_stats.add_bytes(buf.len() as u64, true);
+        }
     }
 
     pub fn update_subscription_options(
