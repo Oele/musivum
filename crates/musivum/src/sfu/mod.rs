@@ -10,6 +10,7 @@ pub mod datachannel;
 mod errors;
 pub mod flexfec;
 mod forwardstats;
+mod interfaces;
 pub mod pacer;
 pub mod packettrailer;
 mod receiver_base;
@@ -27,6 +28,7 @@ pub mod videolayerselector;
 
 pub use errors::*;
 pub use forwardstats::*;
+pub use interfaces::*;
 pub use receiver_base::*;
 pub use rtpmunger::*;
 pub use rtxbudget::*;

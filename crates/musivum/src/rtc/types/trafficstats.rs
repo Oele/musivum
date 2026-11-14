@@ -3,8 +3,7 @@
 // Changes: translated from Go to Rust; the pointers that the original never checks for nil
 // (the stats of a `TrafficTypeStats`, the entries of the lists) are values; the four named
 // results of `TrafficLoadToTrafficRate` are a tuple in the same order; `Timestamp.AsTime()`
-// of a timestamp that may be absent is the function `as_time`; `StreamType` is defined here,
-// see there. The zero `Time` of `crate::go::time` is the Unix epoch, where Go's is the year 1:
+// of a timestamp that may be absent is the function `as_time`. The zero `Time` of `crate::go::time` is the Unix epoch, where Go's is the year 1:
 // a time that is exactly the Unix epoch, which is what an absent timestamp of the protocol
 // becomes, counts as "not set" in `aggregate_traffic_stats` here and as a time upstream.
 // The tests at the end are new: the original has none.
@@ -14,16 +13,8 @@ use musivum_protocol::Timestamp;
 use crate::go::time::{self, Time};
 use crate::protocol::livekit;
 
-/// `livekit.StreamType` upstream, an enumeration of `livekit_analytics.proto`. That file is
-/// not among the definitions `musivum-protocol` compiles, so the type is written out here,
-/// with the names and numbers the generated one would have.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-#[repr(i32)]
-pub enum StreamType {
-    #[default]
-    Upstream = 0,
-    Downstream = 1,
-}
+/// `livekit.StreamType` upstream; here under the name this module has had for it.
+pub use crate::protocol::livekit::StreamType;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct TrafficStats {

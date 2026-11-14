@@ -16,6 +16,9 @@ const FILES: &[&str] = &[
     "livekit_agent_dispatch.proto",
     "livekit_webhook.proto",
     "livekit_internal.proto",
+    // The statistics a down track and the connection quality scorer report in
+    // (`AnalyticsStat`, `StreamType`); it imports the SIP definitions.
+    "livekit_analytics.proto",
 ];
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {

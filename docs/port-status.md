@@ -45,6 +45,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
 | `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
 | `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
+| `pkg/sfu/streamtrackermanager.go` | `sfu/streamtrackermanager.rs` | none upstream | Eight tests added, their expected events and states printed by the Go original for the same steps. The listener is held weakly. `Bitrates` and `ReceiverCodecState` of `receiver_base.go` are in `sfu/receiver_base.rs` ahead of the receiver. |
+| `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender` and `DownTrackListener` as traits with fakes. `DownTrackStreamAllocatorListener` follows with the down track. |
 | `pkg/sfu/rtpmunger.go` | `sfu/rtpmunger.rs` | 9 / 9 | `update_and_get_sn_ts` returns the parameters together with the error, as the original does. Also run against the original: 6,000 operations, 13,548 lines of results and state, identical. |
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
@@ -203,6 +205,12 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `streamtrackermanager.go`: `UpdateTrackInfo` while unmuted resets every tracker, so each
+  active layer is reported stopped until its next packet. `RemoveTracker` leaves the layer
+  available and tells the listener nothing; on a layer of a dependency descriptor stream it
+  stops the shared tracker for all layers. `RemoveTracker` and `SetMaxExpectedSpatialLayer`
+  do not check their layer and panic on one out of range (`AddTracker` and `GetTracker`
+  check). `DistanceToDesired` can be negative.
 - `codecmunger/vp8.go`: a late packet gets the cached picture id offset but the current
   TL0PICIDX and KEYIDX offsets; the wrap handler is moved before the out-of-order check, so
   a late packet that then misses the cache still moves it; on a jump of N picture ids, N
@@ -236,7 +244,6 @@ work in progress committed (not reviewed, not merged):
 
 | What | Branch | State when stopped |
 |---|---|---|
-| `sfu/streamtrackermanager.go` | `worktree-agent-a4f0b6a686c461dee` | Just begun. |
 
 Next after these, in this order: `sfu/rtpstats` and `sfu/bwe/sendsidebwe` (what they
 waited for, the utilities, is merged); `sfu/pacer` (the seam traits are merged); then the
