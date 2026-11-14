@@ -53,6 +53,8 @@
 //   servers names port 443 whatever `turn.tls_port` is, as upstream (which expects a load
 //   balancer on 443), unless a server that builds musivum in names another port: it has no
 //   proxy in front of it to rewrite the URL (`musivum_server::embed`).
+// - New: `get_rooms`, every room of the node, for a server that builds musivum in and sends
+//   the participants back for a full reconnect when it restarts (`musivum_server::embed`).
 
 use std::collections::HashMap;
 use std::future::Future;
@@ -230,6 +232,11 @@ impl RoomManager {
     pub fn get_room(&self, room_name: &livekit::RoomName) -> Option<Arc<Room>> {
         let rooms = self.lock.read();
         rooms.get(room_name).cloned()
+    }
+
+    /// New: every room of the node (see the header).
+    pub fn get_rooms(&self) -> Vec<Arc<Room>> {
+        self.lock.read().values().cloned().collect()
     }
 
     // deleteRoom completely deletes all room information, including active sessions, room store, and routing info

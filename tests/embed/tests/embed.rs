@@ -48,6 +48,9 @@ const HTTP_PORT: u16 = 39607;
 
 const WAIT: Duration = Duration::from_secs(15);
 
+// The tests take the same ports: one at a time.
+static SERIAL: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 type WebSocket = tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<TcpStream>>;
 type Hooks = mpsc::UnboundedReceiver<(String, serde_json::Value)>;
 
@@ -210,6 +213,22 @@ async fn expect_closed(
     }
 }
 
+// Every event until the receiver is told that no event will come.
+async fn collect_until_closed(
+    events: &mut broadcast::Receiver<livekit::WebhookEvent>,
+) -> Vec<livekit::WebhookEvent> {
+    let deadline = tokio::time::Instant::now() + WAIT;
+    let mut seen = Vec::new();
+    loop {
+        match tokio::time::timeout_at(deadline, events.recv()).await {
+            Err(_) => panic!("the events do not end within {WAIT:?}, {seen:?}"),
+            Ok(Ok(event)) => seen.push(event),
+            Ok(Err(broadcast::error::RecvError::Closed)) => return seen,
+            Ok(Err(err)) => panic!("{err}"),
+        }
+    }
+}
+
 // Whether a TCP or a UDP socket can be bound to the port on 127.0.0.1 now (it is closed
 // again at once).
 fn tcp_free(port: u16) -> bool {
@@ -254,6 +273,33 @@ impl Client {
             panic!("not a join response: {res:?}");
         };
         Client { ws, join }
+    }
+
+    // `/rtc` with `reconnect=1`, as LiveKit's clients resume the session `sid`: the first
+    // response.
+    async fn resume(app: SocketAddr, token: &str, sid: &str) -> livekit::SignalResponse {
+        let url = format!(
+            "ws://{app}{PREFIX}/rtc?access_token={token}&protocol=16&sdk=js&version=2.15.0&auto_subscribe=0&reconnect=1&sid={sid}&reconnect_reason=1"
+        );
+        let (mut ws, _) = tokio_tungstenite::connect_async(url).await.unwrap();
+        tokio::time::timeout(WAIT, recv(&mut ws))
+            .await
+            .expect("no answer to the resume")
+            .expect("the signalling ended without an answer to the resume")
+    }
+
+    // The leave requests the server sends until the signalling ends.
+    async fn leaves(&mut self) -> Vec<livekit::LeaveRequest> {
+        let mut leaves = Vec::new();
+        while let Some(res) = tokio::time::timeout(WAIT, recv(&mut self.ws))
+            .await
+            .expect("the signalling does not end")
+        {
+            if let Some(signal_response::Message::Leave(leave)) = res.message {
+                leaves.push(leave);
+            }
+        }
+        leaves
     }
 
     // The URLs of TURN over TLS among the ICE servers of the join response.
@@ -347,6 +393,7 @@ async fn send(ws: &mut WebSocket, message: signal_request::Message) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn musivum_runs_inside_another_server() {
+    let _serial = SERIAL.lock().await;
     // The build is asaroton's: two providers and none for the process, so that a TLS
     // configuration made from the process's default panics.
     assert!(rustls::crypto::CryptoProvider::get_default().is_none());
@@ -546,4 +593,149 @@ async fn musivum_runs_inside_another_server() {
     expect_closed(&mut events, &mut seen).await;
     // the filter of the webhooks holds for the events in process
     assert!(!seen.iter().any(|e| e == "room_started"), "{seen:?}");
+}
+
+// New for musivum: the shutdown for a restart of the embedding server sends the participants
+// back (a leave with the action RECONNECT, as LiveKit's `IssueFullReconnect` does) where the
+// plain shutdown sends them away (DISCONNECT), and its events say so.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn musivum_restarts_inside_another_server() {
+    let _serial = SERIAL.lock().await;
+    let (cert_file, key_file) = turn_certificate();
+    let token = join_token("alice", "r-room");
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let app = listener.local_addr().unwrap();
+    let embedded = Embedded::start(
+        config(app, &cert_file, &key_file, ""),
+        EmbedOptions::default(),
+    )
+    .await
+    .unwrap();
+    let mut events = embedded.events();
+    let mut seen = Vec::new();
+    let (_hooks, stop, served) = serve(listener, &embedded);
+
+    let mut alice = Client::join(app, &token).await;
+    let sid = alice.join.participant.as_ref().unwrap().sid.clone();
+    let pc = alice.connect().await;
+    expect(&mut events, &mut seen, "participant_joined").await;
+
+    // sent back at once: the call does not wait out its timeout
+    let timeout = Duration::from_secs(5);
+    let t = Instant::now();
+    embedded.shutdown_for_restart(timeout).await;
+    assert!(t.elapsed() < timeout, "{:?}", t.elapsed());
+    assert_ports_free();
+    // and not taken in again
+    let (status, _, _) = get(app, &format!("{PREFIX}/rtc/validate?access_token={token}")).await;
+    assert_eq!(503, status);
+
+    // one leave: reconnect, for a migration, with the regions LiveKit gives without a region
+    // configuration (none)
+    let leaves = alice.leaves().await;
+    assert_eq!(
+        vec![(
+            livekit::leave_request::Action::Reconnect,
+            livekit::DisconnectReason::Migration,
+            None,
+        )],
+        leaves
+            .iter()
+            .map(|l| (l.action(), l.reason(), l.regions.clone()))
+            .collect::<Vec<_>>()
+    );
+    let _ = pc.close();
+
+    // the events say that the participant is expected back and that the room was restarted
+    let rest = collect_until_closed(&mut events).await;
+    let left: Vec<_> = rest
+        .iter()
+        .filter(|e| e.event.starts_with("participant_"))
+        .map(|e| {
+            let p = e.participant.as_ref().unwrap();
+            (e.event.as_str(), p.identity.as_str(), p.disconnect_reason())
+        })
+        .collect();
+    assert_eq!(
+        vec![(
+            "participant_left",
+            "alice",
+            livekit::DisconnectReason::Migration
+        )],
+        left
+    );
+    let finished: Vec<_> = rest
+        .iter()
+        .filter(|e| e.event == "room_finished")
+        .map(|e| (e.room.as_ref().unwrap().name.as_str(), e.room_end_reason()))
+        .collect();
+    assert_eq!(
+        vec![("r-room", livekit::RoomEndReason::RoomEndSuperseded)],
+        finished
+    );
+    stop.cancel();
+    served.await.unwrap();
+
+    // The server started again, on the same ports.
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let app = listener.local_addr().unwrap();
+    let embedded = Embedded::start(
+        config(app, &cert_file, &key_file, ""),
+        EmbedOptions::default(),
+    )
+    .await
+    .unwrap();
+    let mut events = embedded.events();
+    let mut seen = Vec::new();
+    let (_hooks, stop, served) = serve(listener, &embedded);
+
+    // a resume of the old session is answered as LiveKit answers the resume of a participant
+    // the node does not know: reconnect, for a state mismatch
+    let res = Client::resume(app, &token, &sid).await;
+    let Some(signal_response::Message::Leave(leave)) = res.message else {
+        panic!("not a leave: {res:?}");
+    };
+    assert_eq!(
+        (
+            livekit::leave_request::Action::Reconnect,
+            livekit::DisconnectReason::StateMismatch
+        ),
+        (leave.action(), leave.reason())
+    );
+    // the full reconnect that the leave asks for: a new session
+    let mut alice = Client::join(app, &token).await;
+    assert_ne!(sid, alice.join.participant.as_ref().unwrap().sid);
+    let pc = alice.connect().await;
+    expect(&mut events, &mut seen, "participant_joined").await;
+
+    // The plain shutdown sends the participant away, as before.
+    embedded.shutdown(Duration::from_millis(500)).await;
+    assert_ports_free();
+    let leaves = alice.leaves().await;
+    assert_eq!(
+        vec![(
+            livekit::leave_request::Action::Disconnect,
+            livekit::DisconnectReason::ServerShutdown,
+        )],
+        leaves
+            .iter()
+            .map(|l| (l.action(), l.reason()))
+            .collect::<Vec<_>>()
+    );
+    let _ = pc.close();
+    let rest = collect_until_closed(&mut events).await;
+    let left: Vec<_> = rest
+        .iter()
+        .filter(|e| e.event.starts_with("participant_"))
+        .map(|e| e.participant.as_ref().unwrap().disconnect_reason())
+        .collect();
+    assert_eq!(vec![livekit::DisconnectReason::ServerShutdown], left);
+    assert!(
+        rest.iter().any(|e| e.event == "room_finished"
+            && e.room_end_reason() == livekit::RoomEndReason::RoomEndServerShutdown),
+        "{rest:?}"
+    );
+    stop.cancel();
+    served.await.unwrap();
 }

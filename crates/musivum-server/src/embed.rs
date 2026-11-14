@@ -1,6 +1,6 @@
 //! musivum inside another server's process: everything `musivum-server` starts but its HTTP
 //! listener, with the routes as an axum router for that server to serve, the room API as
-//! calls, the webhook events in process, and a shutdown.
+//! calls, the webhook events in process, and a shutdown, or one for a restart.
 //!
 //! Written for a Matrix homeserver on axum 0.8 and tokio 1 that serves LiveKit's signalling
 //! under a path of its own and makes the room API calls and receives the webhooks a server
@@ -70,8 +70,8 @@
 //! ```
 //!
 //! A WebSocket session runs as a task of the server that serves the route, on its runtime.
-//! From the end of the participants' wait in [`Embedded::shutdown`] on, the router answers
-//! 503 and holds nothing of musivum.
+//! From the end of the participants' wait in [`Embedded::shutdown`] on, and from the start of
+//! [`Embedded::shutdown_for_restart`] on, the router answers 503 and holds nothing of musivum.
 //!
 //! # Calling the room API
 //!
@@ -115,9 +115,10 @@
 //! The receiver is a `tokio::sync::broadcast` one: a receiver that falls more than
 //! [`EmbedOptions::event_capacity`] events behind loses the oldest and is told how many
 //! (`RecvError::Lagged`), as a webhook queue drops what waits too long. After
-//! [`Embedded::shutdown`], once the events of the shutdown (the participants that left, the
-//! rooms that closed) are handed on and musivum has let go of its services, a receiver gets
-//! `RecvError::Closed`; the HTTP webhooks still queued are sent then.
+//! [`Embedded::shutdown`] or [`Embedded::shutdown_for_restart`], once the events of the
+//! shutdown (the participants that left, the rooms that closed) are handed on and musivum has
+//! let go of its services, a receiver gets `RecvError::Closed`; the HTTP webhooks still queued
+//! are sent then.
 //!
 //! ```no_run
 //! # fn f(embedded: &musivum_server::embed::Embedded) {
@@ -150,6 +151,58 @@
 //! sessions end with their participants. Stop serving [`Embedded::router`] before or after,
 //! as the embedding server shuts down. Dropping an `Embedded` without shutting it down leaves
 //! musivum running.
+//!
+//! Each participant closed by the shutdown is sent a `LeaveRequest` with the action
+//! `DISCONNECT` (the client is to disconnect, and does not come back) and the reason
+//! `SERVER_SHUTDOWN`; its `participant_left` event has the `disconnect_reason`
+//! `SERVER_SHUTDOWN`, and each room's `room_finished` the `room_end_reason`
+//! `ROOM_END_SERVER_SHUTDOWN`.
+//!
+//! # Restarting
+//!
+//! [`Embedded::shutdown_for_restart`] is the shutdown of a server that is stopped to be
+//! started again (an upgrade, a restart by its service manager): the participants are sent
+//! back instead of away. The routes answer 503 from its start on, so that they do not join
+//! this node again; the node is drained, and each participant is closed as LiveKit closes one
+//! it sends back for a full reconnect (`IssueFullReconnect`): it is sent a `LeaveRequest` with
+//! the action `RECONNECT` and the reason `MIGRATION` (the close reason `MIGRATION_REQUESTED`,
+//! LiveKit's for a participant a node asks to go elsewhere), with the regions LiveKit adds to
+//! a leave that is not a `DISCONNECT` (none without a region configuration, as in LiveKit),
+//! its signalling is closed, and it is closed without another leave. A participant that
+//! joins meanwhile (one whose request was under way) is sent back the same way. The rooms
+//! are then closed with the reason `SUPERSEDED` (LiveKit's for a room that was restarted or
+//! replaced elsewhere), and the rest is [`Embedded::shutdown`]'s. `timeout` bounds the wait
+//! for the participants to be gone as there, but they go at once: the call returns as soon as
+//! everything is closed.
+//!
+//! `RECONNECT` asks a client for a full reconnect: a new join, without `reconnect=1`. While
+//! the routes answer 503 and while the server is away, that fails, and a LiveKit client tries
+//! again as its reconnect policy says; once the server serves again it joins with a new
+//! session. A client that tries a resume instead (`reconnect=1`) is answered there as LiveKit
+//! answers the resume of a participant the node does not know: a `LeaveRequest` with the
+//! action `RECONNECT` and the reason `STATE_MISMATCH`, logged as LiveKit logs it, as an error
+//! (`could not handle new participant`).
+//!
+//! The events of such a shutdown say so: a participant's `participant_left` (or
+//! `participant_connection_aborted`, for one that had not connected) has the
+//! `disconnect_reason` `MIGRATION` (`livekit::DisconnectReason::Migration`), and a room's
+//! `room_finished` the `room_end_reason` `ROOM_END_SUPERSEDED`
+//! (`livekit::RoomEndReason::RoomEndSuperseded`). Such a participant is expected back as a new
+//! session (`participant_joined`, with another `sid`) once the server serves again. The HTTP
+//! webhooks carry the same.
+//!
+//! On SIGTERM, for a restart:
+//!
+//! ```no_run
+//! # async fn f(embedded: musivum_server::embed::Embedded) -> std::io::Result<()> {
+//! use std::time::Duration;
+//! use tokio::signal::unix::{SignalKind, signal};
+//!
+//! signal(SignalKind::terminate())?.recv().await;
+//! embedded.shutdown_for_restart(Duration::from_secs(5)).await;
+//! // then stop serving and end the process
+//! # Ok(()) }
+//! ```
 //!
 //! # Threads
 //!
@@ -199,6 +252,7 @@ use musivum::protocol::livekit;
 use musivum::protocol::logger;
 use musivum::protocol::webhook::{self, FilterParams, NotifyOption, QueuedNotifier};
 use musivum::routing::{LocalNode, LocalNodeImpl};
+use musivum::rtc::types::{ParticipantCloseReason, RoomCloseReason};
 use musivum::service::{self as mservice, RoomService};
 use parking_lot::{Mutex, RwLock};
 use tokio::sync::broadcast;
@@ -401,13 +455,38 @@ impl Embedded {
     }
 
     /// `LivekitServer::stop`: drains the node, waits until `timeout` for the participants to
-    /// leave, then closes the rest and returns when everything is closed. See the module's
-    /// description.
+    /// leave, then closes the rest and returns when everything is closed. The participants it
+    /// closes are told to disconnect. See the module's description.
     pub async fn shutdown(self, timeout: Duration) {
+        self.stop(timeout, false).await;
+    }
+
+    /// The shutdown of a server that is stopped to be started again: the routes answer no
+    /// more, the participants are sent back for a full reconnect (`RECONNECT`) instead of
+    /// being told to disconnect, and the events say so; the rest is [`Embedded::shutdown`]'s.
+    /// The participants go at once, so it does not wait out `timeout`, which bounds the wait
+    /// for them as in [`Embedded::shutdown`]. See the module's description.
+    pub async fn shutdown_for_restart(self, timeout: Duration) {
+        self.stop(timeout, true).await;
+    }
+
+    async fn stop(self, timeout: Duration, for_restart: bool) {
         let deadline = tokio::time::Instant::now() + timeout;
+
+        if for_restart {
+            infow!(
+                logger::get_logger(),
+                "shutting down for a restart, sending participants back to reconnect"
+            );
+            // the participants sent back are not to join this node again
+            self.routes.write().take();
+        }
 
         // `Stop(false)`: wait for all participants to exit, here until the deadline
         self.state.router.drain();
+        if for_restart {
+            self.send_participants_back();
+        }
         if self.state.room_manager.has_participants() {
             infow!(logger::get_logger(), "waiting for participants to exit");
         }
@@ -417,6 +496,18 @@ impl Embedded {
                 break;
             }
             tokio::time::sleep((deadline - now).min(PARTICIPANT_POLL_INTERVAL)).await;
+            if for_restart {
+                // one whose request was under way when the routes went
+                self.send_participants_back();
+            }
+        }
+
+        if for_restart {
+            // and one that joined since the last look, before the rooms close
+            self.send_participants_back();
+            for room in self.state.room_manager.get_rooms() {
+                room.close(RoomCloseReason::Superseded);
+            }
         }
 
         // `Stop(true)` for what is left: `start` shuts the HTTP server down (here: the routes
@@ -428,6 +519,19 @@ impl Embedded {
         }
         // the media sockets are closed when the tasks that read them have let go of them
         self.state.rtc_node.closed().await;
+    }
+
+    // For a restart: every participant that is not closed yet is closed as LiveKit closes one
+    // it sends back to connect again with a new session (`IssueFullReconnect`), with the
+    // reason of a participant that a node asks to go elsewhere (see the module's description).
+    fn send_participants_back(&self) {
+        for room in self.state.room_manager.get_rooms() {
+            for p in room.get_participants() {
+                if !p.is_closed() {
+                    p.issue_full_reconnect(ParticipantCloseReason::MigrationRequested);
+                }
+            }
+        }
     }
 }
 
