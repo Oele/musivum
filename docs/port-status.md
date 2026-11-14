@@ -139,15 +139,14 @@ connection layer (`webrtc/peerconnection`) does not have yet; each is logged whe
 
 | Option | What happens now | What it needs |
 |---|---|---|
-| `udp_port` as a range, `port_range_start`/`_end` | the first port is used | several sockets per node, or a decision that one port stands for the range |
-| `use_stun_port_as_ice` | nothing is bound on 3478 | a second UDP listener |
-| `interfaces`, `ips` | they choose which addresses are advertised; the socket listens on all | a socket per address |
 | `use_mdns: true` | `rtc` is left at query only | the node routing mDNS answers |
 | `stun_servers` as ICE servers of a node that is not ICE lite | the list is computed, nothing gathers | server reflexive candidates in the layer |
-| IPv6 addresses | not advertised | a second (IPv6) listener |
 | `batch_io`, the SCTP window settings, the 16 MiB socket buffers | kept as data | batched writes; settings `rtc` 0.21 does not have; buffer sizes on the node's socket |
 
-ICE over TCP is there (`tcp_port`, `force_tcp`); TURN is not (an open question of the plan).
+IPv6, `interfaces`/`ips` (a socket per address), `udp_port` as a range, `port_range_start`/`_end`
+(the first free ports of the range, as many as processors, given to connections in turn),
+`use_stun_port_as_ice` and ICE over TCP (`tcp_port`, `force_tcp`) are applied
+(`docs/webrtc-library.md`). TURN is being ported.
 
 ## Where the port cannot be the original
 
@@ -507,11 +506,11 @@ row. The call needed no fix to go through; comparing its signalling and logs wit
 found three differences, fixed: the connection layer announced a remote stream again after
 every renegotiation (`on_track` is now once per stream, as pion's), the setting engine left
 out the TCP network types (no TCP candidates were offered), and TCP candidates lacked pion's
-priority offset. What still differs: no IPv6 candidates (the node listens on IPv4 only), and
-candidate lines without pion's `ufrag` attribute.
+priority offset. What still differed then: no IPv6 candidates (added since), and candidate lines
+without pion's `ufrag` attribute.
 
 ## In progress, not on `main`
 
-IPv6 and more listeners in the connection layer; LiveKit's embedded
+LiveKit's embedded
 TURN server (ported from pion/turn, with a relay-only variant of the browser call as its
 proof).

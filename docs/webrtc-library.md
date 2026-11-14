@@ -190,8 +190,6 @@ the library. The layer has fifteen tests of its own now.
 
 Still not there, each with what it would take:
 
-- **A port range**, **IPv6**, **the STUN port as an ICE port**: more listeners in the node;
-  the routing already keys on family and port.
 - **Server reflexive and relay candidates** from ICE servers: a gatherer (a STUN and TURN
   client per connection). **mDNS**: a multicast socket and routing of its answers.
 - **Announcing a track before its first packet** (`SetFireOnTrackBeforeFirstRTP`): `rtc`
@@ -234,13 +232,29 @@ stream that breaks them is closed without touching the others, and a connection'
 close with it. Active TCP (dialling the other side's passive candidates, once each) is there
 for clients and the layer's tests; it is off unless `SettingEngine::active_tcp` is set,
 where pion's is on unless disabled (LiveKit disables it on servers). Not there:
-simultaneous-open, TCP over a second address family (the listener is on the node's bind
-address only, where LiveKit listens on all), and keeping a stream with an unknown user name
+simultaneous-open, and keeping a stream with an unknown user name
 until a connection asks for it (pion's mux does; here it is refused, which is safe because a
 connection's user name is registered before its description is signalled). `rtc`'s agent
 finds a remote candidate by address alone (`find_remote_candidate`), so a peer whose UDP
 candidate and TCP stream share address and port is reported with a mixed pair. `rtc-shared`'s
 own framing helper (`tcp_framing`) has no frame limit, which is why the layer has its own.
+
+Added since: **the node's addresses and ports**. A node listens at each of its addresses
+(`NodeConfig::addresses`, each with what it is advertised as), IPv4 and IPv6, with a UDP
+socket of its own for each address and port and, with TCP, a TCP listener at each address,
+as LiveKit's mux binds them (`CreateUDPMuxesFromPorts`). One socket on all addresses would
+answer from the address the system picks for the way back, and a client takes no answer
+from an address it did not ask (RFC 8445 7.2.5.2.1; `rtc`'s agent checks it). With several
+ports (`udp_port` as a range: its first ports, as many as processors; `port_range_start`/
+`_end`: the first free ports of the range, as many) each connection is given one socket at
+each address in turn (`NewMultiPortsUDPMux`); a standalone port (`use_stun_port_as_ice`,
+3478) is every connection's. A connection advertises the node's candidates of the network
+types its settings allow, so `Udp6`/`Tcp6` and the transport's IPv6 exclusion act as
+upstream. Writes go through a duplicate of each socket: tokio's `try_send_to` does not try
+before the runtime has seen a new socket writable. The reading runtime has a thread per
+processor. Different from LiveKit: a port range gives shared ports, not a port per
+connection; TCP listens per address, not on all addresses (a stream at an address no
+candidate names connects in neither).
 
 Found when the transport was ported onto the layer (`rtc/transport_impl.rs`), the first
 done since, the others each with a stand-in on the transport's side:
