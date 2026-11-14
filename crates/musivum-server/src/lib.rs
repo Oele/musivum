@@ -9,8 +9,10 @@
 //!
 //! - [`service::AxumSignalWebSocket`]: axum's WebSocket as musivum's
 //!   [`SignalWebSocket`](musivum::service::SignalWebSocket).
-//! - [`service::new_mux`]: the routes of the node, where the signalling endpoint and the room
-//!   API are added; [`service::new_http_handler`]: the middleware LiveKit lays over them.
+//! - [`service::initialize_server`] and [`service::new_server_state`]: the services of one
+//!   node made and wired (the router, the room manager, the signalling endpoint).
+//! - [`service::new_mux`]: the routes of the node: the signalling endpoint, and the room API
+//!   when it is added; [`service::new_http_handler`]: the middleware LiveKit lays over them.
 //! - [`service::LivekitServer`]: listening, the health check, and shutting down.
 //! - [`logger`]: the log, set up from the configuration.
 

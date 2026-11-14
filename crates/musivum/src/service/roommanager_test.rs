@@ -97,6 +97,7 @@ fn new_test_node(change: impl FnOnce(&mut Config)) -> TestNode {
     let ra = new_room_allocator(conf.clone(), store.clone());
     let telemetry = Arc::new(FakeTelemetryService::default());
 
+    let rtc_conf = Arc::new(rtc::WebRtcConfig::new(&conf).unwrap());
     let rm = RoomManager::new_local(
         conf,
         store.clone(),
@@ -107,6 +108,7 @@ fn new_test_node(change: impl FnOnce(&mut Config)) -> TestNode {
         new_default_timed_version_generator(),
         bus.clone(),
         None,
+        rtc_conf,
         Node::new(NodeConfig::default()).unwrap(),
     )
     .unwrap();

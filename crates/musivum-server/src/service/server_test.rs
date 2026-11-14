@@ -19,22 +19,9 @@ const CONF: &str = "port: 0\nbind_addresses: [127.0.0.1]\nrtc:\n  node_ip: 127.0
 fn new_server(extra: axum::Router<ServerState>) -> Arc<LivekitServer> {
     let conf = Config::new(CONF, true).unwrap();
     let current_node: Arc<dyn LocalNode> = routing::LocalNodeImpl::new(Some(&conf)).unwrap();
-    let message_bus = routing::new_local_message_bus();
-    let router = routing::create_router(
-        current_node.clone(),
-        routing::new_signal_client(current_node.node_id(), message_bus.clone()).unwrap(),
-        routing::new_room_manager_client(message_bus.clone(), conf.room.clone()).unwrap(),
-        routing::default_node_stats_config(),
-    );
-    let state = ServerState {
-        key_provider: create_key_provider(&conf).unwrap(),
-        webrtc_config: Arc::new(rtc::WebRtcConfig::new(&conf).unwrap()),
-        rtc_node: Node::new(NodeConfig::default()).unwrap(),
-        config: Arc::new(conf),
-        current_node,
-        message_bus,
-        router,
-    };
+    let webrtc_config = Arc::new(rtc::WebRtcConfig::new(&conf).unwrap());
+    let rtc_node = Node::new(NodeConfig::default()).unwrap();
+    let state = new_server_state(conf, current_node, webrtc_config, rtc_node).unwrap();
     let mux = extra
         .with_state(state.clone())
         .merge(new_mux(state.clone()));
@@ -113,6 +100,67 @@ async fn the_health_check_answers_on_the_root() {
         );
         tokio::time::sleep(StdDuration::from_millis(100)).await;
     }
+
+    s.stop(false).await;
+    started.await.unwrap().unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn the_signalling_endpoint_is_routed() {
+    let s = new_server(axum::Router::new());
+    let (addr, started) = start(&s).await;
+    let token = musivum::protocol::auth::AccessToken::new(
+        "key1",
+        "a-secret-of-at-least-thirty-two-characters",
+    )
+    .set_identity("alice")
+    .set_video_grant(musivum::protocol::auth::VideoGrant {
+        room_join: true,
+        room: "a-room".to_string(),
+        ..Default::default()
+    })
+    .to_jwt()
+    .unwrap();
+
+    // validate: with grants, success, and the header the API key middleware adds for it;
+    // `/rtc/v1` wants a join request besides
+    for (path, status, body) in [
+        ("/rtc/validate", 200, "success"),
+        ("/rtc/v1/validate", 400, "join_request is required"),
+    ] {
+        let mut conn = TcpStream::connect(addr).await.unwrap();
+        conn.write_all(
+            format!(
+                "GET {path}?access_token={token} HTTP/1.1\r\nHost: test\r\nConnection: close\r\n\r\n"
+            )
+            .as_bytes(),
+        )
+        .await
+        .unwrap();
+        let mut response = String::new();
+        conn.read_to_string(&mut response).await.unwrap();
+        assert!(
+            response.starts_with(&format!("HTTP/1.1 {status}")),
+            "{path}: {response}"
+        );
+        assert!(
+            response
+                .to_ascii_lowercase()
+                .contains("access-control-allow-origin: *"),
+            "{path}: {response}"
+        );
+        assert!(
+            response.ends_with(&format!("\r\n\r\n{body}")),
+            "{path}: {response}"
+        );
+    }
+    // without grants: refused
+    assert_eq!(401, get_path(addr, "/rtc/validate").await.0);
+    // `/rtc` and `/rtc/v1` take WebSocket requests only
+    let path = format!("/rtc?access_token={token}");
+    assert_eq!(404, get_path(addr, &path).await.0);
+    let path = format!("/rtc/v1?access_token={token}");
+    assert_eq!(404, get_path(addr, &path).await.0);
 
     s.stop(false).await;
     started.await.unwrap().unwrap();

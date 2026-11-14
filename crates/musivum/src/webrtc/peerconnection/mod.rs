@@ -36,7 +36,9 @@
 //!   servers are taken ([`Configuration::ice_servers`]) and nothing is asked of them: a
 //!   connection has no server reflexive and no relayed candidates of its own.
 //! - `on_track` comes when the first packet of a stream has arrived (and after that packet
-//!   has gone to the sink), never from the description alone.
+//!   has gone to the sink), never from the description alone; and once for a stream of a
+//!   receiver, as pion's, though `rtc` opens the stream again (and binds it again at the
+//!   sink) at its first packet after every negotiation.
 //! - Received media is not read from a track: it comes out at the sink, as it does for
 //!   LiveKit through pion's buffer factory.
 //! - A local description has to be set as it was created: `rtc` compares the text.
@@ -1123,6 +1125,11 @@ impl Inner {
                 let Some(receiver) = transceiver.receiver() else {
                     return;
                 };
+                // `rtc` forgets a receiver's streams at every negotiation and opens each again
+                // at its next packet; pion's `OnTrack` comes once for a stream of a receiver.
+                if receiver.tracks().iter().any(|t| t.ssrc() == init.ssrc) {
+                    return;
+                }
                 let Some(mut rtc_receiver) = core.rtc.rtp_receiver(init.receiver_id) else {
                     return;
                 };
@@ -1660,24 +1667,34 @@ fn selected_candidate_pair(core: &mut Core) -> Option<Option<IceCandidatePair>> 
     None
 }
 
-/// A host candidate at this address, over UDP or, with a TCP type, over TCP.
+/// pion's `defaultTCPPriorityOffset`: how much lower the type preference of a TCP candidate
+/// is than that of a UDP candidate of its type, so that UDP is preferred.
+const TCP_PRIORITY_OFFSET: u32 = 27;
+
+/// A host candidate at this address, over UDP or, with a TCP type, over TCP. Its priority is
+/// pion's: `rtc` gives a TCP candidate the type preference of a UDP one.
 fn host_candidate(addr: SocketAddr, tcp_type: TcpType) -> Result<IceCandidateInit, Error> {
     let network = if tcp_type == TcpType::Unspecified {
         "udp"
     } else {
         "tcp"
     };
-    let candidate = CandidateHostConfig {
+    let config = |priority: u32| CandidateHostConfig {
         base_config: CandidateConfig {
             network: network.to_owned(),
             address: addr.ip().to_string(),
             port: addr.port(),
             component: 1,
+            priority,
             ..Default::default()
         },
         tcp_type,
+    };
+    let mut candidate = config(0).new_candidate_host()?;
+    if tcp_type != TcpType::Unspecified {
+        let priority = candidate.priority() - (TCP_PRIORITY_OFFSET << 24);
+        candidate = config(priority).new_candidate_host()?;
     }
-    .new_candidate_host()?;
     Ok(IceCandidate::from(&candidate).to_json()?)
 }
 

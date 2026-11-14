@@ -3,24 +3,31 @@
 // Changes: translated from Go to Rust, on tokio and axum, for one node.
 // - The services are not injected one by one (`NewLivekitServer` takes eighteen). What the
 //   routes share is `ServerState`; the routes are made by `new_mux` (the original's `mux`,
-//   built inside `NewLivekitServer`), where the room API and the signalling endpoint will be
-//   added, and handed to `LivekitServer::new`. `initialize_server` stands in for wire's
-//   `InitializeServer` (wire_gen.go) for what is ported: the bus of the process, the signal
-//   and room manager clients, the router of one node (with the defaults of the node's
-//   statistics, as `musivum::config` does not read `node_stats`), the key provider
-//   (`createKeyProvider` of wire.go) and the WebRTC configuration and sockets.
+//   built inside `NewLivekitServer`), where the room API will be added, and handed to
+//   `LivekitServer::new`. `initialize_server` stands in for wire's `InitializeServer`
+//   (wire_gen.go) for what is ported: the bus of the process, the signal and room manager
+//   clients, the router of one node (with the defaults of the node's statistics, as
+//   `musivum::config` does not read `node_stats`), the local object store (`createStore`
+//   without Redis), the room allocator, the key provider (`createKeyProvider` of wire.go),
+//   the webhook notifier and the telemetry service (`createWebhookNotifier`,
+//   `createTelemetryService`; the analytics service is the null one, LiveKit's is not
+//   ported), the signalling endpoint, the room manager (with `createForwardStats`) and the
+//   signal server. The WebRTC configuration (`rtc.NewWebRTCConfig`, which the original's
+//   room manager makes) is made here, once, with the node's sockets, and handed to the room
+//   manager, which closes the sockets when it stops.
+// - The signalling endpoint's routes (`rtcService.SetupRoutes(mux)`) are axum handlers over
+//   `RtcService`: the grants are in the request, put there by the API key middleware around
+//   the routes, which also adds its headers to the response; the upgrade is axum's, with the
+//   read limit `RtcUpgrade` gives, and the session runs on the socket as an
+//   `AxumSignalWebSocket`.
 // - Not here, with what they belong to: the Twirp servers of egress, ingress, SIP and agent
 //   dispatch, WHIP, the agent endpoints and their tunnels (`drainAgentTunnels`), the IO info
-//   service, WebTransport, TURN, the signal server between nodes, the listeners for
-//   Prometheus and for debugging, and the debug handlers of development mode
+//   service, WebTransport, TURN, the listeners for Prometheus and for debugging, and the debug handlers of development mode
 //   (`debugGoroutines`, which is Go's runtime, and `debugInfo`, which reads the room
 //   manager). Of `NewHTTPHandler`'s middleware, negroni's recovery and the CORS handler of
 //   rs/cors are not here (a handler that panics ends its connection; a browser on another
 //   origin cannot read the answers); the request body limit, the API key authentication and
 //   the path normalisation are.
-// - What waits on the room manager is not here yet: the wait for participants in `Stop`,
-//   `roomManager.Stop()` at the end of `Start`, `backgroundWorker` (which closes idle rooms)
-//   and `RoomManager()`. A comment stands at each place.
 // - `Start` and `Stop` are async. The done channel is made by `new` (a cancelled token cannot
 //   be made anew, and the server is started once). `httpServer.Shutdown` with its timeout of
 //   five seconds is the graceful shutdown of axum's server with that timeout: no new
@@ -28,9 +35,7 @@
 //   waited for, as Go's `Shutdown` does not wait for a hijacked connection. A server bound to
 //   no address in particular listens on `[::]` (with IPv4 on the same socket, as Linux gives
 //   it), or on `0.0.0.0` where there is no IPv6, where Go listens on both. `local_addrs` is
-//   new: the addresses listened on, for a port of 0. The node of the WebRTC connections is
-//   closed at the end of `Start` (new: upstream leaves its sockets to the end of the
-//   process).
+//   new: the addresses listened on, for a port of 0. `backgroundWorker` is a task.
 // - The health check gives the time of the node's last update in UTC; the original gives it
 //   in the server's time zone.
 // - Go's `ServeMux` redirects a path with `..` or a doubled slash inside it to its clean
@@ -40,30 +45,42 @@ use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
 
-use axum::extract::{ConnectInfo, Request, State};
+use axum::extract::ws::WebSocketUpgrade;
+use axum::extract::{ConnectInfo, FromRequestParts, Request, State};
 use axum::http::{HeaderMap, StatusCode, Uri};
 use axum::middleware::{Next, from_fn};
 use axum::response::{IntoResponse, Response};
+use axum::routing::any;
 use musivum::config::Config;
-use musivum::errorw;
 use musivum::go::atomic;
 use musivum::go::time::{self, Duration, Time};
 use musivum::mediatransportutil::rtcconfig;
 use musivum::protocol::auth::{FileBasedKeyProvider, KeyProvider};
-use musivum::protocol::logger;
+use musivum::protocol::utils::new_default_timed_version_generator;
+use musivum::protocol::{logger, webhook};
 use musivum::routing::{self, LocalNode, MessageBus, Router};
-use musivum::rtc;
-use musivum::service::{ApiKeyAuthMiddleware, RemoteAddr};
+use musivum::service::{
+    self as mservice, ApiKeyAuthMiddleware, LocalStore, RemoteAddr, RoomManager, RtcService,
+    RtcUpgrade, SignalServer, new_room_allocator,
+};
+use musivum::sfu;
+use musivum::telemetry::{self, AnalyticsService, NullAnalyticService, TelemetryService};
 use musivum::webrtc::peerconnection::Node;
+use musivum::{errorw, infow, rtc};
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
+use super::axumws::{AxumSignalWebSocket, set_read_limit};
 use super::utils::{RequestBodyLimiter, with_path_normalization};
 
 // the time `httpServer.Shutdown` is given
 const SHUTDOWN_TIMEOUT: Duration = Duration::from_secs(5);
 // how old the node's statistics may be for the node to be ready
 const HEALTH_CHECK_MAX_AGE: Duration = Duration::from_secs(4);
+// how often `Stop` looks whether the participants have left
+const PART_TICKER_INTERVAL: Duration = Duration::from_secs(5);
+// how often `backgroundWorker` closes the idle rooms
+const ROOM_TICKER_INTERVAL: Duration = Duration::from_secs(1);
 
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -79,10 +96,14 @@ pub enum Error {
     Routing(#[from] routing::Error),
     #[error(transparent)]
     RtcConfig(#[from] rtcconfig::Error),
+    #[error(transparent)]
+    Service(#[from] mservice::Error),
+    #[error(transparent)]
+    Webhook(#[from] webhook::Error),
 }
 
 /// What the routes of the node share. The signalling endpoint and the room API take what
-/// they need from here (the room manager, when it is ported, joins it).
+/// they need from here.
 #[derive(Clone)]
 pub struct ServerState {
     pub config: Arc<Config>,
@@ -96,16 +117,34 @@ pub struct ServerState {
     pub webrtc_config: Arc<rtc::WebRtcConfig>,
     /// The sockets of the node's WebRTC connections, made once from `webrtc_config`.
     pub rtc_node: Node,
+    pub rtc_service: Arc<RtcService>,
+    pub room_manager: Arc<RoomManager>,
+    pub signal_server: Arc<SignalServer>,
 }
 
-/// wire's `InitializeServer`, for what is ported: the router of one node and what it is made
-/// with, the key provider, the WebRTC configuration and the node's sockets, the routes. It
-/// blocks (the WebRTC configuration may ask STUN servers for the node's address): call it
-/// before the runtime or from `spawn_blocking`.
+/// wire's `InitializeServer`, for what is ported (see the header): the router of one node and
+/// what it is made with, the services, the routes. It blocks (the WebRTC configuration may ask
+/// STUN servers for the node's address): call it before the runtime or from `spawn_blocking`.
 pub fn initialize_server(
     conf: Config,
     current_node: Arc<dyn LocalNode>,
 ) -> Result<Arc<LivekitServer>, Error> {
+    let webrtc_config = rtc::WebRtcConfig::new(&conf)?;
+    let rtc_node = webrtc_config.web_rtc_config.new_node()?;
+    let state = new_server_state(conf, current_node, Arc::new(webrtc_config), rtc_node)?;
+    let mux = new_mux(state.clone());
+    LivekitServer::new(state, mux)
+}
+
+/// What `initialize_server` makes after the WebRTC configuration and the node's sockets, in
+/// the order of wire's `InitializeServer`.
+pub fn new_server_state(
+    conf: Config,
+    current_node: Arc<dyn LocalNode>,
+    webrtc_config: Arc<rtc::WebRtcConfig>,
+    rtc_node: Node,
+) -> Result<ServerState, Error> {
+    let conf = Arc::new(conf);
     let node_id = current_node.node_id();
     // getMessageBus without Redis
     let message_bus = routing::new_local_message_bus();
@@ -118,20 +157,53 @@ pub fn initialize_server(
         room_manager_client,
         routing::default_node_stats_config(),
     );
+    // createStore without Redis
+    let object_store = LocalStore::new();
+    let room_allocator = new_room_allocator(conf.clone(), object_store.clone());
     let key_provider = create_key_provider(&conf)?;
-    let webrtc_config = rtc::WebRtcConfig::new(&conf)?;
-    let rtc_node = webrtc_config.web_rtc_config.new_node()?;
-    let state = ServerState {
-        config: Arc::new(conf),
+    let queued_notifier = create_webhook_notifier(&conf, key_provider.clone())?;
+    // telemetry.NewAnalyticsService: not ported (see the header)
+    let analytics_service: Arc<dyn AnalyticsService> = Arc::new(NullAnalyticService {});
+    let telemetry_service = create_telemetry_service(Some(queued_notifier), analytics_service);
+    let rtc_service = RtcService::new(
+        conf.clone(),
+        room_allocator.clone(),
+        router.clone(),
+        telemetry_service.clone(),
+    );
+    let timed_version_generator = new_default_timed_version_generator();
+    let forward_stats = create_forward_stats(&conf);
+    let room_manager = RoomManager::new_local(
+        conf.clone(),
+        object_store,
+        current_node.clone(),
+        router.clone(),
+        room_allocator,
+        telemetry_service,
+        timed_version_generator,
+        message_bus.clone(),
+        forward_stats,
+        webrtc_config.clone(),
+        rtc_node.clone(),
+    )?;
+    let signal_server = SignalServer::new_default(
+        current_node.clone(),
+        message_bus.clone(),
+        router.clone(),
+        room_manager.clone(),
+    )?;
+    Ok(ServerState {
+        config: conf,
         current_node,
         message_bus,
         router,
         key_provider,
-        webrtc_config: Arc::new(webrtc_config),
+        webrtc_config,
         rtc_node,
-    };
-    let mux = new_mux(state.clone());
-    LivekitServer::new(state, mux)
+        rtc_service,
+        room_manager,
+        signal_server: Arc::new(signal_server),
+    })
 }
 
 // createKeyProvider of wire.go. The key file has been read into `conf.keys` by
@@ -147,21 +219,124 @@ fn create_key_provider(conf: &Config) -> Result<Arc<dyn KeyProvider>, Error> {
     )))
 }
 
+// createWebhookNotifier of wire.go
+fn create_webhook_notifier(
+    conf: &Config,
+    provider: Arc<dyn KeyProvider>,
+) -> Result<Arc<dyn webhook::QueuedNotifier>, Error> {
+    let wc = &conf.web_hook;
+
+    let secret = provider.get_secret(&wc.api_key);
+    if secret.is_empty() && !wc.urls.is_empty() {
+        return Err(mservice::Error::WebHookMissingApiKey.into());
+    }
+
+    Ok(webhook::new_default_notifier(wc, provider)?)
+}
+
+// createTelemetryService of wire.go. The hook holds the service weakly: the service holds the
+// notifier.
+fn create_telemetry_service(
+    notifier: Option<Arc<dyn webhook::QueuedNotifier>>,
+    analytics: Arc<dyn AnalyticsService>,
+) -> Arc<dyn TelemetryService> {
+    let svc = telemetry::new_telemetry_service(notifier.clone(), analytics);
+    if let Some(notifier) = notifier {
+        let weak = Arc::downgrade(&svc);
+        notifier.register_processed_hook(Arc::new(move |info| {
+            if let Some(svc) = weak.upgrade() {
+                svc.webhook(info);
+            }
+        }));
+    }
+    svc
+}
+
+// createForwardStats of wire.go
+fn create_forward_stats(conf: &Config) -> Option<Arc<sfu::ForwardStats>> {
+    let fs = &conf.rtc.forward_stats;
+    if fs.summary_interval == Duration::ZERO
+        || fs.report_interval == Duration::ZERO
+        || fs.report_window == Duration::ZERO
+    {
+        return None;
+    }
+    Some(sfu::ForwardStats::new(
+        fs.summary_interval,
+        fs.report_interval,
+        fs.report_window,
+    ))
+}
+
 /// The routes of the node: the original's `mux`. Everything that is not routed to anything
 /// else reaches `default_handler`, which answers the health check on `/`.
 pub fn new_mux(state: ServerState) -> axum::Router {
     // In development mode the original adds pprof, /debug/goroutine and /debug/rooms: not
     // here (see the header).
     axum::Router::new()
-        // HERE GO THE ROOM API AND THE SIGNALLING ENDPOINT, as routes of this router:
-        // - the room API, `xtwirp.RegisterServer(mux, roomServer)`: roomservice.go over Twirp,
-        //   under `/twirp/livekit.RoomService/`;
-        // - the signalling endpoint, `rtcService.SetupRoutes(mux)`: rtcservice.go, at `/rtc`,
-        //   `/rtc/v1` and their `/validate`. Its WebSocket is `super::AxumSignalWebSocket`,
-        //   made after `super::set_read_limit(ws, conf.limit.signal_message_size_limit)`.
+        // HERE GOES THE ROOM API, as routes of this router: `xtwirp.RegisterServer(mux,
+        // roomServer)`, roomservice.go over Twirp, under `/twirp/livekit.RoomService/`.
         // Egress, ingress, SIP, agent dispatch, WHIP and `/agent` are left out.
+        // rtcService.SetupRoutes(mux)
+        .route("/rtc", any(rtc_v0))
+        .route("/rtc/validate", any(rtc_v0_validate))
+        .route("/rtc/v1", any(rtc_v1))
+        .route("/rtc/v1/validate", any(rtc_v1_validate))
         .fallback(default_handler)
         .with_state(state)
+}
+
+// The handlers of `/rtc` and `/rtc/v1`: `RtcService::v0` and `v1`, and the session on the
+// upgraded socket. The API key middleware has run: the grants are in the request.
+async fn rtc_v0(State(s): State<ServerState>, r: Request) -> Response {
+    let (mut parts, _) = r.into_parts();
+    let ws = WebSocketUpgrade::from_request_parts(&mut parts, &()).await;
+    let res = s.rtc_service.v0(&parts).await;
+    rtc_upgrade(ws, res)
+}
+
+async fn rtc_v1(State(s): State<ServerState>, r: Request) -> Response {
+    let (mut parts, _) = r.into_parts();
+    let ws = WebSocketUpgrade::from_request_parts(&mut parts, &()).await;
+    let res = s.rtc_service.v1(&parts).await;
+    rtc_upgrade(ws, res)
+}
+
+async fn rtc_v0_validate(State(s): State<ServerState>, r: Request) -> Response {
+    let (parts, _) = r.into_parts();
+    s.rtc_service
+        .v0_validate(&parts)
+        .map(axum::body::Body::from)
+}
+
+async fn rtc_v1_validate(State(s): State<ServerState>, r: Request) -> Response {
+    let (parts, _) = r.into_parts();
+    s.rtc_service
+        .v1_validate(&parts)
+        .map(axum::body::Body::from)
+}
+
+// `upgrader.Upgrade` and the rest of `serve`: the response `RtcService` wrote, or the upgrade
+// run on the socket. `RtcService` has checked the request as gorilla's upgrader does; should
+// axum refuse it all the same, its answer is written and the upgrade dropped, which ends the
+// session as a failed upgrade does upstream.
+#[allow(clippy::result_large_err)]
+fn rtc_upgrade(
+    ws: Result<WebSocketUpgrade, axum::extract::ws::rejection::WebSocketUpgradeRejection>,
+    res: Result<RtcUpgrade, axum::http::Response<bytes::Bytes>>,
+) -> Response {
+    let upgrade = match res {
+        Ok(upgrade) => upgrade,
+        Err(res) => return res.map(axum::body::Body::from),
+    };
+    let ws = match ws {
+        Ok(ws) => ws,
+        Err(rejection) => return rejection.into_response(),
+    };
+    let limit = upgrade.read_limit();
+    set_read_limit(ws, limit).on_upgrade(move |socket| async move {
+        upgrade.run(AxumSignalWebSocket::new(socket)).await;
+    })
 }
 
 pub struct LivekitServer {
@@ -169,8 +344,9 @@ pub struct LivekitServer {
     state: ServerState,
     http_server: axum::Router,
     router: Arc<dyn Router>,
+    room_manager: Arc<RoomManager>,
+    signal_server: Arc<SignalServer>,
     current_node: Arc<dyn LocalNode>,
-    rtc_node: Node,
     running: atomic::Bool,
     done_chan: CancellationToken,
     closed_chan: CancellationToken,
@@ -191,8 +367,9 @@ impl LivekitServer {
         Ok(Arc::new(LivekitServer {
             config: conf,
             current_node: state.current_node.clone(),
-            rtc_node: state.rtc_node.clone(),
             router: state.router.clone(),
+            room_manager: state.room_manager.clone(),
+            signal_server: state.signal_server.clone(),
             state,
             http_server,
             running: atomic::Bool::new(false),
@@ -282,7 +459,7 @@ impl LivekitServer {
             logger::get_logger().infow("starting LiveKit server", &values);
         }
 
-        // the signal server between nodes: not here
+        self.signal_server.start()?;
 
         let shutdown = CancellationToken::new();
         let mut http_group = tokio::task::JoinSet::new();
@@ -320,7 +497,10 @@ impl LivekitServer {
             });
         }
 
-        // backgroundWorker, which closes idle rooms every second: with the room manager
+        {
+            let s = self.clone();
+            time::spawn(async move { s.background_worker().await });
+        }
 
         // give time for Serve goroutine to start
         tokio::time::sleep(std::time::Duration::from_millis(100)).await;
@@ -337,9 +517,9 @@ impl LivekitServer {
 
         // the debug server, WebTransport and TURN: not here
 
-        // roomManager.Stop(), signalServer.Stop() and ioService.Stop(): with the room manager
-        // and the signalling endpoint
-        self.rtc_node.close();
+        self.room_manager.stop();
+        self.signal_server.stop();
+        // the IO info service: not here
 
         self.closed_chan.cancel();
         Ok(())
@@ -350,10 +530,16 @@ impl LivekitServer {
 
         // wait for all participants to exit
         self.router.drain();
-        // Here the original waits, unless `force`, for the room manager to have no
-        // participants, looking every five seconds and logging "waiting for participants to
-        // exit": with the room manager.
-        let _ = force;
+        let mut part_ticker = tokio::time::interval_at(
+            tokio::time::Instant::now() + PART_TICKER_INTERVAL.to_std(),
+            PART_TICKER_INTERVAL.to_std(),
+        );
+        let mut waiting_for_participants = !force && self.room_manager.has_participants();
+        while waiting_for_participants {
+            part_ticker.tick().await;
+            infow!(logger::get_logger(), "waiting for participants to exit");
+            waiting_for_participants = self.room_manager.has_participants();
+        }
 
         if !self.running.swap(false) {
             return;
@@ -364,6 +550,25 @@ impl LivekitServer {
 
         // wait for fully closed
         self.closed_chan.cancelled().await;
+    }
+
+    pub fn room_manager(&self) -> Arc<RoomManager> {
+        self.room_manager.clone()
+    }
+
+    async fn background_worker(&self) {
+        let mut room_ticker = tokio::time::interval_at(
+            tokio::time::Instant::now() + ROOM_TICKER_INTERVAL.to_std(),
+            ROOM_TICKER_INTERVAL.to_std(),
+        );
+        // a ticker of Go drops the ticks nobody takes
+        room_ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+        loop {
+            tokio::select! {
+                _ = self.done_chan.cancelled() => return,
+                _ = room_ticker.tick() => self.room_manager.close_idle_rooms(),
+            }
+        }
     }
 }
 

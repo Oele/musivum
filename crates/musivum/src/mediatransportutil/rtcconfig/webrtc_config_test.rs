@@ -605,10 +605,16 @@ fn test_new_webrtc_config_options() {
     );
     assert!(s.lite);
 
-    // The layer's engine has the settings the layer has. There is no socket for TCP: those
-    // types are not given to it.
+    // The layer's engine has the settings the layer has, the TCP network types among them:
+    // the node's TCP listener (`new_node`) gives a connection with them its passive TCP
+    // candidates.
     assert_eq!(
-        vec![NetworkType::Udp4, NetworkType::Udp6],
+        vec![
+            NetworkType::Udp4,
+            NetworkType::Udp6,
+            NetworkType::Tcp4,
+            NetworkType::Tcp6
+        ],
         engine.network_types
     );
     assert_eq!(
@@ -715,6 +721,11 @@ fn test_new_webrtc_config_ports() {
     assert_eq!(
         vec![NetworkType::Tcp4, NetworkType::Tcp6],
         conf.setting_engine.network_types
+    );
+    // and the layer's engine has those only: no UDP candidates
+    assert_eq!(
+        vec![NetworkType::Tcp4, NetworkType::Tcp6],
+        conf.setting_engine.build().network_types
     );
 
     // A TCP port beside UDP.

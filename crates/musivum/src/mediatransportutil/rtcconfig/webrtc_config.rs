@@ -145,8 +145,9 @@ impl SettingEngineConfig {
 
     /// The layer's `SettingEngine` with what the layer has of these settings: ICE lite, the
     /// mDNS mode, the waits before a candidate pair is accepted, the largest SCTP message,
-    /// and of the network types the ones over UDP (the node has no other socket). The caller
-    /// goes on from there with the settings of its own (the layer's engine is data too).
+    /// and the network types (a connection with the TCP ones has passive TCP candidates on
+    /// the node's TCP listener, when the node has one). The caller goes on from there with the
+    /// settings of its own (the layer's engine is data too).
     ///
     /// A connection made with it advertises the node's addresses. For a copy of these
     /// settings whose filters or rewrite rules were changed for one connection, the addresses
@@ -160,12 +161,7 @@ impl SettingEngineConfig {
             prflx_acceptance_min_wait: wait(self.prflx_acceptance_min_wait),
             relay_acceptance_min_wait: wait(self.relay_acceptance_min_wait),
             ice_multicast_dns_mode: self.ice_multicast_dns_mode,
-            network_types: self
-                .network_types
-                .iter()
-                .copied()
-                .filter(|t| matches!(t, NetworkType::Udp4 | NetworkType::Udp6))
-                .collect(),
+            network_types: self.network_types.clone(),
             sctp_max_message_size: self.sctp_max_message_size,
             ..Default::default()
         }

@@ -142,10 +142,6 @@ pub enum Error {
     NoApiKeysConfigured,
     #[error("failed to read participant from session: {0}")]
     ReadParticipantFromSession(String),
-    /// The error of `rtc::WebRtcConfig::new` (of `rtcconfig`, which is not `Clone`), as its
-    /// text.
-    #[error("{0}")]
-    RtcConfig(String),
     /// An error of `pkg/routing` that the room manager passes on (of the router).
     #[error(transparent)]
     Routing(#[from] crate::routing::Error),

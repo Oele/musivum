@@ -8,8 +8,11 @@
 //   which `Stop` undoes (`Kill`). It takes the WebRTC node its participants' connections are
 //   on (`node`, new: made once per process by `rtcconfig::WebRtcConfig::new_node`), and closes
 //   it in `Stop` where the original closes the UDP mux and the TCP listener of its WebRTC
-//   configuration. It does not take `agentClient`, `agentStore`, `egressLauncher` (agents and
-//   egress are not ported) or `turnAuthHandler` (musivum has no embedded TURN server).
+//   configuration. It takes that WebRTC configuration (`rtc_config`, as an `Arc`) where the
+//   original makes it (`rtc.NewWebRTCConfig(conf)`): the server makes it once, for the node's
+//   sockets and the room manager both. It does not take `agentClient`, `agentStore`,
+//   `egressLauncher` (agents and egress are not ported) or `turnAuthHandler` (musivum has no
+//   embedded TURN server).
 //   `version.Version` and `agent.CurrentProtocol`, of packages that are not ported, are the
 //   constants `VERSION` and `AGENT_CURRENT_PROTOCOL` here, with the original's values.
 // - The servers of psrpc that the original makes per room and per participant
@@ -102,7 +105,7 @@ pub struct RoomManager {
     lock: RwLock<HashMap<livekit::RoomName, Arc<Room>>>,
 
     config: Arc<Config>,
-    rtc_config: rtc::WebRtcConfig,
+    rtc_config: Arc<rtc::WebRtcConfig>,
     server_info: livekit::ServerInfo,
     current_node: Arc<dyn LocalNode>,
     router: Arc<dyn Router>,
@@ -151,10 +154,10 @@ impl RoomManager {
         version_generator: Arc<dyn TimedVersionGenerator>,
         bus: Arc<MessageBus>,
         forward_stats: Option<Arc<sfu::ForwardStats>>,
+        rtc_conf: Arc<rtc::WebRtcConfig>,
         node: Node,
     ) -> Result<Arc<RoomManager>, Error> {
-        let rtc_conf =
-            rtc::WebRtcConfig::new(&conf).map_err(|err| Error::RtcConfig(err.to_string()))?;
+        // `rtc.NewWebRTCConfig(conf)`: the server's (see the header)
 
         let r = Arc::new_cyclic(|this| RoomManager {
             this: this.clone(),
@@ -476,7 +479,7 @@ impl RoomManager {
         let client_conf = self.client_conf_manager.get_configuration(client);
 
         let pv = types::ProtocolVersion(client.protocol);
-        let mut rtc_conf = self.rtc_config.clone();
+        let mut rtc_conf = (*self.rtc_config).clone();
         rtc_conf.set_buffer_factory(room.get_buffer_factory());
         if pi.disable_ice_lite {
             rtc_conf.web_rtc_config.setting_engine.lite = false;
@@ -804,7 +807,7 @@ impl RoomManager {
         let new_room = Room::new(
             &ri,
             internal.as_ref(),
-            self.rtc_config.clone(),
+            (*self.rtc_config).clone(),
             self.config.room.clone(),
             &self.config.audio,
             &self.server_info,

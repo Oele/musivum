@@ -2974,6 +2974,8 @@ async fn test_codec_preferences_outlive_an_offer() {
 /// LiveKit configures one to a client transceiver that has no preferences. The client's
 /// re-offer has no `sprop-stereo` (a browser's has none): the audio that arrives after it is
 /// still the stereo Opus the server's answers give, with the payload type of its answers.
+/// `rtc` forgets the streams at a negotiation and binds each again at its next packet, with
+/// the codec it maps that packet to; `on_track` comes once for a stream, as pion's `OnTrack`.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_media_after_a_renegotiation_has_its_codec() {
     let server = Peer::server();
@@ -3032,29 +3034,44 @@ async fn test_media_after_a_renegotiation_has_its_codec() {
         .unwrap();
     connected(&server, &client).await;
     eventually_async(|| audio.is_bound() && video.is_bound(), WAIT, TICK).await;
-    let check =
-        |round: usize, (audio_codec, video_codec): (RtpCodecParameters, RtpCodecParameters)| {
-            assert_eq!(audio_codec.payload_type, OPUS, "{round}");
-            assert!(
-                audio_codec.mime_type.eq_ignore_ascii_case(MIME_TYPE_OPUS),
-                "{round}"
-            );
-            assert_eq!(
-                audio_codec.sdp_fmtp_line, "minptime=10;useinbandfec=1;sprop-stereo=1",
-                "{round}"
-            );
-            assert_eq!(video_codec.payload_type, VP8, "{round}");
-            assert!(
-                video_codec.mime_type.eq_ignore_ascii_case(MIME_TYPE_VP8),
-                "{round}"
-            );
-        };
+    let check = |round: usize, (audio_info, video_info): (StreamInfo, StreamInfo)| {
+        assert_eq!(audio_info.payload_type, OPUS, "{round}");
+        assert!(
+            audio_info.mime_type.eq_ignore_ascii_case(MIME_TYPE_OPUS),
+            "{round}"
+        );
+        assert_eq!(
+            audio_info.sdp_fmtp_line, "minptime=10;useinbandfec=1;sprop-stereo=1",
+            "{round}"
+        );
+        assert_eq!(video_info.payload_type, VP8, "{round}");
+        assert!(
+            video_info.mime_type.eq_ignore_ascii_case(MIME_TYPE_VP8),
+            "{round}"
+        );
+    };
     let mut sequence_number = 0;
     let streams = ((&server, &*audio), (&client, &*video));
     check(
         1,
-        send_until_announced(1, &mut sequence_number, streams.0, streams.1).await,
+        send_until_bound(1, &mut sequence_number, streams.0, streams.1).await,
     );
+    let (audio_ssrc, video_ssrc) = (audio.context().ssrc(), video.context().ssrc());
+    let announcements = || {
+        let count = |peer: &Peer, ssrc: u32| {
+            let tracks = peer.tracks.lock();
+            tracks.iter().filter(|(t, _)| t.ssrc() == ssrc).count()
+        };
+        (count(&client, audio_ssrc), count(&server, video_ssrc))
+    };
+    assert_eq!((1, 1), announcements());
+    let first_tracks: Vec<_> = client
+        .tracks
+        .lock()
+        .iter()
+        .chain(server.tracks.lock().iter())
+        .map(|(t, _)| t.codec())
+        .collect();
 
     // The client offers again, without stereo; the server's answer keeps its preferences.
     let reoffer = client.pc.create_offer(None).unwrap();
@@ -3069,30 +3086,40 @@ async fn test_media_after_a_renegotiation_has_its_codec() {
         .set_remote_description(server.pc.local_description().unwrap())
         .unwrap();
 
-    // `rtc` announces each stream again at its first packet after a negotiation.
+    // `rtc` binds each stream again at its first packet after a negotiation; the tracks are
+    // not announced again, and keep their codecs.
     check(
         2,
-        send_until_announced(2, &mut sequence_number, streams.0, streams.1).await,
+        send_until_bound(2, &mut sequence_number, streams.0, streams.1).await,
     );
+    assert_eq!((1, 1), announcements());
+    let tracks: Vec<_> = client
+        .tracks
+        .lock()
+        .iter()
+        .chain(server.tracks.lock().iter())
+        .map(|(t, _)| t.codec())
+        .collect();
+    assert_eq!(first_tracks, tracks);
 
     client.pc.close().unwrap();
     server.pc.close().unwrap();
 }
 
 /// Writes the audio track's packets from one peer and the video track's from the other until
-/// each stream has been announced `n` times at the other end; the codecs of the `n`-th
-/// announcements, audio and video.
-async fn send_until_announced(
+/// each stream has been bound `n` times at the sink of the other end; what the `n`-th binds
+/// say of the streams, audio and video.
+async fn send_until_bound(
     n: usize,
     sequence_number: &mut u16,
     (audio_peer, audio): (&Peer, &TestTrack),
     (video_peer, video): (&Peer, &TestTrack),
-) -> (RtpCodecParameters, RtpCodecParameters) {
+) -> (StreamInfo, StreamInfo) {
     let (audio_ssrc, video_ssrc) = (audio.context().ssrc(), video.context().ssrc());
     let announced = |peer: &Peer, ssrc: u32| {
-        let tracks = peer.tracks.lock();
-        let mine: Vec<_> = tracks.iter().filter(|(t, _)| t.ssrc() == ssrc).collect();
-        (mine.len() >= n).then(|| mine[n - 1].0.codec())
+        let bound = peer.sink.bound.lock();
+        let mine: Vec<_> = bound.iter().filter(|info| info.ssrc == ssrc).collect();
+        (mine.len() >= n).then(|| mine[n - 1].clone())
     };
     for _ in 0..500 {
         *sequence_number = sequence_number.wrapping_add(1);
@@ -3119,7 +3146,7 @@ async fn send_until_announced(
         }
     }
     panic!(
-        "the streams were not announced {n} times: {:?} at the audio's receiver, {:?} at the \
+        "the streams were not bound {n} times: {:?} at the audio's receiver, {:?} at the \
          video's",
         video_peer.sink.calls.lock(),
         audio_peer.sink.calls.lock()

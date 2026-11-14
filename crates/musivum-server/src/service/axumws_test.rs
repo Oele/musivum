@@ -309,3 +309,41 @@ async fn a_close_is_answered_and_ends_the_reading() {
         "the connection goes on: {end:?}"
     );
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_close_ends_a_pending_read() {
+    // What the signalling endpoint does when a session ends from the server's side: the
+    // response pump closes the connection while the request loop waits for the next frame.
+    let (tx, mut rx) = mpsc::unbounded_channel();
+    let handler = move |ws: WebSocketUpgrade| {
+        let tx = tx.clone();
+        async move {
+            ws.on_upgrade(move |socket| async move {
+                let conn = AxumSignalWebSocket::new(socket);
+                let reading = {
+                    let conn = conn.clone();
+                    tokio::spawn(async move { conn.next_frame().await })
+                };
+                tokio::time::sleep(Duration::from_millis(100)).await;
+                conn.close().await.unwrap();
+                let _ = tx.send(reading.await.unwrap());
+            })
+        }
+    };
+    let app = Router::new().route("/ws", get(handler));
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+
+    let mut client = connect(addr, "").await;
+    let read = tokio::time::timeout(WAIT, rx.recv())
+        .await
+        .expect("the read goes on after close")
+        .unwrap();
+    let err = read.expect_err("the read gave a frame");
+    assert_eq!(std::io::ErrorKind::NotConnected, err.kind());
+    // and the connection is dropped, without a close frame of the server's (Go's
+    // `conn.Close()`)
+    let end = tokio::time::timeout(WAIT, client.next()).await.unwrap();
+    assert!(!matches!(end, Some(Ok(_))), "{end:?}");
+}

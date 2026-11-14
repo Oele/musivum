@@ -124,6 +124,17 @@ async fn test_ice_over_tcp() {
             "{c}"
         );
     }
+    // With pion's priorities: the type preference of a TCP host candidate is a UDP one's (126)
+    // less 27, so that UDP comes first, and the local preference is RFC 6544's, its direction
+    // (passive 4, active 6) times 2^13 and 8191.
+    let priority = |c: &str| c.split(' ').nth(3).unwrap().parse::<u32>().unwrap();
+    let pion = |direction: u32| (99 << 24) + (((direction << 13) + 8191) << 8) + 255;
+    for c in &server_candidates {
+        assert_eq!(pion(4), priority(c), "{c}");
+    }
+    for c in &client_candidates {
+        assert_eq!(pion(6), priority(c), "{c}");
+    }
 
     connected(&client, &server).await;
 
