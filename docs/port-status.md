@@ -23,6 +23,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | mtu `pkg/codec/vp8.go`, `h26xhelper.go`, `helpers.go`, `keyframe.go` | `mediatransportutil/codec/` (same names) | 6 / 6 | Twelve tests added (`vp8.go` and `keyframe.go` have none upstream). `reference_test.rs` compares the port with what the Go original says about 326 payloads, pinned in `testdata/` with the Go test that printed it. Also run against the original with about 700,000 generated payloads: identical, the two panics below included. |
 | pion/rtp `codecs/vp9_packet.go`, `common.go`, `error.go` | `webrtc/rtp/codecs/` (same names) | 5 / 7 | Only `VP9Packet` and what it stands on: the payloader and the other depacketizers are not used by LiveKit. The tests of allocations assert that buffers stay where they are instead. `Vp9Packet.payload` is a copy of the payload (`Vec<u8>`): a cost per VP9 packet, to be looked at with the buffer. |
 | mtu `pkg/red/red.go` | `mediatransportutil/red/red.rs` | 4 / 4 | Also run against the original with 60 generated streams: identical. |
+| mtu `pkg/rtcconfig/config.go`, `ip.go`, `webrtc_config.go`, `rtc_unix.go` | `mediatransportutil/rtcconfig/` (same names) | 3 / 3 | The `rtc:` section of LiveKit's configuration with its defaults, validation and error texts; 23 tests added, with values from a run of the original. What it produces is for musivum's connection layer: a `NodeConfig` and a `SettingEngineConfig` (data, since `rtc`'s setting engine cannot be copied and changed per connection as pion's is). Options the layer cannot honour yet are accepted and logged as not applied: see the table below. No test sends anything off the machine (STUN goes to a responder of the test's own). |
 | mtu `helpers.go` | `mediatransportutil/helpers.rs` | 1 / 1 | Two tests added (the way back from NTP time, RTT from a receiver report). |
 | pion/rtp `packet.go`, `error.go` | `webrtc/rtp/packet.rs`, `error.rs` | 43 / 43 | Four tests added. Benchmarks left out. Run against pion with 432,008 generated inputs: every output identical, error texts and the cases where pion panics included. |
 | pion/rtp `abssendtimeextension.go`, `audiolevelextension.go`, `transportccextension.go`, `playoutdelayextension.go`, `abscapturetimeextension.go` | `webrtc/rtp/` (same names) | 20 / 20 | Benchmarks left out. |
@@ -92,6 +93,24 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
 with the same pseudo-random inputs (34,021 lines of output, identical).
+
+## Options of the `rtc:` section that are accepted and not applied
+
+`mediatransportutil/rtcconfig` reads every option LiveKit has. These need something the
+connection layer (`webrtc/peerconnection`) does not have yet; each is logged when set:
+
+| Option | What happens now | What it needs |
+|---|---|---|
+| `udp_port` as a range, `port_range_start`/`_end` | the first port is used | several sockets per node, or a decision that one port stands for the range |
+| `tcp_port`, `force_tcp` | UDP only; `force_tcp` without `tcp_port` is the original's error | a TCP listener in the node, RFC 4571 framing, TCP candidates |
+| `use_stun_port_as_ice` | nothing is bound on 3478 | a second UDP listener |
+| `interfaces`, `ips` | they choose which addresses are advertised; the socket listens on all | a socket per address |
+| `use_mdns: true` | `rtc` is left at query only | the node routing mDNS answers |
+| `stun_servers` as ICE servers of a node that is not ICE lite | the list is computed, nothing gathers | server reflexive candidates in the layer |
+| IPv6 addresses | not advertised | a second (IPv6) listener |
+| `batch_io`, the SCTP window settings, the 16 MiB socket buffers | kept as data | batched writes; settings `rtc` 0.21 does not have; buffer sizes on the node's socket |
+
+Clients that cannot use UDP are therefore not served yet (an open question of the plan).
 
 ## Where the port cannot be the original
 
@@ -212,6 +231,11 @@ What looked wrong or fragile upstream and was ported as it is:
   taken for a rollover of the sequence number: 65,536 ahead, about 63,000 packets counted
   lost (seen in the run). `Test_RTPStatsReceiver_Update` starts at a random sequence number
   and fails when that is within 13 of 65535, upstream and in the port.
+- mtu `rtcconfig`: `use_external_ip` with `port_range_start` equal to `port_range_end`
+  panics (`rand.Intn(0)`), here too. A YAML mapping or sequence for `udp_port` or `node_ip`
+  is silently ignored. `GetLocalIPAddresses` does not look at whether an interface is up.
+  `port_range_start` alone suppresses the default ports in `Validate`, and then neither a
+  range nor a port is used.
 - `rtc/signalling`: `signallerAsync.WriteMessage` warns "unknown message type" for a
   message that is no signal response and then writes it to the sink anyway; the handler
   drops the errors of `HandleOffer` and `UpdateMetadata` without logging them, and logs the

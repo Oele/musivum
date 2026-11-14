@@ -62,6 +62,10 @@ was checked:
 - **golang.org/x/mod** `semver` and **google.golang.org/protobuf** (both BSD-3-Clause): read
   for how versions are compared and what a merge into nothing does; nothing copied
   (`clientconfiguration/semver.rs` is written new and held against the original by a test).
+- **pion/ice** as LiveKit builds it (`livekit/ice` v4.4.0-warp.3, MIT): the rules by which
+  a node's advertised addresses follow from its NAT 1:1 mappings (`gather.go`,
+  `external_ip_mapper.go`) are followed in `mediatransportutil/rtcconfig/webrtc_config.rs`,
+  reduced to what that package configures.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
