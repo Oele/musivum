@@ -1,3 +1,41 @@
+diff -ru a/src/peer_connection/configuration/setting_engine.rs b/src/peer_connection/configuration/setting_engine.rs
+--- a/src/peer_connection/configuration/setting_engine.rs
++++ b/src/peer_connection/configuration/setting_engine.rs
+@@ -357,6 +357,8 @@
+     pub(crate) replay_protection: ReplayProtection,
+     pub(crate) sdp_media_level_fingerprints: bool,
+     pub(crate) answering_dtls_role: RTCDtlsRole,
++    // musivum: pion's `SetDTLSRetransmissionInterval`; `None` keeps the dtls crate's (1 s)
++    pub(crate) dtls_retransmission_interval: Option<Duration>,
+     pub(crate) disable_certificate_fingerprint_verification: bool,
+     pub(crate) allow_insecure_verification_algorithm: bool,
+     pub(crate) disable_media_engine_copy: bool,
+@@ -587,6 +589,14 @@
+         self
+     }
+ 
++    /// musivum: how long the DTLS handshake waits for an answer to a flight before it sends
++    /// the flight again (pion's `SetDTLSRetransmissionInterval`). `None` keeps the dtls
++    /// crate's default, one second.
++    pub fn with_dtls_retransmission_interval(mut self, interval: Option<Duration>) -> Self {
++        self.0.dtls_retransmission_interval = interval;
++        self
++    }
++
+     /// Configures ICE connection attempt behavior, including number of connection attempts
+     /// per candidate, and the amount of time between connection attempts.
+     ///
+diff -ru a/src/peer_connection/internal.rs b/src/peer_connection/internal.rs
+--- a/src/peer_connection/internal.rs
++++ b/src/peer_connection/internal.rs
+@@ -134,6 +134,7 @@
+             disable_certificate_fingerprint_verification: setting_engine
+                 .disable_certificate_fingerprint_verification,
+             replay_protection: setting_engine.replay_protection,
++            dtls_retransmission_interval: setting_engine.dtls_retransmission_interval,
+             crypto_provider,
+         })?;
+ 
 diff -ru a/src/peer_connection/mod.rs b/src/peer_connection/mod.rs
 --- a/src/peer_connection/mod.rs
 +++ b/src/peer_connection/mod.rs
@@ -25,6 +63,79 @@ diff -ru a/src/peer_connection/mod.rs b/src/peer_connection/mod.rs
                      }
                  }
              }
+diff -ru a/src/peer_connection/transport/dtls/mod.rs b/src/peer_connection/transport/dtls/mod.rs
+--- a/src/peer_connection/transport/dtls/mod.rs
++++ b/src/peer_connection/transport/dtls/mod.rs
+@@ -14,7 +14,7 @@
+ use shared::error::{Error, Result};
+ use shared::{TransportContext, TransportProtocol};
+ use std::sync::Arc;
+-use std::time::SystemTime;
++use std::time::{Duration, SystemTime};
+ 
+ pub(crate) mod fingerprint;
+ pub(crate) mod parameters;
+@@ -62,6 +62,8 @@
+     pub(crate) allow_insecure_verification_algorithm: bool,
+     pub(crate) disable_certificate_fingerprint_verification: bool,
+     pub(crate) replay_protection: ReplayProtection,
++    // musivum: see `SettingEngineBuilder::with_dtls_retransmission_interval`
++    pub(crate) dtls_retransmission_interval: Option<Duration>,
+ }
+ 
+ pub(crate) struct RTCDtlsTransportConfig {
+@@ -74,6 +76,7 @@
+     pub(crate) allow_insecure_verification_algorithm: bool,
+     pub(crate) disable_certificate_fingerprint_verification: bool,
+     pub(crate) replay_protection: ReplayProtection,
++    pub(crate) dtls_retransmission_interval: Option<Duration>,
+     pub(crate) crypto_provider: Arc<dyn RTCCryptoProvider>,
+ }
+ 
+@@ -89,6 +92,7 @@
+             allow_insecure_verification_algorithm,
+             disable_certificate_fingerprint_verification,
+             replay_protection,
++            dtls_retransmission_interval,
+             crypto_provider,
+         } = config;
+         if !certificates.is_empty() {
+@@ -125,6 +129,7 @@
+             allow_insecure_verification_algorithm,
+             disable_certificate_fingerprint_verification,
+             replay_protection,
++            dtls_retransmission_interval,
+             crypto_provider,
+         })
+     }
+@@ -243,8 +248,11 @@
+ 
+         let profiles = self.supported_srtp_protection_profiles()?;
+ 
++        // musivum: a retransmission interval of zero is the dtls crate's default (1 s)
++        let flight_interval = self.dtls_retransmission_interval.unwrap_or_default();
+         Ok(Arc::new(
+             ::dtls::config::ConfigBuilder::default()
++                .with_flight_interval(flight_interval)
+                 .with_crypto_provider(self.crypto_provider.clone())
+                 .with_certificates(vec![certificate])
+                 .with_srtp_protection_profiles(profiles)
+@@ -395,6 +403,7 @@
+             allow_insecure_verification_algorithm: false,
+             disable_certificate_fingerprint_verification: false,
+             replay_protection: ReplayProtection::default(),
++            dtls_retransmission_interval: None,
+             crypto_provider: crypto::default_provider().expect("test crypto provider"),
+         })
+         .expect("a self-signed ECDSA certificate is generated when none is supplied")
+@@ -503,6 +512,7 @@
+                 allow_insecure_verification_algorithm: false,
+                 disable_certificate_fingerprint_verification: false,
+                 replay_protection: ReplayProtection::default(),
++                dtls_retransmission_interval: None,
+                 crypto_provider: provider.clone(),
+             })
+         };
 diff -ru a/src/rtp_transceiver/internal.rs b/src/rtp_transceiver/internal.rs
 --- a/src/rtp_transceiver/internal.rs
 +++ b/src/rtp_transceiver/internal.rs

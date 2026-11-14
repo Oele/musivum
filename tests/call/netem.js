@@ -33,7 +33,8 @@ if (!apiSecret || !wanted.length) {
   console.error('scenarios: ' + Object.keys(scenarios).join(' '));
   process.exit(2);
 }
-const names = wanted.join(' ').split(/\s+/).filter(Boolean).flatMap(n => n === 'all' ? Object.keys(scenarios) : [n]);
+const names = wanted.join(' ').split(/\s+/).filter(Boolean)
+  .flatMap(n => n === 'all' ? Object.keys(scenarios).filter(k => !scenarios[k].extra) : [n]);
 for (const n of names) if (!scenarios[n]) { console.error(`unknown scenario: ${n}`); process.exit(2); }
 
 // What the server advertises, where it listens, and where the relay listens instead.
@@ -421,11 +422,11 @@ function proof(before, relay, after) {
   return p;
 }
 
-function summarise(rows, pubRows, imp) {
+function summarise(rows, pubRows, imp, duration) {
   const at = t => pubRows.find(r => r.t === t) || pubRows[pubRows.length - 1];
   const win = (a, b) => rows.filter(r => r.t > a && r.t <= b);
   const label = (h, among) => h ? ((among.find(r => r.h === h) || {}).layer || `${h}p`) : 'none';
-  const before = imp ? win(imp.from - 5, imp.from) : win(0, DURATION);
+  const before = imp ? win(imp.from - 5, imp.from) : win(0, duration);
   const refH = median(before.map(r => r.h)), refFps = median(before.map(r => r.fps));
   const ok = r => r.h !== null && r.h >= refH && r.fps !== null && r.fps >= 0.8 * refFps;
   const s = {
@@ -439,7 +440,7 @@ function summarise(rows, pubRows, imp) {
     pli: sum(rows.map(r => r.pli)),
     audioConcealedMs: sum(rows.map(r => r.audioConcealedMs)),
   };
-  const after = rows.filter(r => r.t > DURATION - 5);
+  const after = rows.filter(r => r.t > duration - 5);
   s.after = {layer: label(median(after.map(r => r.h)), after), fps: median(after.map(r => r.fps)),
     rttMs: median(after.map(r => r.rttMs))};
   s.before = {rttMs: median(before.map(r => r.rttMs)), jbMs: median(before.map(r => r.jbMs))};
@@ -484,8 +485,10 @@ function summaryLine(scenario, s, extra) {
 
 async function runScenario(relayBin, scenarioName) {
   const sc = scenarios[scenarioName];
+  const duration = sc.duration || DURATION;
   const imp = sc.set.length ? {from: sc.at, to: sc.at + sc.for, commands: sc.set} : null;
   const relay = await startRelay(relayBin);
+  if (sc.setup) for (const c of sc.setup) await relay.control.send(c);
   const browser = await puppeteer.launch({
     executablePath: chrome,
     headless: true,
@@ -511,13 +514,18 @@ async function runScenario(relayBin, scenarioName) {
       await page.goto(`http://127.0.0.1:${pagePort}/`);
     }
     const {alice, bob} = pages;
+    const setupStart = Date.now();
     await alice.evaluate((u, t) => window.join(u, t), wsUrl, token('alice', room));
     await alice.evaluate(() => window.publishCameraAndMicrophone());
     await bob.bringToFront();
     await bob.evaluate((u, t) => window.join(u, t), wsUrl, token('bob', room));
     const subscribed = await until(async () =>
-      (await bob.evaluate(() => window.log.filter(e => e.event === 'TrackSubscribed').length)) >= 2, 15000);
+      (await bob.evaluate(() => window.log.filter(e => e.event === 'TrackSubscribed').length)) >= 2,
+      1000 * (sc.setupTimeoutS || 15));
     if (!subscribed) throw new Error('bob was not subscribed to alice\'s tracks');
+    // How long the two took from alice's join until bob was subscribed to both tracks.
+    const setup = {commands: sc.setup || [], seconds: round((Date.now() - setupStart) / 1000, 1)};
+    if (sc.setup) await relay.control.send('clear');
     await bob.evaluate(() => window.setVideoSize(1280, 720));
 
     // Every client port the relay sees belongs to a participant.
@@ -551,7 +559,7 @@ async function runScenario(relayBin, scenarioName) {
     const logStart = {};
     for (const [who, page] of Object.entries(pages)) logStart[who] = await page.evaluate(() => window.log.length);
     const t0 = Date.now();
-    for (let s = 0; s <= DURATION; s++) {
+    for (let s = 0; s <= duration; s++) {
       const wait = t0 + s * 1000 - Date.now();
       if (wait > 0) await sleep(wait);
       if (imp && s === imp.from) for (const c of imp.commands) await relay.control.send(c);
@@ -586,7 +594,7 @@ async function runScenario(relayBin, scenarioName) {
       relayRows.push(relayRow(raw.bob[i].t, relayRaw[i - 1], relayRaw[i]));
     }
     rows.forEach(r => { r.layer = layerName(r.h, pubRows.find(p => p.t === r.t)); });
-    const summary = summarise(rows, pubRows, imp);
+    const summary = summarise(rows, pubRows, imp, duration);
     // What Chrome did not report, of what is asked for.
     const lastVideo = video(raw.bob[raw.bob.length - 1]) || {};
     const missing = ['freezeCount', 'totalFreezesDuration', 'pauseCount', 'framesDropped', 'jitterBufferDelay', 'nackCount', 'pliCount']
@@ -611,8 +619,8 @@ async function runScenario(relayBin, scenarioName) {
       clientLoopback: m.client.startsWith('127.'), relayPort: m.port, up: m.up, down: m.down,
     }));
     const result = {
-      target, scenario: scenarioName, about: sc.about, at: new Date().toISOString(), seed: SEED, duration: DURATION,
-      impairment: imp, warmup, summary: line, subscribers: {bob: {summary, samples: rows}},
+      target, scenario: scenarioName, about: sc.about, at: new Date().toISOString(), seed: SEED, duration,
+      impairment: imp, setup, warmup, summary: line, subscribers: {bob: {summary, samples: rows}},
       publishers: {alice: {samples: pubRows}},
       relay: {lateUs: relayEnd.late_us, mappings, samples: relayRows},
       path: path_, filter: {alice: pa.alice.filter, bob: pa.bob.filter}, missing, machine, events,

@@ -137,6 +137,14 @@ hard-coded.
    hotspot ICE connected and the connection never did (found in production, 2026-11-14).
    `third_party/rtc-ice` is `rtc-ice` 0.21.1 with pion's rules (`MUSIVUM.md`,
    `MUSIVUM.patch`), used through `[patch.crates-io]`. Not proposed upstream yet.
+7. **Its DTLS handshake waits a second before it sends a flight again.** `rtc` builds its
+   DTLS configuration with the dtls crate's default (1 s, seven times at most) and has no
+   setting for it; LiveKit sets pion's to 100 ms. With 30% loss while two browsers joined
+   (`tests/netem`, `setup-loss-30`) LiveKit connected in under a second and musivum not
+   within the client's ten seconds after ICE. `third_party/rtc` has the setting
+   (`SettingEngineBuilder::with_dtls_retransmission_interval`), the layer's engine
+   `set_dtls_retransmission_interval`, and the transport sets LiveKit's 100 ms: set-up in
+   0.9 s under the same loss.
 
 None of these changes the structure of the port.
 

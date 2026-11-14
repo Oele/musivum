@@ -14,7 +14,7 @@ use rustls::pki_types::CertificateDer;
 use shared::error::{Error, Result};
 use shared::{TransportContext, TransportProtocol};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 pub(crate) mod fingerprint;
 pub(crate) mod parameters;
@@ -62,6 +62,8 @@ pub(crate) struct DtlsTransport {
     pub(crate) allow_insecure_verification_algorithm: bool,
     pub(crate) disable_certificate_fingerprint_verification: bool,
     pub(crate) replay_protection: ReplayProtection,
+    // musivum: see `SettingEngineBuilder::with_dtls_retransmission_interval`
+    pub(crate) dtls_retransmission_interval: Option<Duration>,
 }
 
 pub(crate) struct RTCDtlsTransportConfig {
@@ -74,6 +76,7 @@ pub(crate) struct RTCDtlsTransportConfig {
     pub(crate) allow_insecure_verification_algorithm: bool,
     pub(crate) disable_certificate_fingerprint_verification: bool,
     pub(crate) replay_protection: ReplayProtection,
+    pub(crate) dtls_retransmission_interval: Option<Duration>,
     pub(crate) crypto_provider: Arc<dyn RTCCryptoProvider>,
 }
 
@@ -89,6 +92,7 @@ impl DtlsTransport {
             allow_insecure_verification_algorithm,
             disable_certificate_fingerprint_verification,
             replay_protection,
+            dtls_retransmission_interval,
             crypto_provider,
         } = config;
         if !certificates.is_empty() {
@@ -125,6 +129,7 @@ impl DtlsTransport {
             allow_insecure_verification_algorithm,
             disable_certificate_fingerprint_verification,
             replay_protection,
+            dtls_retransmission_interval,
             crypto_provider,
         })
     }
@@ -243,8 +248,11 @@ impl DtlsTransport {
 
         let profiles = self.supported_srtp_protection_profiles()?;
 
+        // musivum: a retransmission interval of zero is the dtls crate's default (1 s)
+        let flight_interval = self.dtls_retransmission_interval.unwrap_or_default();
         Ok(Arc::new(
             ::dtls::config::ConfigBuilder::default()
+                .with_flight_interval(flight_interval)
                 .with_crypto_provider(self.crypto_provider.clone())
                 .with_certificates(vec![certificate])
                 .with_srtp_protection_profiles(profiles)
@@ -395,6 +403,7 @@ mod tests {
             allow_insecure_verification_algorithm: false,
             disable_certificate_fingerprint_verification: false,
             replay_protection: ReplayProtection::default(),
+            dtls_retransmission_interval: None,
             crypto_provider: crypto::default_provider().expect("test crypto provider"),
         })
         .expect("a self-signed ECDSA certificate is generated when none is supplied")
@@ -503,6 +512,7 @@ mod tests {
                 allow_insecure_verification_algorithm: false,
                 disable_certificate_fingerprint_verification: false,
                 replay_protection: ReplayProtection::default(),
+                dtls_retransmission_interval: None,
                 crypto_provider: provider.clone(),
             })
         };

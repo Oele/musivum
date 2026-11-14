@@ -25,8 +25,7 @@ use crate::webrtc::Error;
 /// Set on pion's engine by LiveKit and not here, because `rtc` 0.21 has no such setting:
 /// `DisableSRTPReplayProtection` and `DisableSRTCPReplayProtection` (a window can be sized,
 /// not switched off), `SetDTLSEllipticCurves`, `SetDTLSInsecureSkipHelloVerify`,
-/// `SetDTLSRetransmissionInterval`, `SetDTLSConnectContextMaker` (no limit on the time of a
-/// handshake), `DisableCloseByDTLS`, `EnableSCTPZeroChecksum`, `SetSCTPMinCwnd`,
+/// `SetDTLSConnectContextMaker` (no limit on the time of a handshake), `DisableCloseByDTLS`, `EnableSCTPZeroChecksum`, `SetSCTPMinCwnd`,
 /// `SetSCTPFastRtxWnd`, `SetSCTPCwndCAStep`, `EnableSped`, `EnableSctpSnap`. Not here
 /// because the layer does it
 /// otherwise: `DetachDataChannels` and `EnableDataChannelBlockWrite` (a channel has `send`,
@@ -78,6 +77,10 @@ pub struct SettingEngine {
     pub sctp_max_receive_buffer_size: u32,
     /// `SetIgnoreRidPauseForRecv`.
     pub ignore_rid_pause_for_recv: bool,
+    /// `SetDTLSRetransmissionInterval`: how long the DTLS handshake waits for an answer to a
+    /// flight before it sends the flight again. `None`: the library's (1 s). `rtc` has the
+    /// setting through musivum's patch (`third_party/rtc/MUSIVUM.md`).
+    pub dtls_retransmission_interval: Option<Duration>,
     /// pion's `DisableActiveTCP`, the other way round and off unless set: whether the
     /// connection has active TCP candidates (one for each address it advertises, with port
     /// 9) and dials the passive TCP candidates of the other side, once each, from a port of
@@ -115,6 +118,11 @@ impl SettingEngine {
 
     /// pion's `SetAnsweringDTLSRole`, which takes the client's role or the server's and
     /// refuses anything else.
+    /// pion's `SetDTLSRetransmissionInterval`.
+    pub fn set_dtls_retransmission_interval(&mut self, interval: Duration) {
+        self.dtls_retransmission_interval = Some(interval);
+    }
+
     pub fn set_answering_dtls_role(&mut self, role: DtlsRole) -> Result<(), Error> {
         if role != DtlsRole::Client && role != DtlsRole::Server {
             return Err(Error::Other(
@@ -142,6 +150,7 @@ impl SettingEngine {
             .with_srflx_acceptance_min_wait(std(self.srflx_acceptance_min_wait))
             .with_prflx_acceptance_min_wait(std(self.prflx_acceptance_min_wait))
             .with_relay_acceptance_min_wait(std(self.relay_acceptance_min_wait))
+            .with_dtls_retransmission_interval(std(self.dtls_retransmission_interval))
             .with_multicast_dns_mode(self.ice_multicast_dns_mode)
             .with_network_types(self.network_types.clone())
             .with_ignore_rid_pause_for_recv(self.ignore_rid_pause_for_recv);

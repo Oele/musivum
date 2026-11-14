@@ -357,6 +357,8 @@ pub struct SettingEngine {
     pub(crate) replay_protection: ReplayProtection,
     pub(crate) sdp_media_level_fingerprints: bool,
     pub(crate) answering_dtls_role: RTCDtlsRole,
+    // musivum: pion's `SetDTLSRetransmissionInterval`; `None` keeps the dtls crate's (1 s)
+    pub(crate) dtls_retransmission_interval: Option<Duration>,
     pub(crate) disable_certificate_fingerprint_verification: bool,
     pub(crate) allow_insecure_verification_algorithm: bool,
     pub(crate) disable_media_engine_copy: bool,
@@ -584,6 +586,14 @@ impl SettingEngineBuilder {
     ///   or `None` to disable the timeout.
     pub fn with_dcep_handshake_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.0.data_channel.dcep_handshake_timeout = timeout;
+        self
+    }
+
+    /// musivum: how long the DTLS handshake waits for an answer to a flight before it sends
+    /// the flight again (pion's `SetDTLSRetransmissionInterval`). `None` keeps the dtls
+    /// crate's default, one second.
+    pub fn with_dtls_retransmission_interval(mut self, interval: Option<Duration>) -> Self {
+        self.0.dtls_retransmission_interval = interval;
         self
     }
 

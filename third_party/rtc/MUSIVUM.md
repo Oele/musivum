@@ -1,12 +1,12 @@
-# rtc, with a transceiver's codecs as pion has them
+# rtc, with a transceiver's codecs as pion has them, and pion's DTLS retransmission setting
 
 This directory is the crate `rtc` 0.21.1 of webrtc-rs (https://github.com/webrtc-rs/rtc, MIT
 or Apache-2.0: the two licence files here are that repository's) as published on crates.io,
-with one change, `MUSIVUM.patch`. Of the published crate only `src`, `Cargo.toml` (unchanged),
+with two changes, `MUSIVUM.patch`. Of the published crate only `src`, `Cargo.toml` (unchanged),
 the licences and the README are here: its examples, tests, documents and scripts are not
 needed to build it as a dependency.
 
-The change, in five places:
+The first change, a transceiver's codecs, in five places:
 
 - `RTCRtpReceiverInternal::get_codecs` (`src/rtp_transceiver/rtp_receiver/internal.rs`), the
   codecs of a transceiver that has codec preferences, keeps each preferred codec as it was
@@ -67,6 +67,17 @@ As with pion, a sender's repair streams follow the media engine, not the prefere
 sender keeps its RTX and FEC SSRCs where the media engine has RTX or FEC, so preferences that
 leave them out make a description with `a=ssrc-group:FID` or `FEC-FR` and no such codec (pion
 writes the same).
+
+The second change: `SettingEngineBuilder::with_dtls_retransmission_interval`
+(`src/peer_connection/configuration/setting_engine.rs`), pion's
+`SetDTLSRetransmissionInterval`, passed to the DTLS transport (`RTCDtlsTransportConfig`,
+`src/peer_connection/internal.rs`) and from there to the dtls crate's `with_flight_interval`
+(`src/peer_connection/transport/dtls/mod.rs`). The crate built its DTLS configuration with the
+dtls crate's default, a flight sent again after a second, seven times at most; LiveKit sets
+100 ms. With 30% of the packets lost while two browsers joined (`tests/netem`,
+`setup-loss-30`), LiveKit was connected in under a second and musivum not within the ten
+seconds the client waits after ICE ("could not establish pc connection"); with 100 ms it
+connects in 0.9 s. Unset, nothing changes.
 
 It is used through `[patch.crates-io]`. To move to a newer rtc: replace the sources with the
 new version's and apply `MUSIVUM.patch` (made with `diff -ru a/src b/src` against the

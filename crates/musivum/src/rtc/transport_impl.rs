@@ -11,8 +11,7 @@
 //   registers its interceptors and pion its buffer factory (the RTX info extractor, the RTT
 //   from XR responder with its empty callback, the pairings of `SimTracks`). The settings
 //   `rtc` does not have are comments at their places (the layer's settings.rs lists them):
-//   the DTLS curves, the HelloVerify skip, the DTLS retransmission interval and handshake
-//   time limit, close by DTLS, SRTP replay protection, SCTP zero checksum, warp, detached
+//   the DTLS curves, the HelloVerify skip, the DTLS handshake time limit, close by DTLS, SRTP replay protection, SCTP zero checksum, warp, detached
 //   channels and blocking writes (the writers wait on the buffered amount instead,
 //   `block_write`), firing `OnTrack` before the first packet. The address rewrite rules and
 //   IP filter for a client that cannot do prflx over relay are applied to a copy of the
@@ -130,8 +129,8 @@ pub const DATA_TRACK_DATA_CHANNEL: &str = "_data_track";
 const FAST_NEGOTIATION_FREQUENCY: Duration = Duration::from_millis(10);
 const NEGOTIATION_FREQUENCY: Duration = Duration::from_millis(150);
 pub const NEGOTIATION_FAILED_TIMEOUT: Duration = Duration::from_secs(15);
-// `dtlsRetransmissionInterval` (100 ms) and `dtlsHandshakeTimeout` (a minute): `rtc` has
-// neither setting (see the header)
+const DTLS_RETRANSMISSION_INTERVAL: Duration = Duration::from_millis(100);
+// `dtlsHandshakeTimeout` (a minute): `rtc` has no such setting (see the header)
 
 const ICE_DISCONNECTED_TIMEOUT: Duration = Duration::from_secs(10); // compatible for ice-lite with firefox client
 pub const ICE_FAILED_TIMEOUT: Duration = Duration::from_secs(5); // time between disconnected and failed
@@ -526,8 +525,9 @@ fn new_peer_connection(
     }
     // ICE checks already prove the remote address, so the HelloVerifyRequest cookie only adds a round trip.
     // pion applies this only when this side ends up as the DTLS server.
-    // (`se.SetDTLSInsecureSkipHelloVerify(true)`, `se.SetDTLSRetransmissionInterval`,
-    // `se.SetDTLSConnectContextMaker`: not in `rtc`)
+    // (`se.SetDTLSInsecureSkipHelloVerify(true)`, `se.SetDTLSConnectContextMaker`: not in
+    // `rtc`)
+    se.set_dtls_retransmission_interval(DTLS_RETRANSMISSION_INTERVAL);
     se.set_ice_timeouts(
         ICE_DISCONNECTED_TIMEOUT,
         ICE_FAILED_TIMEOUT,
