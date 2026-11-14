@@ -11,7 +11,7 @@ const LK = LivekitClient;
 window.log = [];
 const note = (event, detail = {}) => window.log.push({t: Math.round(performance.now()), event, ...detail});
 
-window.join = async (url, token, options = {}) => {
+window.join = async (url, token, options = {}, connectOptions = {}) => {
   const room = new LK.Room({adaptiveStream: true, dynacast: true, ...options});
   window.room = room;
   const E = LK.RoomEvent;
@@ -48,7 +48,7 @@ window.join = async (url, token, options = {}) => {
     .on(E.ParticipantPermissionsChanged, (prev, p) => note('ParticipantPermissionsChanged', {identity: p.identity}))
     .on(E.MediaDevicesError, e => note('MediaDevicesError', {error: String(e)}))
     .on(E.SignalConnected, () => note('SignalConnected'));
-  await room.connect(url, token);
+  await room.connect(url, token, connectOptions);
   return {
     name: room.name,
     identity: room.localParticipant.identity,
@@ -111,6 +111,23 @@ window.outbound = async () => {
   for (const t of pcs) {
     const stats = await t.getStats();
     stats.forEach(s => { if (s.type === 'outbound-rtp' && s.kind === 'video') out.push({rid: s.rid, active: s.active, frameWidth: s.frameWidth, framesSent: s.framesSent, targetBitrate: s.targetBitrate, qualityLimitationReason: s.qualityLimitationReason, nackCount: s.nackCount, pliCount: s.pliCount}); });
+  }
+  return out;
+};
+
+// The candidate pairs the peer connections use: the local candidate's type and, for a relay
+// candidate, the protocol to the TURN server (udp, tcp, tls).
+window.relayInfo = async () => {
+  const out = [];
+  const pcm = window.room.engine.pcManager;
+  for (const [name, t] of [['publisher', pcm && pcm.publisher], ['subscriber', pcm && pcm.subscriber]]) {
+    if (!t) continue;
+    const stats = await t.getStats();
+    let pair;
+    stats.forEach(s => { if (s.type === 'transport' && s.selectedCandidatePairId) pair = stats.get(s.selectedCandidatePairId); });
+    if (!pair) stats.forEach(s => { if (s.type === 'candidate-pair' && s.nominated && s.state === 'succeeded') pair = s; });
+    const local = pair && stats.get(pair.localCandidateId);
+    out.push({pc: name, type: local && local.candidateType, relayProtocol: local && local.relayProtocol, url: local && local.url});
   }
   return out;
 };

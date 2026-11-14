@@ -35,7 +35,7 @@ rayon = "1.12.0"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots"] }
 # Its errors, to tell a certificate that is not trusted (protocol/webhook/retryablehttp.rs).
 # Already in the build through rtc and reqwest.
-rustls = { version = "0.23.46", default-features = false }
+rustls = { version = "0.23.46", default-features = false, features = ["ring", "std", "tls12"] }
 # The WebRTC library musivum stands on (docs/webrtc-library.md). Its RTP crate is patched in
 # the workspace root (third_party/rtc-rtp).
 rtc = "0.21"
@@ -48,6 +48,9 @@ sha2 = { version = "0.11.1", default-features = false }
 thiserror = "2.0.21"
 tokio = { version = "1.54.1", features = ["rt", "rt-multi-thread", "time", "sync", "macros", "net"] }
 tokio-util = "0.7.20"
+# The TLS listener of the embedded TURN server (webrtc/turn/net.rs), on the TLS stack reqwest
+# brings in (rustls with ring). Already in the build through reqwest.
+tokio-rustls = { version = "0.26.6", default-features = false, features = ["ring", "tls12"] }
 tracing = "0.1.44"
 
 # Interface addresses and socket options without `unsafe` (mediatransportutil/rtcconfig). The
@@ -57,6 +60,9 @@ nix = { version = "0.31.3", default-features = false, features = ["net", "socket
 
 [dev-dependencies]
 musivum-fakes = { version = "0.0.0", path = "../musivum-fakes" }
+# Certificates for the tests of the TURN server's TLS (webrtc/turn/server_test.rs,
+# service/turn_test.rs). Already in the build through rtc.
+rcgen = "0.14.10"
 # AES-GCM for a test of the buffer that upstream writes with Go's crypto/aes. Already in the
 # build through rtc.
 ring = "0.17.14"

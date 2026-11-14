@@ -184,6 +184,44 @@ pub enum Error {
     /// (`routing::TypedRoomClient`, `TypedParticipantClient`), or `psrpc.ErrUnimplemented`.
     #[error(transparent)]
     Psrpc(#[from] PsrpcError),
+
+    // turn.go, turnrelay.go: `ErrExpired`, `ErrTURNTCPRelayDisabled`, and the errors
+    // `NewTurnServer` and the TURN auth handler make in place (`errors.New`, `errors.Wrap`,
+    // `fmt.Errorf`), with their texts; what pion/turn, base62 and strconv fail with, as text.
+    #[error("expired")]
+    Expired,
+    #[error("TURN TCP relay allocations are disabled")]
+    TurnTcpRelayDisabled,
+    #[error("invalid TURN ports")]
+    InvalidTurnPorts,
+    #[error("TURN domain required")]
+    TurnDomainRequired,
+    #[error("TURN domain is not correct")]
+    TurnDomainIsNotCorrect,
+    /// `fmt.Errorf("invalid CIDR %q in %s: %w", cidr, field, err)`.
+    #[error("invalid CIDR {0:?} in {1}: {2}")]
+    InvalidCidrIn(String, String, String),
+    /// `errors.Wrap(err, "could not get local IPs for TURN relay policy")`.
+    #[error("could not get local IPs for TURN relay policy: {0}")]
+    TurnLocalIps(String),
+    #[error("no matching node IP for relay")]
+    NoMatchingNodeIpForRelay,
+    /// `errors.Wrap(err, "TURN tls cert required")`.
+    #[error("TURN tls cert required: {0}")]
+    TurnTlsCertRequired(String),
+    #[error("turn.proxy_protocol requires at least one entry in turn.proxy_protocol_trusted_cidrs")]
+    TurnProxyProtocolRequiresTrustedCidrs,
+    /// `errors.Wrap(err, "could not listen on TURN TCP port")`.
+    #[error("could not listen on TURN TCP port: {0}")]
+    TurnTcpListen(String),
+    /// `errors.Wrap(err, "could not listen on TURN UDP port")`.
+    #[error("could not listen on TURN UDP port: {0}")]
+    TurnUdpListen(String),
+    #[error("invalid username")]
+    InvalidUsername,
+    /// What pion/turn's `NewServer`, base62's decoding or `strconv.ParseInt` failed with.
+    #[error("{0}")]
+    Turn(String),
 }
 
 impl Error {

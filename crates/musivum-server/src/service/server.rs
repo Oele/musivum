@@ -23,7 +23,7 @@
 //   `AxumSignalWebSocket`.
 // - Not here, with what they belong to: the Twirp servers of egress, ingress, SIP and agent
 //   dispatch, WHIP, the agent endpoints and their tunnels (`drainAgentTunnels`), the IO info
-//   service, WebTransport, TURN, the listener for debugging, and the debug handlers of
+//   service, WebTransport, the listener for debugging, and the debug handlers of
 //   development mode
 //   (`debugGoroutines`, which is Go's runtime, and `debugInfo`, which reads the room
 //   manager). Of `NewHTTPHandler`'s middleware, negroni's recovery and the CORS handler of
@@ -40,6 +40,9 @@
 //   new: the addresses listened on, for a port of 0. `backgroundWorker` is a task.
 // - The health check gives the time of the node's last update in UTC; the original gives it
 //   in the server's time zone.
+// - The embedded TURN server (wire's `newInProcessTurnServer`) is made by `start`, in the
+//   runtime its sockets need (`initialize_server` runs before there is one), and closed where
+//   `Stop` closes it; its auth handler is made for the room manager by `new_server_state`.
 // - Go's `ServeMux` redirects a path with `..` or a doubled slash inside it to its clean
 //   form; axum's router does not, and such a path is not found.
 // - The Prometheus listener (`promServer`) is `PromServer` of promserver.rs, made, started
@@ -71,6 +74,7 @@ use musivum::service::{
 use musivum::sfu;
 use musivum::telemetry::{self, AnalyticsService, NullAnalyticService, TelemetryService};
 use musivum::webrtc::peerconnection::Node;
+use musivum::webrtc::turn;
 use musivum::{errorw, infow, rtc};
 use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
@@ -133,6 +137,7 @@ pub struct ServerState {
     /// The room API: roomservice.go behind the Twirp server that `NewRoomServiceServer`
     /// makes (`xtwirp.RegisterServer`).
     pub room_service_server: Arc<RoomServiceServer>,
+    pub turn_auth_handler: Arc<mservice::TurnAuthHandler>,
 }
 
 /// wire's `InitializeServer`, for what is ported (see the header): the router of one node and
@@ -203,6 +208,7 @@ pub fn new_server_state(
     );
     let timed_version_generator = new_default_timed_version_generator();
     let forward_stats = create_forward_stats(&conf);
+    let turn_auth_handler = mservice::new_turn_auth_handler(key_provider.clone());
     let room_manager = RoomManager::new_local(
         conf.clone(),
         object_store,
@@ -211,6 +217,7 @@ pub fn new_server_state(
         room_allocator,
         telemetry_service,
         timed_version_generator,
+        Some(turn_auth_handler.clone()),
         message_bus.clone(),
         forward_stats,
         webrtc_config.clone(),
@@ -234,6 +241,7 @@ pub fn new_server_state(
         room_manager,
         signal_server: Arc::new(signal_server),
         room_service_server,
+        turn_auth_handler,
     })
 }
 
@@ -397,6 +405,7 @@ pub struct LivekitServer {
     room_manager: Arc<RoomManager>,
     signal_server: Arc<SignalServer>,
     current_node: Arc<dyn LocalNode>,
+    turn_server: Mutex<Option<Arc<turn::Server>>>,
     running: atomic::Bool,
     done_chan: CancellationToken,
     closed_chan: CancellationToken,
@@ -425,6 +434,7 @@ impl LivekitServer {
             state,
             http_server,
             prom_server,
+            turn_server: Mutex::new(None),
             running: atomic::Bool::new(false),
             done_chan: CancellationToken::new(),
             closed_chan: CancellationToken::new(),
@@ -488,6 +498,15 @@ impl LivekitServer {
         }
 
         // WebTransport: not here
+
+        // newInProcessTurnServer (see the header)
+        *self.turn_server.lock() = mservice::new_turn_server(
+            &self.config,
+            Some(mservice::get_turn_auth_handler_func(
+                &self.state.turn_auth_handler,
+            )),
+            false,
+        )?;
 
         {
             let rtc = &self.config.rtc.rtc_config;
@@ -584,7 +603,11 @@ impl LivekitServer {
             prom_server.shutdown();
         }
 
-        // the debug server, WebTransport and TURN: not here
+        // the debug server and WebTransport: not here
+
+        if let Some(turn_server) = self.turn_server.lock().take() {
+            let _ = turn_server.close();
+        }
 
         self.room_manager.stop();
         self.signal_server.stop();

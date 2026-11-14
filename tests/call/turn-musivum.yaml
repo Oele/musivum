@@ -1,0 +1,33 @@
+# musivum for the relay-only call (TURN=1 ./run.sh musivum): turn-livekit.yaml's configuration,
+# with the same ports, for target/release/musivum-server.
+port: 39500
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 39501
+  udp_port: 39502
+  use_external_ip: false
+  node_ip: 127.0.0.1
+  # the media sockets on the loopback interface only: a relay to them is answered from
+  # 127.0.0.1, the address the clients made a permission for on the TURN server
+  enable_loopback_candidate: true
+  ips:
+    includes:
+      - 127.0.0.1/32
+turn:
+  enabled: true
+  domain: turn.musivum.test
+  udp_port: 39540
+  tls_port: 39541
+  cert_file: ../../target/call-turn/cert.pem
+  key_file: ../../target/call-turn/key.pem
+  relay_range_start: 39545
+  relay_range_end: 39559
+  bind_addresses:
+    - 127.0.0.1
+  allow_restricted_peer_cidrs:
+    - 127.0.0.0/8
+keys:
+  calltestkey: calltestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info

@@ -28,19 +28,30 @@
 //!   [`RoomServiceServer`] (`twirp.rs`), a function from a request's parts and body to the
 //!   response, with the hooks that log and count the calls.
 //!
+//! - [`new_turn_server`] (`turn.rs`, with `turnrelay.rs` and `turnquota.rs`): the embedded TURN
+//!   server, pion/turn's (`webrtc::turn`) as LiveKit configures it, and [`TurnAuthHandler`],
+//!   the credentials the room manager hands to clients for it. `base62.rs` is jxskiss/base62
+//!   as far as those credentials use it; `proxyproto.rs` (written new) the PROXY protocol
+//!   listener in front of TURN over TLS.
+//!
 //! [`useragent`] is written new: it stands in for the user agent parser the original uses. So
 //! is `protojson.rs`: the JSON form of the room API's messages as Go's `protojson` writes them.
 
 mod auth;
+mod base62;
 mod errors;
 mod interfaces;
 mod localstore;
 mod protojson;
+pub mod proxyproto;
 mod roomallocator;
 mod roommanager;
 mod roomservice;
 mod rtcservice;
 mod signal;
+mod turn;
+mod turnquota;
+mod turnrelay;
 mod twirp;
 pub mod useragent;
 mod utils;
@@ -55,6 +66,7 @@ pub use roommanager::*;
 pub use roomservice::*;
 pub use rtcservice::*;
 pub use signal::*;
+pub use turn::*;
 pub use twirp::*;
 pub use utils::*;
 pub use wsprotocol::*;

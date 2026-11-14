@@ -6,6 +6,14 @@
 //
 // <name> names the output: out/<name>.json. The browser is $CHROME, or the first of
 // google-chrome, chromium, chromium-browser found.
+//
+// With RELAY=1 the clients connect with iceTransportPolicy 'relay': they reach the server's
+// media only through the TURN servers the join response names (LiveKit's embedded one, see
+// run.sh). That server is named turns:<TURN_DOMAIN>:443, which LiveKit writes whatever its TLS
+// port is: the page's RTCPeerConnection is wrapped so that the port is TURN_TLS_PORT instead
+// (and the domain is resolved to 127.0.0.1 by Chrome), and it refuses to start with any TURN URL
+// on port 443 left. TURN_ONLY=tls or udp keeps only the TURN URLs of that transport. One
+// observation more says what the peer connections use.
 const crypto = require('crypto');
 const fs = require('fs');
 const http = require('http');
@@ -21,6 +29,10 @@ if (!apiSecret) {
 const chrome = process.env.CHROME ||
   execSync('command -v google-chrome || command -v chromium || command -v chromium-browser', {shell: '/bin/sh'}).toString().trim();
 const pagePort = Number(process.env.PAGE_PORT || 39510);
+const relay = process.env.RELAY === '1';
+const turnTlsPort = process.env.TURN_TLS_PORT || '';
+const turnDomain = process.env.TURN_DOMAIN || '';
+const turnOnly = process.env.TURN_ONLY || '';
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 // An access token as LiveKit's server SDKs make them: a JWT signed with the API secret.
@@ -85,6 +97,11 @@ const has = (log, name, match) => events(log, name, match).length > 0;
       '--use-fake-ui-for-media-stream',
       '--allow-loopback-in-peer-connection',
       '--autoplay-policy=no-user-gesture-required',
+      // with RELAY: asks for the default network only (the browser allocates a relay per network
+      // and TURN URL, and the test's relay range has fifteen ports); in the runs so far Chrome
+      // still allocated on three networks
+      ...(relay ? ['--ignore-certificate-errors', `--host-resolver-rules=MAP ${turnDomain} 127.0.0.1`,
+        '--force-webrtc-ip-handling-policy=default_public_interface_only'] : []),
     ],
   });
   const room = 'call-' + crypto.randomBytes(4).toString('hex');
@@ -97,11 +114,40 @@ const has = (log, name, match) => events(log, name, match).length > 0;
     for (const [who, page] of [['alice', alice], ['bob', bob]]) {
       page.on('pageerror', e => console.log(`  [${who}] page error: ${e.message}`));
       page.on('console', m => { if (m.type() === 'error' || process.env.VERBOSE) console.log(`  [${who}] ${m.text()}`); });
+      if (relay) {
+        await page.evaluateOnNewDocument((tlsPort, only) => {
+          const Native = window.RTCPeerConnection;
+          const rewrite = config => {
+            if (!config || !config.iceServers) return config;
+            const iceServers = config.iceServers.map(s => {
+              let urls = [].concat(s.urls || []).map(u => u.replace(/^(turns:[^:?]+):443(\?|$)/, `$1:${tlsPort}$2`));
+              if (only === 'tls') urls = urls.filter(u => u.startsWith('turns:'));
+              if (only === 'udp') urls = urls.filter(u => u.startsWith('turn:'));
+              if (urls.some(u => /^turns?:/.test(u) && /:443(\?|$)/.test(u))) throw new Error('a TURN URL on port 443 is left: ' + urls);
+              return {...s, urls};
+            }).filter(s => s.urls.length > 0);
+            console.log('ice servers: ' + JSON.stringify(iceServers.map(s => s.urls)));
+            return {...config, iceServers};
+          };
+          window.RTCPeerConnection = function (config, ...rest) {
+            const pc = new Native(rewrite(config), ...rest);
+            pc.addEventListener('icecandidate', e => console.log('candidate: ' + (e.candidate ? e.candidate.candidate : '(done)')));
+            pc.addEventListener('icecandidateerror', e => console.log(`candidate error: ${e.url} ${e.errorCode} ${e.errorText}`));
+            pc.addEventListener('iceconnectionstatechange', () => console.log('ice connection state: ' + pc.iceConnectionState));
+            return pc;
+          };
+          window.RTCPeerConnection.prototype = Native.prototype;
+          Object.setPrototypeOf(window.RTCPeerConnection, Native);
+          const setConfiguration = Native.prototype.setConfiguration;
+          Native.prototype.setConfiguration = function (config) { return setConfiguration.call(this, rewrite(config)); };
+        }, turnTlsPort, turnOnly);
+      }
       await page.goto(pageUrl);
     }
 
     // Alice joins and publishes.
-    const a = await alice.evaluate((u, t) => window.join(u, t), wsUrl, token('alice', room));
+    const connectOptions = relay ? {rtcConfig: {iceTransportPolicy: 'relay'}} : {};
+    const a = await alice.evaluate((u, t, c) => window.join(u, t, {}, c), wsUrl, token('alice', room), connectOptions);
     observe('alice joined', {name: a.name === room, identity: a.identity, sidPrefix: a.sidPrefix, others: a.remoteParticipants, canPublish: a.canPublish},
       {name: true, identity: 'alice', sidPrefix: 'PA_', others: [], canPublish: true});
     observe('server as alice sees it', {version: a.serverVersion, protocol: a.serverProtocol, edition: a.serverEdition});
@@ -111,7 +157,7 @@ const has = (log, name, match) => events(log, name, match).length > 0;
 
     // Bob joins and is subscribed to both.
     await bob.bringToFront();
-    const b = await bob.evaluate((u, t) => window.join(u, t), wsUrl, token('bob', room));
+    const b = await bob.evaluate((u, t, c) => window.join(u, t, {}, c), wsUrl, token('bob', room), connectOptions);
     observe('bob joined', {identity: b.identity, others: b.remoteParticipants}, {identity: 'bob', others: ['alice']});
     await until(async () => has(await logOf(alice), 'ParticipantConnected', {identity: 'bob'}), 5000);
     observe('alice sees bob connect', has(await logOf(alice), 'ParticipantConnected', {identity: 'bob'}), true);
@@ -130,6 +176,11 @@ const has = (log, name, match) => events(log, name, match).length > 0;
       return x && x.packetsReceived > 100 ? x : null;
     }, 10000);
     observe('bob receives alice\'s audio', !!audio, true);
+    if (relay) {
+      const relayInfo = {alice: await alice.evaluate(() => window.relayInfo()), bob: await bob.evaluate(() => window.relayInfo())};
+      observe('the media go through the TURN server', relayInfo,
+        v => [...v.alice, ...v.bob].length > 0 && [...v.alice, ...v.bob].every(p => p.type === 'relay'));
+    }
 
     // The size of the video element decides the layer (adaptive stream): small, then large.
     const small = await until(async () => {

@@ -106,6 +106,7 @@ fn new_test_node(change: impl FnOnce(&mut Config)) -> TestNode {
         ra,
         telemetry.clone(),
         new_default_timed_version_generator(),
+        None,
         bus.clone(),
         None,
         rtc_conf,

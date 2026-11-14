@@ -8,6 +8,12 @@
 #                          with musivum.yaml, which has the same ports
 #
 # Everything listens on the loopback interface, on ports 39500 to 39511.
+#
+# With TURN=1 the server has its embedded TURN server as well (turn-livekit.yaml,
+# turn-musivum.yaml: UDP 39540, TLS 39541, relays from 39545 to 39559, with a self-signed
+# certificate made here under target/call-turn) and the clients may only use it (RELAY=1 for
+# run.js: iceTransportPolicy 'relay'); the output is out/<target>-turn.json. TURN_ONLY=tls (or
+# udp) leaves the clients only the TURN server's URL of that transport.
 set -euo pipefail
 cd "$(dirname "$0")"
 TARGET=${1:-reference}
@@ -22,17 +28,34 @@ mkdir -p out
 PORT=39500
 if [ -n "${NETEM:-}" ]; then PORT=39521; export PAGE_PORT=39538; fi
 
+CONF_REFERENCE=reference-livekit.yaml
+CONF_MUSIVUM=musivum.yaml
+NAME=$TARGET
+if [ "${TURN:-}" = 1 ]; then
+  CONF_REFERENCE=turn-livekit.yaml
+  CONF_MUSIVUM=turn-musivum.yaml
+  NAME=$TARGET-turn
+  export RELAY=1 TURN_TLS_PORT=39541 TURN_DOMAIN=turn.musivum.test
+  CERTS=../../target/call-turn
+  if [ ! -f "$CERTS/cert.pem" ]; then
+    mkdir -p "$CERTS"
+    openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 30 \
+      -subj "/CN=$TURN_DOMAIN" -addext "subjectAltName=DNS:$TURN_DOMAIN" \
+      -keyout "$CERTS/key.pem" -out "$CERTS/cert.pem" 2>/dev/null
+  fi
+fi
+
 case "$TARGET" in
   reference)
     WANT=$(sed -n 's/^tag = "v\(.*\)"$/\1/p' ../../upstream.toml | head -n 1)
     HAVE=$(livekit-server --version | awk '{print $NF}')
     [ "$WANT" = "$HAVE" ] || { echo "livekit-server is $HAVE, the pin is $WANT" >&2; exit 1; }
-    livekit-server --config "${NETEM:+../netem/}reference-livekit.yaml" > out/reference-server.log 2>&1 &
+    livekit-server --config "${NETEM:+../netem/}$CONF_REFERENCE" > out/reference-server.log 2>&1 &
     URL=ws://127.0.0.1:$PORT
     ;;
   musivum)
     (cd ../.. && nice -n 10 cargo build --release -p musivum-server)
-    ../../target/release/musivum-server --config "${NETEM:+../netem/}musivum.yaml" > out/musivum-server.log 2>&1 &
+    ../../target/release/musivum-server --config "${NETEM:+../netem/}$CONF_MUSIVUM" > out/musivum-server.log 2>&1 &
     URL=ws://127.0.0.1:$PORT
     ;;
   *)
@@ -59,4 +82,4 @@ if [ -n "${NETEM:-}" ]; then
   node netem.js "$TARGET" "$URL" "$KEY" "$SECRET" $NETEM
   exit
 fi
-node run.js "$TARGET" "$URL" "$KEY" "$SECRET"
+node run.js "$NAME" "$URL" "$KEY" "$SECRET"

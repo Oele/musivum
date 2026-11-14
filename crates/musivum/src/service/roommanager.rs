@@ -11,8 +11,8 @@
 //   configuration. It takes that WebRTC configuration (`rtc_config`, as an `Arc`) where the
 //   original makes it (`rtc.NewWebRTCConfig(conf)`): the server makes it once, for the node's
 //   sockets and the room manager both. It does not take `agentClient`, `agentStore`,
-//   `egressLauncher` (agents and egress are not ported) or `turnAuthHandler` (musivum has no
-//   embedded TURN server).
+//   `egressLauncher` (agents and egress are not ported). Its `turnAuthHandler` is an `Option`
+//   (the original's tests pass nil; one that is used is there).
 //   `version.Version` and `agent.CurrentProtocol`, of packages that are not ported, are the
 //   constants `VERSION` and `AGENT_CURRENT_PROTOCOL` here, with the original's values.
 // - The servers of psrpc that the original makes per room and per participant
@@ -42,8 +42,6 @@
 //   `pi.Client.Protocol` and `pi.CreateRoom.Name`, which the original reads without checking
 //   for nil, are `expect`ed with the message of a nil dereference; `pi.Client.GetSdk()` and the
 //   other getters give the zero value of a client that is not there.
-// - `iceServersForParticipant` leaves out what the embedded TURN server adds (its URLs and
-//   credentials); a comment stands at its place. The API key it is handed is read only there.
 // - `PerformRpc` and `UpdateRoomMetadata` wait as the original does, blocking the caller's
 //   thread (`block_on`, which tells a multi-threaded runtime so); the channels of `PerformRpc`
 //   are tokio's (see the header of `rtc/participant.rs`). When the participant drops both
@@ -62,7 +60,7 @@ use parking_lot::{Mutex, RwLock};
 use sha1::Sha1;
 use tokio::sync::mpsc;
 
-use super::{Error, ObjectStore, RoomAllocator};
+use super::{Error, ObjectStore, RoomAllocator, TurnAuthHandler};
 use crate::clientconfiguration::{
     ClientConfigurationManager, STATIC_CONFIGURATIONS, StaticClientConfigurationManager,
 };
@@ -119,7 +117,7 @@ pub struct RoomManager {
     // Not here: `agentClient`, `agentStore` and `egressLauncher`, agents and egress are not
     // ported.
     version_generator: Arc<dyn TimedVersionGenerator>,
-    // Not here: `turnAuthHandler`, musivum has no embedded TURN server.
+    turn_auth_handler: Option<Arc<TurnAuthHandler>>,
     bus: Arc<MessageBus>,
 
     // `roomServers`, `participantServers`: what is registered on the bus under each topic
@@ -156,6 +154,7 @@ impl RoomManager {
         room_allocator: Arc<dyn RoomAllocator>,
         telemetry: Arc<dyn telemetry::TelemetryService>,
         version_generator: Arc<dyn TimedVersionGenerator>,
+        turn_auth_handler: Option<Arc<TurnAuthHandler>>,
         bus: Arc<MessageBus>,
         forward_stats: Option<Arc<sfu::ForwardStats>>,
         rtc_conf: Arc<rtc::WebRtcConfig>,
@@ -176,6 +175,7 @@ impl RoomManager {
                 STATIC_CONFIGURATIONS.clone(),
             )),
             version_generator,
+            turn_auth_handler,
             bus: bus.clone(),
             room_servers: Mutex::new(HashMap::new()),
             participant_servers: Mutex::new(HashMap::new()),
@@ -1238,9 +1238,9 @@ impl RoomManager {
 
     fn ice_servers_for_participant(
         &self,
-        _api_key: &str,
+        api_key: &str,
         participant: &Arc<dyn types::LocalParticipant>,
-        tls_only: bool,
+        mut tls_only: bool,
     ) -> Vec<livekit::IceServer> {
         let mut ice_servers = Vec::new();
         let rtc_conf = &self.config.rtc;
@@ -1251,14 +1251,60 @@ impl RoomManager {
                 "tls only enabled but no turn tls config",
                 nil
             );
-            // `tlsOnly = false`: read only by the embedded TURN server's part, below
+            tls_only = false;
         }
 
         let mut has_stun = false;
-        // Not here: `if r.config.TURN.Enabled { ... }`, the URLs of the embedded TURN server
-        // (UDP TURN, which is used as STUN, unless TLS only; TURN over TLS on port 443 of its
-        // domain) with credentials of its `TURNAuthHandler` made from the API key and the
-        // participant's ID. musivum has no embedded TURN server.
+        if self.config.turn.enabled {
+            let mut urls = Vec::new();
+            if self.config.turn.udp_port > 0 && !tls_only {
+                // UDP TURN is used as STUN
+                has_stun = true;
+                for ip in self.config.rtc.rtc_config.node_ip.to_string_slice() {
+                    let host = if ip.contains(':') {
+                        format!("[{ip}]")
+                    } else {
+                        ip
+                    };
+                    urls.push(format!(
+                        "turn:{host}:{}?transport=udp",
+                        self.config.turn.udp_port
+                    ));
+                }
+            }
+            if self.config.turn.tls_port > 0 {
+                urls.push(format!(
+                    "turns:{}:443?transport=tcp",
+                    self.config.turn.domain
+                ));
+            }
+            if !urls.is_empty() {
+                let turn_auth_handler = self
+                    .turn_auth_handler
+                    .as_ref()
+                    .expect("invalid memory address or nil pointer dereference");
+                let (username, expiry) = turn_auth_handler.create_username(
+                    api_key,
+                    &participant.id(),
+                    self.config.turn.ttl_seconds,
+                );
+                match turn_auth_handler.create_password(api_key, &participant.id(), expiry) {
+                    Err(err) => {
+                        warnw!(
+                            participant.get_logger(),
+                            "could not create turn password",
+                            err
+                        );
+                        has_stun = false;
+                    }
+                    Ok(password) => ice_servers.push(livekit::IceServer {
+                        urls,
+                        username,
+                        credential: password,
+                    }),
+                }
+            }
+        }
 
         if !rtc_conf.turn_servers.is_empty() {
             has_stun = true;
