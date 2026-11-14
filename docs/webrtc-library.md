@@ -2,7 +2,7 @@
 
 Step 3 of `docs/PORTING.md`. Decided on 2026-11-14: musivum stands on **`rtc`**, the
 protocol core of webrtc-rs (0.21.1, MIT or Apache-2.0), with its RTP crate patched by one
-field. This page says why, what was run to find out, and what was not.
+field and two functions of its own patched. This page says why, what was run to find out, and what was not.
 
 ## What the library has to do
 
@@ -107,6 +107,17 @@ hard-coded.
    where musivum takes them: the counterpart of pion's buffer factory.
 4. **`RTCRtpSender::write_rtp` takes only the track's own SSRC.** RTX and padding on the
    repair SSRC go through `RTCPeerConnection::handle_write`, which takes them.
+5. **A sender's codecs are not pion's.** `rtc` gives a sender no codecs until codec
+   preferences are set (pion: the transceiver's, the media engine's of its kind until
+   then), and writes into the description, and gives a receiver, the media engine's codec
+   that matches a preference instead of the preference, so what LiveKit sets on one
+   (`sprop-stereo=1` in Opus's fmtp line, NACK taken away, the payload type an offer gave)
+   did not reach the description. `third_party/rtc` is `rtc` 0.21.1 with
+   `RTCRtpReceiverInternal::get_codecs` and `RTCRtpSenderInternal::get_parameters` changed
+   as pion has them (`MUSIVUM.md`, `MUSIVUM.patch`), used through `[patch.crates-io]`. It
+   cannot be done above the crate: its media engine cannot be read once a connection has
+   it, and a local description has to be set as the crate wrote it. To be proposed
+   upstream, when the owner says so.
 
 None of these changes the structure of the port.
 
@@ -224,15 +235,18 @@ finds a remote candidate by address alone (`find_remote_candidate`), so a peer w
 candidate and TCP stream share address and port is reported with a mixed pair. `rtc-shared`'s
 own framing helper (`tcp_framing`) has no frame limit, which is why the layer has its own.
 
-Found when the transport was ported onto the layer (`rtc/transport_impl.rs`), each with a
-stand-in on the transport's side:
+Found when the transport was ported onto the layer (`rtc/transport_impl.rs`), the first
+done since, the others each with a stand-in on the transport's side:
 
-- **A sender's codecs.** pion's `RTPSender.GetParameters().Codecs` are the transceiver's
-  codecs; `rtc` leaves a sender's empty until codec preferences are set, and a transceiver
-  made from a kind has no sender in the layer. The transport reads the codecs from the
-  receiver, which works for send-and-receive transceivers. `rtc` also writes the media
-  engine's codec into the description, not the preferred one, so parameters set on a
-  preference (`sprop-stereo`, NACK removed) may not reach the description.
+- **A sender's codecs** (done since): a transceiver made from a kind to send has a sender
+  without a track (pion's has a track of its own that writes nothing), which `replace_track`
+  can give one; a sender's codecs and the description are pion's through the patch above.
+  Still different: `rtc` replaces a transceiver's codec preferences with the other side's
+  codecs at every remote description, offer or answer (pion only for a transceiver a remote
+  offer creates), so preferences do not outlive a renegotiation (a later offer or answer
+  carries what the other side had: no `sprop-stereo` from a browser, NACK from a client's
+  re-offer); and it adds back the media engine's repair codecs (RTX of a kept codec, FEC,
+  RED) that preferences leave out.
 - **No ICE transport object.** The selected pair comes from the layer's event; the RTT from
   the statistics, which have none under ICE lite.
 - **Gathering is synchronous**, so the transport's paths that wait for gathering to end are

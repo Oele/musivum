@@ -118,8 +118,9 @@ port the changed tests, move the pin. Ported files stay close to their originals
 
 ## Open questions
 
-- Clients without UDP: LiveKit offers TCP and an embedded TURN server over TLS. `rtc` has
-  ICE over TCP; a TURN server would have to be found or built.
-- Proposing the padding size field to webrtc-rs, so that `third_party/rtc-rtp` can go.
+- Clients without UDP: LiveKit offers TCP and an embedded TURN server over TLS. ICE over
+  TCP is in the connection layer now; a TURN server would have to be found or built.
+- Proposing the padding size field and a sender's codecs to webrtc-rs, so that
+  `third_party/rtc-rtp` and `third_party/rtc` can go.
 - (Settled: the server reads LiveKit's own configuration file, `crate::config`. Sections for
   what musivum leaves out are accepted and ignored, with a log line each.)
