@@ -191,6 +191,9 @@ lazily is not needed, since the macros do not evaluate values when the level is 
 - When a ported test passes, check that it can fail: change something in the code under test
   that the test is about, see it fail, change it back. A test that cannot fail is a
   translation mistake in the test.
+- A test of what the code logs captures it with `crate::testutils::capture_log` or
+  `LogCapture`, never with a subscriber of its own installed for the test's thread: that
+  loses lines now and then (the reason is written at `install_log_capture`).
 - An assertion on allocations per call (`testing.AllocsPerRun`) is left out, with a comment
   at its place: counting them needs `unsafe`. The rest of such a test is kept.
 - If something of the original cannot be ported as it is (a test that needs pion's

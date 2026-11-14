@@ -41,6 +41,15 @@ and pacing to LiveKit's ported code. str0m, the other candidate, does those itse
 `docs/webrtc-library.md` has the experiment that was run, what `rtc` lacks (one field in its
 RTP packet, carried as a patch in `third_party/rtc-rtp`) and what was not tested.
 
+## Sources used beyond the listed ones
+
+`CLAUDE.md` lists what may be read and ported from. Used besides, each after its licence
+was checked:
+
+- **golang-jwt/jwt v5.3.1** (MIT), the JWT library LiveKit's `auth` package is built on:
+  parsing and validating a token in `protocol/auth/jwt.rs` follow its `parser.go`,
+  `validator.go`, `types.go`, `token.go` and `hmac.go`. Its notice is in `NOTICE`.
+
 ## Order of work
 
 1. **Survey.** Read `pkg/sfu` and `pkg/rtc` and write `docs/port-map.md`: for every upstream

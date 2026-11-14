@@ -22,12 +22,14 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | pion/interceptor `pkg/twcc/twcc.go`, `arrival_time_map.go`, `internal/sequencenumber/unwrapper.go` | `webrtc/interceptor/twcc/`, `webrtc/interceptor/internal/sequencenumber/` | 15 / 15 | Only the recorder and what it stands on, not pion's interceptors around it. The assertion on allocations in one test is replaced by one on the buffer not moving. Two benchmarks left out. |
 | mtu `pkg/codec/vp8.go`, `h26xhelper.go`, `helpers.go`, `keyframe.go` | `mediatransportutil/codec/` (same names) | 6 / 6 | Twelve tests added (`vp8.go` and `keyframe.go` have none upstream). `reference_test.rs` compares the port with what the Go original says about 326 payloads, pinned in `testdata/` with the Go test that printed it. Also run against the original with about 700,000 generated payloads: identical, the two panics below included. |
 | pion/rtp `codecs/vp9_packet.go`, `common.go`, `error.go` | `webrtc/rtp/codecs/` (same names) | 5 / 7 | Only `VP9Packet` and what it stands on: the payloader and the other depacketizers are not used by LiveKit. The tests of allocations assert that buffers stay where they are instead. `Vp9Packet.payload` is a copy of the payload (`Vec<u8>`): a cost per VP9 packet, to be looked at with the buffer. |
+| mtu `pkg/red/red.go` | `mediatransportutil/red/red.rs` | 4 / 4 | Also run against the original with 60 generated streams: identical. |
 | mtu `helpers.go` | `mediatransportutil/helpers.rs` | 1 / 1 | Two tests added (the way back from NTP time, RTT from a receiver report). |
 | pion/rtp `packet.go`, `error.go` | `webrtc/rtp/packet.rs`, `error.rs` | 43 / 43 | Four tests added. Benchmarks left out. Run against pion with 432,008 generated inputs: every output identical, error texts and the cases where pion panics included. |
 | pion/rtp `abssendtimeextension.go`, `audiolevelextension.go`, `transportccextension.go`, `playoutdelayextension.go`, `abscapturetimeextension.go` | `webrtc/rtp/` (same names) | 20 / 20 | Benchmarks left out. |
 | pion/rtp `header_extension.go` | `webrtc/rtp/header_extension.rs` | 0 / 13 | Only the one function `packet.go` calls; LiveKit does not use the types of this file. |
 | protocol `codecs/mime/mimetype.go` | `protocol/codecs/mime/mimetype.rs` | none upstream | Five tests added. The conversion to `roomobs` (observability) is left out. |
 | protocol `codecs/codecs.go` | `protocol/codecs/codecs.rs` | none upstream | Three tests added. |
+| protocol `auth/accesstoken.go`, `grants.go`, `verifier.go`, `provider.go`, `interfaces.go` | `protocol/auth/` (same names, with `jwt.rs` and `json.rs`) | 13 / 13 | Seventeen tests added. `jwt.rs` is what the original takes from golang-jwt (MIT), ported in part; `json.rs` is new. Tokens signed by Go verify here and tokens signed here verify in Go (run both ways, every grant; for fixed claims and times the token is Go's byte for byte). More than 200 unusual tokens and 60 key files were put through Go, and the tests expect Go's outcome. Token times are compared with the system clock, as in Go. `authfakes` is not ported. |
 | protocol `utils/mono/mono.go` | `protocol/utils/mono.rs` | 0 / 2 | The clock itself is `go::time`; upstream's two tests are about Go's `time.Time` and have nothing to test here. |
 | protocol `livekit/types.go` | `protocol/livekit/types.rs` | 0 / 4 | Only the identifier types; upstream's tests are of the YAML conversions, which are not ported. |
 | protocol `utils/rtputil/rtpconverter.go` | `protocol/utils/rtputil.rs` | 1 / 1 | |
@@ -37,6 +39,12 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/utils/debounce.go` | `sfu/utils/debounce.rs` | none upstream | One test added. |
 | `pkg/sfu/ccutils/trenddetector.go`, `prober.go`, `probe_regulator.go`, `probe_signal.go` | `sfu/ccutils/` (same names) | none upstream | Fourteen tests added, their expected values taken from the Go originals. Re-read line by line against the originals. |
 | `pkg/sfu/bwe/bwe.go`, `null_bwe.go` | `sfu/bwe/bwe.rs`, `null_bwe.rs` | none upstream | Two tests added. `Bwe` and `BweListener` are traits; `NullBwe` does not implement `Bwe` (upstream's has no `Type()` either) and is held by the estimators for the calls they do not define. |
+| `pkg/sfu/utils/helpers.go` | `sfu/utils/helpers.rs` | none upstream | Five tests added. pion's `interceptor.RTPHeaderExtension` is `webrtc::interceptor::RtpHeaderExtension`. |
+| `pkg/sfu/bwe/remotebwe/` (four files) | `sfu/bwe/remotebwe/` (same names) | none upstream | 22 tests added, their expected values printed by the Go original for the same calls with the same sleeps. The config `Default`s are Go's zero values; the original's defaults are the `DEFAULT_...` constants. |
+| `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
+| `pkg/sfu/flexfec/decoder.go` | `sfu/flexfec/decoder.rs` | 19 / 19 | The lookup of media packets is handed to `decode_fec` with every packet instead of to the constructor (it reads the buffer's state under the buffer's lock). Three benchmarks left out. `reference_test.rs` compares decoder and encoder with 241 lines of the original's output, all three masks included. |
+| pion/interceptor `pkg/flexfec/flexfec_encoder_03.go`, `flexfec_coverage.go`, `flexfec_encoder.go`, `util/` | `webrtc/interceptor/flexfec/` (tests only) | 11 / 11 | The FlexFEC-03 encoder, for the decoder's tests. pion's own decoder, its interceptor and their tests are not ported. |
+| `pkg/sfu/testutils/rtptest/packet.go` | `sfu/testutils/rtptest.rs` | none upstream | |
 | `pkg/sfu/audio/audiolevel.go` | `sfu/audio/audiolevel.rs` | 1 / 1 | |
 | `pkg/sfu/packettrailer/packet_trailer.go` | `sfu/packettrailer/packet_trailer.rs` | 1 / 1 | |
 | `pkg/sfu/rtpextension/dependencydescriptor/` (five files) | `sfu/rtpextension/dependencydescriptor/` (same names) | 7 / 8 | `TestDependencyDescriptorMarshalAllocs` counts allocations and is left out (see the guide); two benchmarks left out. Also compared with 143 lines of output of the original for the same inputs (`reference_test.rs`): identical except where Go tells a nil slice from an empty one, see below. |
@@ -50,6 +58,9 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/buffer/streamstats.go` | `sfu/buffer/streamstats.rs` | none upstream | Written, not declared in the module yet: it needs `rtpstats`. |
 | `pkg/sfu/testutils/data.go` | `sfu/testutils/data.rs` | none upstream | Test helpers. The two test codecs are functions. |
 | `pkg/sfu/buffer/buffer_base.go` | `sfu/buffer/buffer_base.rs` | | Only the type `ExtPacket` so far, so that what takes packets from the buffer can be ported before it. |
+| `pkg/rtc/types/protocol_version.go`, `trafficstats.go` | `rtc/types/` (same names) | none upstream | Five tests added. `livekit.StreamType` is written out (its proto file is not compiled here). |
+| `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
+| `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
 with the same pseudo-random inputs (34,021 lines of output, identical).
@@ -66,6 +77,13 @@ with the same pseudo-random inputs (34,021 lines of output, identical).
 - **The zero time in a protocol timestamp.** Go's `timestamppb.New(time.Time{})` gives year
   1; `go::time::Time` cannot tell its zero from the Unix epoch, and `timestamppb_new` gives
   the epoch for it.
+- **Access tokens and key files, at the edges.** Each is asserted in a test marked "not as
+  the original". Written JSON is the same but not byte for byte (Go escapes `<`, `>`, `&`;
+  the order of map entries). Of duplicate claims the last wins (Go merges two objects). In
+  a room configuration inside a token, an unknown enum value is refused (Go keeps or drops
+  it) and of a duplicate field the last wins (Go refuses). A key file with a tab right
+  after the colon is refused (Go reads it); three forms Go refuses are read. The first two
+  could be had from `pbjson-build`'s options in `musivum-protocol`; not tried.
 - **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
   files) are left out: counting allocations needs an allocator of the test binary's own,
   which needs `unsafe`, and the workspace forbids it.
@@ -142,6 +160,30 @@ What looked wrong or fragile upstream and was ported as it is:
   it can shift by a negative count, which panics in Go (run) and in the port. LiveKit uses
   1024. `buffer/rtcpreader.go`: `Write` reports 0 bytes written on success.
   `buffer/datastats.go`: a duration of zero gives an infinite or undefined bitrate.
+- `bwe/remotebwe`: `ProbeClusterDone` with the invalid cluster on an estimator that is not
+  probing starts a hangover (a new controller holds the invalid cluster, and only the ids
+  are compared). `ProbeClusterFinalize` after a congesting probe sets the state back to
+  none without telling the listener. While congested, the committed capacity follows the
+  estimate up as well as down. The NACK window's maximum only ends in `Add`.
+- `streamtracker`: the tracker from dependency descriptors keeps layer 0 active on a mask
+  without active decode targets, and reports nothing when paused (it reports "stopped" for
+  all layers when unpaused). `StreamTracker.Stop()` leaves the status as it was. The
+  upstream timing tests fail if the test stalls for about 500 ms; so do the ported ones.
+- `flexfec` (pion's encoder): more than 110 media packets keep the previous batch, and a
+  reused encoder then protects the old packets under the new base sequence number; 110
+  packets are allowed where the masks hold 109. `sfu/utils/helpers.go`,
+  `FindRTXPayloadType`: compares the whole fmtp line with `apt=N`, so `apt=96;rtx-time=200`
+  is not found. Two upstream tests cannot fail on what they are named for
+  (`TestDecoderResetsOnBigSequenceGap`, RED's "history window edge").
+- protocol `auth`: `GetCanPublishSource` compares the stored strings exactly while
+  `GetCanPublishSources` upper-cases them; `checkOutputForCredentials` has no case for
+  image outputs; a token without `iss` is verified with the secret of the key `""`;
+  `TestVerifier`'s "incorrect key" case uses an expired token and cannot notice a missing
+  signature check (a test was added).
+- `pkg/rtc`: `CanHandleReconnectResponse` panics on a `ClientInfo` without a message.
+  `UserPacketDeduper` takes a nonce of 16 zero bytes for a duplicate at first sight.
+  `RTPStatsDiffToTrafficStats` clamps lost packets at zero while padding and out-of-order
+  counts wrap. `TrafficLoadToTrafficRate` divides by an elapsed time of zero.
 - mtu `codec/vp8.go`: `MarshalTo` trusts `HeaderSize` and panics on a buffer that is at
   least that large but smaller than what the flags write; `Unmarshal` does not reset a
   reused struct. `codec/h26xhelper.go`: `parseH264SPS` ignores read errors (a truncated SPS
