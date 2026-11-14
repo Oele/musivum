@@ -100,11 +100,15 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/types/interfaces.go` | `rtc/types/interfaces.rs` | none upstream | The seventeen interfaces as traits with fakes: 327 of 330 methods (left out: the three that return zap's deferred fields or the observability reporters). The rules by which a signature became Rust's are in `docs/porting-guide.md`. Seven tests added; the tables of close reasons are compared with a run of the original. |
 | `pkg/rtc/testutils.go` | `rtc/testutils.rs` | none upstream | The mock participant and track that most tests of the package start from. One test added. |
 | `pkg/rtc/types/ice.go` | `rtc/types/ice.rs` | none upstream | On the candidate type of `rtc`. Eight tests added, their expected values from a run of the original over 25 candidate lines. Where `rtc`'s candidate parser differs from pion's the test asserts the library's answer with pion's beside it: an IPv6 address with a zone and a host name ending in `.invalid` are parse errors, `tcptype` is only read directly behind the type. Nothing calls `set_selected_pair` yet: the layer has no event for the selected pair. |
+| `pkg/rtc/config.go` | `rtc/config.rs` | none upstream | The header extensions, RTCP feedback, FlexFEC, RTX budget and buffer sizes of both directions are compared with the original for the default configuration and with each send-side estimator switch: identical. |
+| `pkg/rtc/mediaengine.go` | `rtc/mediaengine.rs` | 4 / 4 | Registers into `rtc`'s media engine, which has no getters: the tests make an offer on a connection of the layer and read it, as upstream's do. A full offer compared with the original's: the same payload types, rtpmap, fmtp, feedback and extension ids; the `a=extmap` lines come in another order. |
+| `pkg/rtc/transport/handler.go` | `rtc/transport/handler.rs` | none upstream | The trait has default bodies equal to `UnimplementedHandler`'s, and a fake. |
+| `pkg/rtc/participant_data_blob_handler.go` | `rtc/participant_data_blob_handler.rs` | 4 / 4 | The original's methods of the participant are provided methods of a trait the participant will implement. |
 | `pkg/rtc/uptrackmanager.go` | `rtc/uptrackmanager.rs` | 2 / 2 | |
 | `pkg/rtc/subscriptionmanager.go` | `rtc/subscriptionmanager.rs` | 11 / 11 | The manager holds its participant weakly; the callbacks for a closed track hold it strongly until the track has closed, as upstream's closures do. The reconciler is a task; `close` waits for it as upstream does. The tests' three overridable timeouts are constants with the test values in a test build. `subscriptionTimeout` is the transport's ICE failure timeout, written out until `transport.go` is ported. |
 | `pkg/rtc/roomtrackmanager.go`, `medialossproxy.go`, `signalanddatastats.go` | `rtc/` (same names) | none upstream | Twelve tests added. Of `signalanddatastats.go` the counting and the reports to telemetry are ported; what feeds the observability reporters is left out, so `BytesTrackStats::new` takes four arguments where upstream's takes seven. |
 | `pkg/rtc/supervisor/` (two files) | `rtc/supervisor/` (same names) | 2 / 2 | One test added. |
-| `pkg/rtc/datatrack.go`, `datadowntrack.go`, `datatrack_stats.go`, `updatatrackmanager.go` | `rtc/` (same names) | 1 / 1 | Six tests added, their expected bytes and counts from a run of the original. The byte statistics (`BytesTrackStats`) are not wired in yet: the places are marked. |
+| `pkg/rtc/datatrack.go`, `datadowntrack.go`, `datatrack_stats.go`, `updatatrackmanager.go` | `rtc/` (same names) | 1 / 1 | Six tests added, their expected bytes and counts from a run of the original. The byte statistics (`BytesTrackStats`) are wired in; a down track's statistics hold the subscriber weakly. |
 | `pkg/rtc/dynacast/` (six files) | `rtc/dynacast/` (same names) | 3 / 3 | The base is generic over the state of its manager, which its one lock guards as upstream. The listener is held weakly (the media track is listener and owner). A manager dropped without `close()` notifies nobody afterwards. `RegressTo` with nothing to regress to does nothing where Go dereferences nil. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
@@ -263,6 +267,10 @@ What looked wrong or fragile upstream and was ported as it is:
   is silently ignored. `GetLocalIPAddresses` does not look at whether an interface is up.
   `port_range_start` alone suppresses the default ports in `Validate`, and then neither a
   range nor a port is used.
+- `rtc/transport/handler.go`: `UnimplementedHandler.OnFailed` takes one parameter where the
+  interface's takes two, so `UnimplementedHandler` alone does not implement `Handler` in Go.
+  `participant_data_blob_handler.go`: the text for a data blob over the limit is "async
+  attribute definition exceeds limit".
 - `rtc/uptrackmanager.go`: `maybeRevokeSubscriptions` calls into the tracks with the write
   lock held. `roomtrackmanager.go`: `GetTrackInfo` gives nothing while the earliest track
   under an id is closing, even if a later one under that id is open. `medialossproxy.go`
