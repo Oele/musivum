@@ -15,6 +15,10 @@ workspace = true
 [dependencies]
 base64 = "0.22.1"
 bytes = "1.12.1"
+# gzip-compressed join requests (service/utils.rs), with the pure-Rust backend (miniz_oxide).
+flate2 = { version = "1.1.11", default-features = false, features = ["rust_backend"] }
+# The request types the service layer takes (service/): any HTTP server hands them over.
+http = "1.4.2"
 hmac = "0.13.0"
 musivum-protocol = { version = "0.0.0", path = "../musivum-protocol" }
 parking_lot = "0.13.0"

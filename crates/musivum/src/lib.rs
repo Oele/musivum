@@ -23,6 +23,7 @@ pub mod mediatransportutil;
 pub mod protocol;
 pub mod routing;
 pub mod rtc;
+pub mod service;
 pub mod sfu;
 pub mod telemetry;
 pub mod utils;
