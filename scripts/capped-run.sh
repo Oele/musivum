@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # The runner cargo uses for this repository (.cargo/config.toml): runs the given program with
-# a cap on its memory, and a test binary also with a cap on its running time.
+# a cap on its memory, and a test binary also with a cap on its running time and at a lower
+# priority.
 #
 #   MUSIVUM_RUN_MEMORY_KB   memory the program may have, in kB (default 8 GB; "unlimited"
 #                           for none). It is the limit on data (heap and other private
@@ -19,9 +20,11 @@ fi
 TIMEOUT=${MUSIVUM_TEST_TIMEOUT:-1800}
 case "$1" in
   */deps/*)
+    # A test binary also yields the processor to whatever else the machine is doing.
     if [ "$TIMEOUT" != 0 ] && command -v timeout >/dev/null; then
-      exec timeout --kill-after=10 "$TIMEOUT" "$@"
+      exec nice -n 10 timeout --kill-after=10 "$TIMEOUT" "$@"
     fi
+    exec nice -n 10 "$@"
     ;;
 esac
 exec "$@"

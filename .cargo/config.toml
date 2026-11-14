@@ -3,3 +3,8 @@
 # that loops while allocating must not be able to take the machine down with it.
 [target.'cfg(unix)']
 runner = "scripts/capped-run.sh"
+
+# Several builds run here at once (the port is made by agents working in parallel, on a
+# machine that does other work too): none of them takes all the cores.
+[build]
+jobs = 8
