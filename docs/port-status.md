@@ -20,6 +20,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | mtu `pkg/latency/owd_estimator.go` | `mediatransportutil/latency/owd_estimator.rs` | none upstream | Four tests added, their expected values printed by the Go original for the same series. |
 | mtu `pkg/twcc/twcc.go` | `mediatransportutil/twcc/twcc.rs` | 1 / 1 | One of the six cases of upstream's test fails upstream too (see below); the port asserts what the original does. One test added that compares 27 marshalled feedback packets with pion's bytes. |
 | pion/interceptor `pkg/twcc/twcc.go`, `arrival_time_map.go`, `internal/sequencenumber/unwrapper.go` | `webrtc/interceptor/twcc/`, `webrtc/interceptor/internal/sequencenumber/` | 15 / 15 | Only the recorder and what it stands on, not pion's interceptors around it. The assertion on allocations in one test is replaced by one on the buffer not moving. Two benchmarks left out. |
+| mtu `pkg/codec/vp8.go`, `h26xhelper.go`, `helpers.go`, `keyframe.go` | `mediatransportutil/codec/` (same names) | 6 / 6 | Twelve tests added (`vp8.go` and `keyframe.go` have none upstream). `reference_test.rs` compares the port with what the Go original says about 326 payloads, pinned in `testdata/` with the Go test that printed it. Also run against the original with about 700,000 generated payloads: identical, the two panics below included. |
+| pion/rtp `codecs/vp9_packet.go`, `common.go`, `error.go` | `webrtc/rtp/codecs/` (same names) | 5 / 7 | Only `VP9Packet` and what it stands on: the payloader and the other depacketizers are not used by LiveKit. The tests of allocations assert that buffers stay where they are instead. `Vp9Packet.payload` is a copy of the payload (`Vec<u8>`): a cost per VP9 packet, to be looked at with the buffer. |
 | mtu `helpers.go` | `mediatransportutil/helpers.rs` | 1 / 1 | Two tests added (the way back from NTP time, RTT from a receiver report). |
 | pion/rtp `packet.go`, `error.go` | `webrtc/rtp/packet.rs`, `error.rs` | 43 / 43 | Four tests added. Benchmarks left out. Run against pion with 432,008 generated inputs: every output identical, error texts and the cases where pion panics included. |
 | pion/rtp `abssendtimeextension.go`, `audiolevelextension.go`, `transportccextension.go`, `playoutdelayextension.go`, `abscapturetimeextension.go` | `webrtc/rtp/` (same names) | 20 / 20 | Benchmarks left out. |
@@ -41,6 +43,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/rtpextension/playoutdelay/playoutdelay.go` | `sfu/rtpextension/playoutdelay/playoutdelay.rs` | 1 / 1 | |
 | `pkg/sfu/rtpextension/abscapturetime/abscapturetime.go` | `sfu/rtpextension/abscapturetime/abscapturetime.rs` | none upstream | One test added. |
 | `pkg/sfu/datachannel/bitrate.go` | `sfu/datachannel/bitrate.rs` | 6 / 6 | |
+| `pkg/sfu/testutils/data.go` | `sfu/testutils/data.rs` | none upstream | Test helpers. The two test codecs are functions. |
+| `pkg/sfu/buffer/buffer_base.go` | `sfu/buffer/buffer_base.rs` | | Only the type `ExtPacket` so far, so that what takes packets from the buffer can be ported before it. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
 with the same pseudo-random inputs (34,021 lines of output, identical).
@@ -122,5 +126,15 @@ What looked wrong or fragile upstream and was ported as it is:
   dereference upstream; the selector there wraps the call in `recover()`).
 - `dependencydescriptor/dependencydescriptorreader.go`: a reused descriptor keeps its
   attached structure and active decode targets from the packet before.
+- mtu `codec/vp8.go`: `MarshalTo` trusts `HeaderSize` and panics on a buffer that is at
+  least that large but smaller than what the flags write; `Unmarshal` does not reset a
+  reused struct. `codec/h26xhelper.go`: `parseH264SPS` ignores read errors (a truncated SPS
+  still gives a size) and reads the eight scaling list flags but never the lists (a wrong
+  size for an SPS that has them); `ExtractH264VideoSize` and `IsH264KeyFrame` disagree on
+  where a unit starts in an MTAP. `codec/keyframe.go`: `IsH265KeyFrame` reads the FU header
+  with the mask of the NAL header, so the start of a fragmented SPS or PPS is not
+  recognised; `IsAV1KeyFrame` never reports a key frame when W is 0.
+- pion/rtp `vp9_packet.go`: `Unmarshal` appends to `PDiff`, `PGTID` and `PGU` without
+  clearing them, so a reused packet accumulates (LiveKit resets the packet first).
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
