@@ -531,8 +531,11 @@ of one track and 10 calls of 4. musivum's memory is lower (an idle 13 MB against
 about 2 MB per participant against 3). Its CPU was LiveKit's while a track had fewer than
 20 subscribers, and 2 to 4 times LiveKit's above that: the ported fan-out of a packet to
 its down tracks started a thread of the operating system per worker for every packet,
-where LiveKit starts goroutines on Go's fixed set of threads (being changed to a
-persistent pool). Not measured yet: latency and freezes under load, runs of minutes,
+where LiveKit starts goroutines on Go's fixed set of threads. Since the fan-out runs on
+rayon's persistent pool (`in_place_scope`, the caller waiting as on the original's
+`WaitGroup`), musivum used 0.44 cores in scenario b (was 0.84; LiveKit 0.22) and 0.31 in d
+(was 0.47; LiveKit 0.22), on a quieter machine than the first runs. What is left of the gap
+is not measured yet; a run with the fan-out made serial took b to 0.17 cores. Not measured yet: latency and freezes under load, runs of minutes,
 joins and leaves during a run. Each ops queue is a thread of its own (four per
 participant).
 
@@ -540,4 +543,4 @@ participant).
 
 LiveKit's embedded
 TURN server (ported from pion/turn, with a relay-only variant of the browser call as its
-proof); a persistent worker pool for the fan-out of packets to down tracks.
+proof).
