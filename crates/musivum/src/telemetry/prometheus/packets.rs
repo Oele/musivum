@@ -46,6 +46,7 @@ pub static PROM_FORWARD_LATENCY_HIST: Histogram<10> = Histogram::new(
         20.0 * 1000.0 * 1000.0,
     ],
 );
+pub static PROM_RTX_CAPPED_TOTAL: MetricVec<Counter, 1> = MetricVec::new(["kind"], Counter::new);
 
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
@@ -64,6 +65,17 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "",
         &PROM_FORWARD_LATENCY_HIST,
     ));
+    families.push(MetricFamily::of_vec(
+        "livekit_rtx_capped_total",
+        "NACKed packets not retransmitted because the down track was over its retransmission budget.",
+        &PROM_RTX_CAPPED_TOTAL,
+    ));
+}
+
+pub fn record_rtx_capped(kind: &str, packets: u32) {
+    PROM_RTX_CAPPED_TOTAL
+        .with_label_values([kind])
+        .add(packets as u64);
 }
 
 pub fn record_forward_latency_sample(forward_latency: i64) {
@@ -88,6 +100,19 @@ pub fn increment_key_frames(direction: Direction) {
 mod tests {
     use super::super::HistogramSnapshot;
     use super::*;
+
+    #[test]
+    fn capped_retransmissions_count_under_their_kind() {
+        let count = || {
+            PROM_RTX_CAPPED_TOTAL
+                .with_label_values(["a kind of this test"])
+                .get()
+        };
+        let before = count();
+        record_rtx_capped("a kind of this test", 3);
+        record_rtx_capped("a kind of this test", 4);
+        assert_eq!(before + 7, count());
+    }
 
     #[test]
     fn a_forward_latency_sample_counts_in_its_bucket() {

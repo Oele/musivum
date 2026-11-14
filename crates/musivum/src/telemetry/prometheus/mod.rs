@@ -73,7 +73,8 @@ mod tests {
             [
                 "livekit_keyframe_total",
                 "livekit_forward_latency",
-                "livekit_forward_latency_ns"
+                "livekit_forward_latency_ns",
+                "livekit_rtx_capped_total",
             ]
         );
         assert_eq!(families[0].label_names, ["direction"]);

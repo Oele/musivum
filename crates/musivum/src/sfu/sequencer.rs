@@ -8,9 +8,6 @@
 // `lookupExtPacketMeta` likewise; `MarshalLogObject` is `Debug`; a nil slice is an empty one;
 // the embedded `packetMeta` is the field `packet_meta`; sizes and slots are unsigned.
 
-// The down track uses the sequencer, and it is not ported yet.
-#![allow(dead_code)]
-
 use std::fmt;
 
 use parking_lot::Mutex;

@@ -1,8 +1,9 @@
 // Ported from LiveKit, pkg/sfu/interfaces.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust. The interfaces are traits, with fakes for tests where
-// the original has counterfeiter make them. `DownTrackStreamAllocatorListener` is not here
-// yet: its methods take a `*DownTrack`, and it is ported with the down track. A callback
+// the original has counterfeiter make them. `DownTrackStreamAllocatorListener` is given the
+// down track by reference, which its fake does not record, and the RTCP packet it is handed
+// by reference too: a listener that keeps one copies it. A callback
 // handed over (`AddOnReady`, `AddOnCodecStateChange`) is a boxed closure. `DebugInfo`'s
 // `map[string]any` is a JSON object. A `*livekit.TrackInfo` that is handed out is shared
 // (`Arc`), one that is handed in is borrowed. `REDTransformer` repeats `GetDownTracks`, which
@@ -16,9 +17,12 @@ use crate::mediatransportutil::codec;
 use crate::protocol::codecs::mime;
 use crate::protocol::livekit;
 use crate::sfu::buffer;
+use crate::sfu::bwe;
 use crate::sfu::utils as sfuutils;
-use crate::sfu::{Bitrates, Error, ReceiverCodecState};
+use crate::sfu::{Bitrates, DownTrack, Error, ReceiverCodecState};
 use crate::webrtc;
+use crate::webrtc::rtcp::payload_feedbacks::receiver_estimated_maximum_bitrate::ReceiverEstimatedMaximumBitrate;
+use crate::webrtc::rtcp::transport_feedbacks::transport_layer_cc::TransportLayerCc;
 
 /// Go's `map[string]any` of the `DebugInfo()` methods.
 pub type DebugInfo = serde_json::Map<String, serde_json::Value>;
@@ -126,6 +130,57 @@ pub trait TrackSender: Send + Sync {
     fn resync(&self);
     fn set_receiver(&self, r: Arc<dyn TrackReceiver>);
     fn receiver_restart(&self, r: Arc<dyn TrackReceiver>);
+}
+
+// -------------------------------------------------------------------
+
+#[cfg_attr(test, musivum_fakes::fake)]
+pub trait DownTrackStreamAllocatorListener: Send + Sync {
+    // RTCP received
+    fn on_remb(
+        &self,
+        #[cfg_attr(test, fake(skip))] dt: &DownTrack,
+        remb: &ReceiverEstimatedMaximumBitrate,
+    );
+    fn on_transport_cc_feedback(
+        &self,
+        #[cfg_attr(test, fake(skip))] dt: &DownTrack,
+        cc: &TransportLayerCc,
+    );
+
+    // video layer availability changed
+    fn on_available_layers_changed(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // video layer bitrate availability changed
+    fn on_bitrate_availability_changed(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // max published spatial layer changed
+    fn on_max_published_spatial_changed(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // max published temporal layer changed
+    fn on_max_published_temporal_changed(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // subscription changed - mute/unmute
+    fn on_subscription_changed(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // subscribed max video layer changed
+    fn on_subscribed_layer_changed(
+        &self,
+        #[cfg_attr(test, fake(skip))] dt: &DownTrack,
+        layers: buffer::VideoLayer,
+    );
+
+    // stream resumed
+    fn on_resume(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack);
+
+    // check if track should participate in BWE
+    fn is_bwe_enabled(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack) -> bool;
+
+    // get the BWE type in use
+    fn bwe_type(&self) -> bwe::BweType;
+
+    // check if subscription mute can be applied
+    fn is_subscribe_mutable(&self, #[cfg_attr(test, fake(skip))] dt: &DownTrack) -> bool;
 }
 
 // -------------------------------------------------------------------

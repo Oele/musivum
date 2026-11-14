@@ -7,6 +7,7 @@ pub mod ccutils;
 pub mod codecmunger;
 pub mod connectionquality;
 pub mod datachannel;
+mod downtrack;
 mod errors;
 pub mod flexfec;
 mod forwarder;
@@ -30,6 +31,7 @@ pub mod testutils;
 pub mod utils;
 pub mod videolayerselector;
 
+pub use downtrack::*;
 pub use errors::*;
 pub use forwarder::*;
 pub use forwardstats::*;

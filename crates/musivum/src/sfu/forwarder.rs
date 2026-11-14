@@ -240,7 +240,6 @@ pub struct TranslationParams {
 
 impl TranslationParams {
     // codecHeader returns the munged codec header to prepend to the payload.
-    #[allow(dead_code)] // the down track calls it, and it is not ported yet
     pub(super) fn codec_header(&self) -> &[u8] {
         &self.codec_bytes[..self.codec_bytes_len]
     }
@@ -248,7 +247,6 @@ impl TranslationParams {
     // ddInline returns the dependency descriptor extension held inline. It points
     // into tp, so it has to be copied before it is attached to anything that
     // outlives the write.
-    #[allow(dead_code)] // the down track calls it, and it is not ported yet
     pub(super) fn dd_inline(&self) -> &[u8] {
         &self.dd_bytes[..self.dd_bytes_len]
     }

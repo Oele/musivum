@@ -7,9 +7,6 @@
 // `spend` take the budget as an `Option`, their first argument, where the original has the
 // receiver that may be nil. The sizes are unsigned.
 
-// The down track uses the budget, and it is not ported yet.
-#![allow(dead_code)]
-
 use parking_lot::Mutex;
 
 use crate::go::atomic;

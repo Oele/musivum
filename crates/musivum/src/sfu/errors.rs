@@ -20,6 +20,14 @@ pub enum Error {
     PaddingNotOnFrameBoundary,
     #[error("unknown kind of codec")]
     UnknownKind,
+    #[error("already bound")]
+    DownTrackAlreadyBound,
+    #[error("payload overflow")]
+    PayloadOverflow,
+    // io.EOF, which downtrack.go looks for in what a receiver's `ReadRTP` returns: the
+    // buffer it reads from is closed
+    #[error("EOF")]
+    Eof,
 
     // forwarder.go: the two `errX` values, and the three `fmt.Errorf` of
     // `getRefLayerRTPTimestamp`, with the layers they name
@@ -45,6 +53,11 @@ pub enum Error {
     // an error of the codec munger, which forwarder.go passes on
     #[error(transparent)]
     CodecMunger(#[from] crate::sfu::codecmunger::Error),
+
+    // an error of the playout delay extension, which downtrack.go passes on when it makes
+    // its playout delay controller
+    #[error(transparent)]
+    PlayoutDelay(#[from] crate::sfu::rtpextension::playoutdelay::Error),
 
     // errors of other packages that redreceiver.go and redprimaryreceiver.go pass on
     #[error(transparent)]
