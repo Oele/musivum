@@ -32,6 +32,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | protocol `auth/accesstoken.go`, `grants.go`, `verifier.go`, `provider.go`, `interfaces.go` | `protocol/auth/` (same names, with `jwt.rs` and `json.rs`) | 13 / 13 | Seventeen tests added. `jwt.rs` is what the original takes from golang-jwt (MIT), ported in part; `json.rs` is new. Tokens signed by Go verify here and tokens signed here verify in Go (run both ways, every grant; for fixed claims and times the token is Go's byte for byte). More than 200 unusual tokens and 60 key files were put through Go, and the tests expect Go's outcome. Token times are compared with the system clock, as in Go. `authfakes` is not ported. |
 | protocol `utils/`: `timed_version.go`, `bitmap.go`, `time_size_cache.go`, `timed_aggregator.go`, `rtpstats.go`, `protoproxy.go`, `dedupedslice.go`, `guid/id.go`, `id.go`, `connectionquality.go`, `error.go`, `data_channel_rpc.go`, `secret.go`, `pointer/to.go` | `protocol/utils/` (same names) | 11 / 12 | 29 tests added, with values from the originals. `guid.Hash` and its test are not ported (it reproduces Go's ChaCha8 sequence for a seed; only request ids of the service use it). Identifiers take their random numbers from the `rand` crate. `base62.rs` is jxskiss/base62's encoder (MIT). The database methods of `TimedVersion`, `LocalNodeID` and the psrpc conversion are left out. `ProtoProxy` is generic over a value with `Default` and `PartialEq`; its `update_fn` has to hold its owner weakly. |
 | protocol `datatrack/packet.go`, `extension_e2ee.go`, `extension_participant_sid.go`, `extension_user_timestamp.go` | `protocol/datatrack/` (same names) | 5 / 5 | The fuzz test runs its property over the 15 seeds; the fuzzing itself is not carried over. Three tests added. A participant id that is not UTF-8 is read with replacement characters (a Go string holds any bytes). Also run against the original with 5,173 inputs (truncated at every length, flipped bits): all agreed. |
+| protocol `sdp/sdp.go`, `signalling/utils.go` | `protocol/sdp/sdp.rs`, `protocol/signalling/utils.rs` | 4 / 4 | On the parsed description of `rtc`'s SDP crate. `reference_test.rs` in both compares with 253 and 62 lines printed by the originals for a browser's real offer and answer and for made-up ones. pion's `GetCodecMap` and `GetCodecForPayloadType` are ported (`webrtc/sdp/util.rs`, 15 of pion's 26 tests) because `rtc`'s own lookup knows no static payload types and drops an `a=fmtp` with a space in it. `rtc` refuses a media line without formats, which pion takes. |
 | protocol `utils/mono/mono.go` | `protocol/utils/mono.rs` | 0 / 2 | The clock itself is `go::time`; upstream's two tests are about Go's `time.Time` and have nothing to test here. |
 | protocol `livekit/types.go` | `protocol/livekit/types.rs` | 0 / 4 | Only the identifier types; upstream's tests are of the YAML conversions, which are not ported. |
 | protocol `utils/rtputil/rtpconverter.go` | `protocol/utils/rtputil.rs` | 1 / 1 | |
@@ -44,6 +45,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/utils/helpers.go` | `sfu/utils/helpers.rs` | none upstream | Five tests added. pion's `interceptor.RTPHeaderExtension` is `webrtc::interceptor::RtpHeaderExtension`. |
 | `pkg/sfu/bwe/remotebwe/` (four files) | `sfu/bwe/remotebwe/` (same names) | none upstream | 22 tests added, their expected values printed by the Go original for the same calls with the same sleeps. The config `Default`s are Go's zero values; the original's defaults are the `DEFAULT_...` constants. |
 | `pkg/sfu/bwe/sendsidebwe/` (eight files) | `sfu/bwe/sendsidebwe/` (same names) | 1 / 1 | At the pin the congestion detector handles a feedback report in the call, under its lock, and calls the listener after unlocking: no worker. Also run against the original with a session of 13,822 packets and 429 feedback reports (delay rising, loss, recovery, a pause, probes, reports out of order and repeated, the wraps of the sequence number and of the reference time): 439 lines of state, identical; 46 of them pinned in `reference_test.rs`. Left out of the comparison, because the original reads the clock there: the detector's own estimate of the feedback interval, finalizing a probe by settle wait. |
+| `pkg/sfu/rtpstats/` (six files) | `sfu/rtpstats/` (same names) | 4 / 4 | One lock per statistics object, the embedded bases as fields inside it; inherited methods are forwarded. Also run against the original with a script of 8,843 operations on receivers, senders and their lite forms (loss, reordering, wraps, restarts, pauses of hours, sender and receiver reports in and out of order): 3,620 lines, identical; 50 of them pinned. Left out of the comparison, because the original reads the clock there: durations, rates and the times of the last PLI, FIR and key frame. One benchmark left out. |
 | `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
 | `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
 | `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
@@ -105,6 +107,11 @@ with the same pseudo-random inputs (34,021 lines of output, identical).
   it) and of a duplicate field the last wins (Go refuses). A key file with a tab right
   after the colon is refused (Go reads it); three forms Go refuses are read. The first two
   could be had from `pbjson-build`'s options in `musivum-protocol`; not tried.
+- **Unset times in `RTPStats`.** The last key frame, the last FIR and the last layer lock PLI
+  of statistics that never had one are written as 1970-01-01 where the original writes
+  0001-01-01 (the zero time, see above).
+- **Float to integer out of range in `rtpstats`.** `fraction_lost` of an interval in which
+  every expected packet was lost is 255 here and 0 in Go on amd64 (`uint8(256.0)`).
 - **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
   files) are left out: counting allocations needs an allocator of the test binary's own,
   which needs `unsafe`, and the workspace forbids it.
@@ -186,6 +193,18 @@ What looked wrong or fragile upstream and was ported as it is:
   are compared). `ProbeClusterFinalize` after a congesting probe sets the state back to
   none without telling the listener. While congested, the committed capacity follows the
   estimate up as well as down. The NACK window's maximum only ends in `Add`.
+- `rtpstats`: the lite receiver and sender hand `ToProto` the start and the highest
+  extended sequence number where it takes packets expected and packets seen, so `Packets`
+  is the highest sequence number and the loss percentage is lost over the start. The lite
+  sender decrements `packetsLost` on every duplicate or late packet without a check. A
+  reception report's `LastSequenceNumber` is the extended highest plus one. In the
+  receiver, a packet from before the start that has a payload and a newer time stamp is
+  taken for a rollover of the sequence number: 65,536 ahead, about 63,000 packets counted
+  lost (seen in the run). `Test_RTPStatsReceiver_Update` starts at a random sequence number
+  and fails when that is within 13 of 65535, upstream and in the port.
+- protocol `sdp`: `SDPFragment.Unmarshal` never recognises a plain `a=end-of-candidates`;
+  `PatchICECredentialAndCandidatesIntoSDP` writes the candidates into every media section;
+  `ExtractStreamID` returns the second token of `a=msid`, which is the track id.
 - `bwe/sendsidebwe`: `ProbeClusterIsGoalReached` is true only when the probe signal is
   not "not congesting", which reads inverted, and its validity check uses a result that is
   only set when the cluster is done, so the goal cannot be reached while the probe runs. A

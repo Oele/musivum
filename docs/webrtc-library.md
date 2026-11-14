@@ -147,8 +147,13 @@ Found in `rtc` 0.21.1 while building it (the places named are under `src/` of th
    `with_ice_credentials` (`peer_connection/internal.rs`), so a node must not fix them.
 5. `set_local_description` insists on the text `create_offer` or `create_answer` gave
    (`peer_connection/internal.rs`):
-   the SDP cannot be changed before it is set locally, which LiveKit does in places
-   (`pkg/rtc/transport.go`); what it changes there has to be reached another way.
+   the SDP cannot be changed before it is set locally. LiveKit at the pin never does that
+   (all five `SetLocalDescription` calls of `pkg/rtc/transport.go` pass what
+   `CreateOffer` or `CreateAnswer` returned; pion requires it too). What it changes by hand
+   is the copy that is signalled to the client after setting (candidates filtered out,
+   Opus parameters in the publisher's answer) and remote descriptions before setting, both
+   of which `rtc` allows. `tr.SetMid(mid)`, used for migration only, has no public
+   counterpart in `rtc`.
 6. A rollback removes transceivers by index (`peer_connection/internal.rs`); passed
    through, untested.
 7. Not there yet in the layer: detached data channels with deadlines (LiveKit writes with a

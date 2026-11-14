@@ -13,6 +13,7 @@ mod rtcpreader;
 mod streamstats;
 mod videolayer;
 mod videolayerutils;
+mod vp9keyframe;
 
 pub use buffer_base::*;
 pub use datastats::*;
@@ -23,6 +24,7 @@ pub use rtcpreader::*;
 pub use streamstats::*;
 pub use videolayer::*;
 pub use videolayerutils::*;
+pub use vp9keyframe::*;
 
 /// The errors of the package: its `ErrX` values, to be added as the files that return them
 /// are ported, and `io.EOF` where the original returns that.
@@ -39,6 +41,10 @@ pub enum Error {
     DdStructureAttachedToNonFirstPacket,
     #[error("dependency descriptor extension not found")]
     DdExtentionNotFound,
+    // vp9keyframe.rs (new for musivum)
+    #[error("VP9 packet has no frame behind its payload descriptor")]
+    Vp9DescriptorOnly,
+
     // an error of the reader of the dependency descriptor, which the parser passes on
     #[error(transparent)]
     DependencyDescriptor(#[from] crate::sfu::rtpextension::dependencydescriptor::Error),
