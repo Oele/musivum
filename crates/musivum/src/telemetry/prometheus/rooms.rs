@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use super::{Counter, Histogram, MetricFamily, MetricVec};
+use super::{Counter, Gauge, Histogram, MetricFamily, MetricVec};
 use crate::go::atomic;
 use crate::go::time::{Duration, MILLISECOND};
 use crate::protocol::livekit;
@@ -43,6 +43,30 @@ pub static PROM_SUBSCRIBE_PACE_SHADOW: MetricVec<Histogram<14>, 1> =
 pub static PROM_PEER_CONNECTION: MetricVec<Counter, 2> =
     MetricVec::new(["transport", "state"], Counter::new);
 
+// Added for the telemetry service (`events.go`), from here on.
+pub(super) static PARTICIPANT_CURRENT: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_PUBLISHED_CURRENT: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_SUBSCRIBED_CURRENT: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_PUBLISH_ATTEMPTS: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_PUBLISH_SUCCESS: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_SUBSCRIBE_ATTEMPTS: atomic::Int32 = atomic::Int32::new(0);
+pub(super) static TRACK_SUBSCRIBE_SUCCESS: atomic::Int32 = atomic::Int32::new(0);
+// count the number of failures that are due to user error (permissions, track doesn't exist), so we could compute
+// success rate by subtracting this from total attempts
+pub(super) static TRACK_SUBSCRIBE_USER_ERROR: atomic::Int32 = atomic::Int32::new(0);
+
+pub static PROM_PARTICIPANT_CURRENT: Gauge = Gauge::new();
+pub static PROM_TRACK_PUBLISHED_CURRENT: MetricVec<Gauge, 1> = MetricVec::new(["kind"], Gauge::new);
+pub static PROM_TRACK_SUBSCRIBED_CURRENT: MetricVec<Gauge, 1> =
+    MetricVec::new(["kind"], Gauge::new);
+pub static PROM_TRACK_PACKET_TRAILER_CURRENT: Gauge = Gauge::new();
+// Upstream's `initRoomStats` sets the gauge of every known feature to zero, so that each is
+// there before a track has it; here a feature's gauge is there once a track had it.
+pub static PROM_TRACK_PACKET_TRAILER_BY_FEATURE_CURRENT: MetricVec<Gauge, 1> =
+    MetricVec::new(["feature"], Gauge::new);
+pub static PROM_TRACK_PUBLISH_COUNTER: MetricVec<Counter, 2> =
+    MetricVec::new(["kind", "state"], Counter::new);
+
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
     families.push(MetricFamily::of_vec(
@@ -64,6 +88,36 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "livekit_peer_connection_state",
         "",
         &PROM_PEER_CONNECTION,
+    ));
+    families.push(MetricFamily::of(
+        "livekit_participant_total",
+        "",
+        &PROM_PARTICIPANT_CURRENT,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_track_published_total",
+        "",
+        &PROM_TRACK_PUBLISHED_CURRENT,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_track_subscribed_total",
+        "",
+        &PROM_TRACK_SUBSCRIBED_CURRENT,
+    ));
+    families.push(MetricFamily::of(
+        "livekit_track_packet_trailer_total",
+        "Current number of published video tracks with packet trailers enabled.",
+        &PROM_TRACK_PACKET_TRAILER_CURRENT,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_track_packet_trailer_feature_total",
+        "Current number of published video tracks by enabled packet trailer feature.",
+        &PROM_TRACK_PACKET_TRAILER_BY_FEATURE_CURRENT,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_track_publish_counter",
+        "",
+        &PROM_TRACK_PUBLISH_COUNTER,
     ));
 }
 
@@ -153,6 +207,130 @@ pub fn record_track_subscribe_cancels(num_cancels: i32) {
     PROM_TRACK_SUBSCRIBE_COUNTER
         .with_label_values(["cancel", ""])
         .add(u64::try_from(num_cancels).expect("counter cannot decrease in value"));
+}
+
+// Added for the telemetry service (`events.go`), from here on, in upstream's order.
+
+pub fn add_participant() {
+    PROM_PARTICIPANT_CURRENT.add(1.0);
+    PARTICIPANT_CURRENT.inc();
+}
+
+pub fn sub_participant() {
+    PROM_PARTICIPANT_CURRENT.sub(1.0);
+    PARTICIPANT_CURRENT.dec();
+}
+
+pub fn add_published_track(kind: &str) {
+    PROM_TRACK_PUBLISHED_CURRENT
+        .with_label_values([kind])
+        .add(1.0);
+    TRACK_PUBLISHED_CURRENT.inc();
+}
+
+pub fn sub_published_track(kind: &str) {
+    PROM_TRACK_PUBLISHED_CURRENT
+        .with_label_values([kind])
+        .sub(1.0);
+    TRACK_PUBLISHED_CURRENT.dec();
+}
+
+pub fn add_packet_trailer_track(track: &livekit::TrackInfo) {
+    update_packet_trailer_tracks(track, 1.0);
+}
+
+pub fn sub_packet_trailer_track(track: &livekit::TrackInfo) {
+    update_packet_trailer_tracks(track, -1.0);
+}
+
+fn update_packet_trailer_tracks(track: &livekit::TrackInfo, delta: f64) {
+    if track.r#type() != livekit::TrackType::Video {
+        return;
+    }
+
+    let features = packet_trailer_feature_labels(&track.packet_trailer_features);
+    if features.is_empty() {
+        return;
+    }
+
+    PROM_TRACK_PACKET_TRAILER_CURRENT.add(delta);
+    for feature in &features {
+        PROM_TRACK_PACKET_TRAILER_BY_FEATURE_CURRENT
+            .with_label_values([feature])
+            .add(delta);
+    }
+}
+
+fn packet_trailer_feature_labels(features: &[i32]) -> Vec<&'static str> {
+    let mut labels = Vec::with_capacity(features.len());
+    let mut seen = std::collections::HashSet::with_capacity(features.len());
+    for feature in features {
+        let mut label = "UNKNOWN";
+        if let Ok(feature) = livekit::PacketTrailerFeature::try_from(*feature) {
+            label = feature.as_str_name();
+        }
+
+        if !seen.insert(label) {
+            continue;
+        }
+        labels.push(label);
+    }
+    labels
+}
+
+pub fn record_track_publish_attempt(kind: &str) {
+    TRACK_PUBLISH_ATTEMPTS.inc();
+    PROM_TRACK_PUBLISH_COUNTER
+        .with_label_values([kind, "attempt"])
+        .inc();
+}
+
+pub fn record_track_publish_success(kind: &str) {
+    TRACK_PUBLISH_SUCCESS.inc();
+    PROM_TRACK_PUBLISH_COUNTER
+        .with_label_values([kind, "success"])
+        .inc();
+}
+
+pub fn record_track_subscribe_success(kind: &str) {
+    // modify both current and total counters
+    PROM_TRACK_SUBSCRIBED_CURRENT
+        .with_label_values([kind])
+        .add(1.0);
+    TRACK_SUBSCRIBED_CURRENT.inc();
+
+    PROM_TRACK_SUBSCRIBE_COUNTER
+        .with_label_values(["success", ""])
+        .inc();
+    TRACK_SUBSCRIBE_SUCCESS.inc();
+}
+
+pub fn record_track_unsubscribed(kind: &str) {
+    // unsubscribed modifies current counter, but we leave the total values alone since they
+    // are used to compute rate
+    PROM_TRACK_SUBSCRIBED_CURRENT
+        .with_label_values([kind])
+        .sub(1.0);
+    TRACK_SUBSCRIBED_CURRENT.dec();
+}
+
+pub fn record_track_subscribe_attempt() {
+    TRACK_SUBSCRIBE_ATTEMPTS.inc();
+    PROM_TRACK_SUBSCRIBE_COUNTER
+        .with_label_values(["attempt", ""])
+        .inc();
+}
+
+/// `RecordTrackSubscribeFailure(err error, isUserError bool)`, with the error's text.
+pub fn record_track_subscribe_failure(err: &str, is_user_error: bool) {
+    PROM_TRACK_SUBSCRIBE_COUNTER
+        .with_label_values(["failure", err])
+        .inc();
+
+    if is_user_error {
+        TRACK_SUBSCRIBE_USER_ERROR.inc();
+        TRACK_SUBSCRIBE_CANCELS.inc();
+    }
 }
 
 // The original has tests of its own (`rooms_test.go`) for functions that are not here yet.
@@ -288,5 +466,119 @@ mod tests {
         // the tests of the subscription manager cancel subscribes of their own meanwhile
         assert!(count() >= before + 3);
         assert!(TRACK_SUBSCRIBE_CANCELS.load() >= before_total + 3);
+    }
+
+    // Ported from LiveKit, pkg/telemetry/prometheus/rooms_test.go at v1.13.11: the original's
+    // two tests, of the functions added for the telemetry service. They run one after the
+    // other, as upstream's do, since both look at the same gauge. There is no `Init`.
+    static PACKET_TRAILER_TESTS: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
+    fn gauge_value(gauge: &Gauge) -> f64 {
+        gauge.get()
+    }
+
+    #[test]
+    fn test_packet_trailer_track_metrics() {
+        let _serial = PACKET_TRAILER_TESTS.lock();
+
+        let track = livekit::TrackInfo {
+            r#type: livekit::TrackType::Video as i32,
+            packet_trailer_features: vec![
+                livekit::PacketTrailerFeature::PtfUserTimestamp as i32,
+                livekit::PacketTrailerFeature::PtfUserTimestamp as i32,
+                livekit::PacketTrailerFeature::PtfFrameId as i32,
+                livekit::PacketTrailerFeature::PtfUserData as i32,
+                99,
+                100,
+            ],
+            ..Default::default()
+        };
+        let by_feature = |feature: &str| {
+            gauge_value(&PROM_TRACK_PACKET_TRAILER_BY_FEATURE_CURRENT.with_label_values([feature]))
+        };
+
+        let trailer_before = gauge_value(&PROM_TRACK_PACKET_TRAILER_CURRENT);
+        let timestamp_before = by_feature("PTF_USER_TIMESTAMP");
+        let frame_id_before = by_feature("PTF_FRAME_ID");
+        let user_data_before = by_feature("PTF_USER_DATA");
+        let unknown_before = by_feature("UNKNOWN");
+
+        add_packet_trailer_track(&track);
+        assert_eq!(
+            trailer_before + 1.0,
+            gauge_value(&PROM_TRACK_PACKET_TRAILER_CURRENT)
+        );
+        assert_eq!(timestamp_before + 1.0, by_feature("PTF_USER_TIMESTAMP"));
+        assert_eq!(frame_id_before + 1.0, by_feature("PTF_FRAME_ID"));
+        assert_eq!(user_data_before + 1.0, by_feature("PTF_USER_DATA"));
+        assert_eq!(unknown_before + 1.0, by_feature("UNKNOWN"));
+
+        sub_packet_trailer_track(&track);
+        assert_eq!(
+            trailer_before,
+            gauge_value(&PROM_TRACK_PACKET_TRAILER_CURRENT)
+        );
+        assert_eq!(timestamp_before, by_feature("PTF_USER_TIMESTAMP"));
+        assert_eq!(frame_id_before, by_feature("PTF_FRAME_ID"));
+        assert_eq!(user_data_before, by_feature("PTF_USER_DATA"));
+        assert_eq!(unknown_before, by_feature("UNKNOWN"));
+    }
+
+    #[test]
+    fn test_packet_trailer_track_metrics_ignore_audio() {
+        let _serial = PACKET_TRAILER_TESTS.lock();
+
+        let before = gauge_value(&PROM_TRACK_PACKET_TRAILER_CURRENT);
+        add_packet_trailer_track(&livekit::TrackInfo {
+            r#type: livekit::TrackType::Audio as i32,
+            packet_trailer_features: vec![livekit::PacketTrailerFeature::PtfUserData as i32],
+            ..Default::default()
+        });
+        assert_eq!(before, gauge_value(&PROM_TRACK_PACKET_TRAILER_CURRENT));
+    }
+
+    // New for musivum: the counters of participants, tracks and subscriptions.
+    #[test]
+    fn participants_tracks_and_subscriptions_count_under_their_labels() {
+        let gauge =
+            |vec: &MetricVec<Gauge, 1>| vec.with_label_values(["a kind of this test"]).get();
+        let counter = |kind: &str, state: &str| {
+            PROM_TRACK_PUBLISH_COUNTER
+                .with_label_values([kind, state])
+                .get()
+        };
+
+        let published = gauge(&PROM_TRACK_PUBLISHED_CURRENT);
+        add_published_track("a kind of this test");
+        add_published_track("a kind of this test");
+        sub_published_track("a kind of this test");
+        assert_eq!(published + 1.0, gauge(&PROM_TRACK_PUBLISHED_CURRENT));
+
+        let (attempts, successes) = (
+            counter("a kind of this test", "attempt"),
+            counter("a kind of this test", "success"),
+        );
+        record_track_publish_attempt("a kind of this test");
+        record_track_publish_attempt("a kind of this test");
+        record_track_publish_success("a kind of this test");
+        assert_eq!(attempts + 2, counter("a kind of this test", "attempt"));
+        assert_eq!(successes + 1, counter("a kind of this test", "success"));
+
+        let subscribed = gauge(&PROM_TRACK_SUBSCRIBED_CURRENT);
+        record_track_subscribe_success("a kind of this test");
+        record_track_subscribe_success("a kind of this test");
+        record_track_unsubscribed("a kind of this test");
+        assert_eq!(subscribed + 1.0, gauge(&PROM_TRACK_SUBSCRIBED_CURRENT));
+
+        let failures = || {
+            PROM_TRACK_SUBSCRIBE_COUNTER
+                .with_label_values(["failure", "an error of this test"])
+                .get()
+        };
+        let (before, user_errors) = (failures(), TRACK_SUBSCRIBE_USER_ERROR.load());
+        record_track_subscribe_failure("an error of this test", true);
+        record_track_subscribe_failure("an error of this test", false);
+        assert_eq!(before + 2, failures());
+        assert!(TRACK_SUBSCRIBE_USER_ERROR.load() > user_errors);
     }
 }

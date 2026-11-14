@@ -1,12 +1,14 @@
 // Ported from LiveKit, pkg/telemetry/stats.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust. Only `StatsKey` with its constructors is here:
-// `TrackStats` of `telemetryService`, which counts a track's statistics into the Prometheus
-// collectors and hands them to the participant's stats worker, is of the implementation of
-// the service, which is not ported. It is the one reader of the key's fields, which are
-// visible in this module for what takes its place. The key can be compared, as a Go struct
-// can. The test at the end is new: the original has none of the key by itself.
+// Changes: translated from Go to Rust. `TrackStats` is a method of `TelemetryServiceImpl`
+// (`telemetryService` upstream), which its implementation of the interface hands on to
+// (`telemetryservice.rs`); its job gets the service and copies of the key and the stat. The
+// key's fields are visible in this module. The key can be compared, as a Go struct can. The
+// sums of a stat's streams are `uint32` and wrap as upstream. The test at the end is new; the
+// original's tests are in `stats_test.rs`.
 
+use super::prometheus;
+use super::telemetryservice::TelemetryServiceImpl;
 use crate::protocol::livekit;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
@@ -59,6 +61,102 @@ impl StatsKey {
         self.stream_type
     }
 }
+
+impl TelemetryServiceImpl {
+    pub(super) fn track_stats(
+        &self,
+        room_id: &livekit::RoomId,
+        _room_name: &livekit::RoomName,
+        key: &StatsKey,
+        stat: &livekit::AnalyticsStat,
+    ) {
+        let (room_id, key, stat) = (room_id.clone(), key.clone(), stat.clone());
+        self.enqueue(move |t| {
+            let mut direction = prometheus::Direction::Incoming;
+            if key.stream_type == livekit::StreamType::Downstream {
+                direction = prometheus::Direction::Outgoing;
+            }
+
+            let mut nacks = 0u32;
+            let mut plis = 0u32;
+            let mut firs = 0u32;
+            let mut packets = 0u32;
+            let mut bytes = 0u64;
+            let mut retransmit_bytes = 0u64;
+            let mut retransmit_packets = 0u32;
+            for stream in &stat.streams {
+                nacks = nacks.wrapping_add(stream.nacks);
+                plis = plis.wrapping_add(stream.plis);
+                firs = firs.wrapping_add(stream.firs);
+                packets = packets
+                    .wrapping_add(stream.primary_packets.wrapping_add(stream.padding_packets));
+                bytes = bytes.wrapping_add(stream.primary_bytes.wrapping_add(stream.padding_bytes));
+                if key.stream_type == livekit::StreamType::Downstream {
+                    retransmit_packets = retransmit_packets.wrapping_add(stream.retransmit_packets);
+                    retransmit_bytes = retransmit_bytes.wrapping_add(stream.retransmit_bytes);
+                } else {
+                    // for upstream, we don't account for these separately for now
+                    packets = packets.wrapping_add(stream.retransmit_packets);
+                    bytes = bytes.wrapping_add(stream.retransmit_bytes);
+                }
+                if key.track {
+                    prometheus::record_packet_loss(
+                        &key.country,
+                        direction,
+                        key.track_source,
+                        key.track_type,
+                        stream.packets_lost,
+                        stream.primary_packets.wrapping_add(stream.padding_packets),
+                    );
+                    prometheus::record_packet_out_of_order(
+                        &key.country,
+                        direction,
+                        key.track_source,
+                        key.track_type,
+                        stream.packets_out_of_order,
+                        stream.primary_packets.wrapping_add(stream.padding_packets),
+                    );
+                    prometheus::record_rtt(
+                        &key.country,
+                        direction,
+                        key.track_source,
+                        key.track_type,
+                        stream.rtt,
+                    );
+                    prometheus::record_jitter(
+                        &key.country,
+                        direction,
+                        key.track_source,
+                        key.track_type,
+                        stream.jitter,
+                    );
+                }
+            }
+            prometheus::increment_rtcp(&key.country, direction, nacks, plis, firs);
+            prometheus::increment_packets(&key.country, direction, packets as u64, false);
+            prometheus::increment_bytes(&key.country, direction, bytes, false);
+            if retransmit_packets != 0 {
+                prometheus::increment_packets(
+                    &key.country,
+                    direction,
+                    retransmit_packets as u64,
+                    true,
+                );
+            }
+            if retransmit_bytes != 0 {
+                prometheus::increment_bytes(&key.country, direction, retransmit_bytes, true);
+            }
+
+            if let Some(worker) = t.get_worker(&room_id, &key.participant_id) {
+                worker.on_track_stat(key.track_id.clone(), key.stream_type, stat);
+            }
+        });
+    }
+}
+
+#[cfg(test)]
+#[path = "stats_test.rs"]
+pub(super) mod stats_test;
 
 #[cfg(test)]
 mod tests {

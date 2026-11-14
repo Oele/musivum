@@ -62,6 +62,8 @@ pub fn gather() -> Vec<MetricFamily> {
     node::collect(&mut families);
     packets::collect(&mut families);
     rooms::collect(&mut families);
+    // the collectors of the protocol's webhook package, which upstream registers with these
+    crate::protocol::webhook::collect(&mut families);
     families
 }
 
@@ -84,10 +86,31 @@ mod tests {
                 "livekit_rtx_capped_total",
                 "livekit_fec_total",
                 "livekit_fec_bytes",
+                "livekit_packet_total",
+                "livekit_packet_bytes",
+                "livekit_nack_total",
+                "livekit_pli_total",
+                "livekit_fir_total",
+                "livekit_packet_loss_total",
+                "livekit_packet_loss_percent",
+                "livekit_packet_out_of_order_total",
+                "livekit_packet_out_of_order_percent",
+                "livekit_jitter_us",
+                "livekit_rtt_ms",
+                "livekit_participant_join_total",
+                "livekit_connection_total",
                 "livekit_track_subscribe_counter",
                 "livekit_pubsubtime_ms",
                 "livekit_subscribe_pace_shadow_delay_ms",
                 "livekit_peer_connection_state",
+                "livekit_participant_total",
+                "livekit_track_published_total",
+                "livekit_track_subscribed_total",
+                "livekit_track_packet_trailer_total",
+                "livekit_track_packet_trailer_feature_total",
+                "livekit_track_publish_counter",
+                "livekit_webhook_dispatch_total",
+                "livekit_webhook_queue_length",
             ]
         );
         assert_eq!(families[1].label_names, ["direction"]);

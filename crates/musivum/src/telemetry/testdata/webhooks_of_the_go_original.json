@@ -1,0 +1,299 @@
+[
+  {
+    "body": {
+      "createdAt": "\u003cnow\u003e",
+      "event": "room_started",
+      "id": "EV_ and 12 characters",
+      "room": {
+        "creationTime": "1700000000",
+        "creationTimeMs": "1700000000123",
+        "emptyTimeout": 300,
+        "enabledCodecs": [
+          {
+            "mime": "audio/opus"
+          },
+          {
+            "fmtpLine": "x=1",
+            "mime": "video/VP8"
+          }
+        ],
+        "maxParticipants": 10,
+        "metadata": "some metadata",
+        "name": "a-room",
+        "numParticipants": 1,
+        "sid": "RM_aRoomOfTheTest",
+        "version": {
+          "ticks": 2,
+          "unixMicro": "1700000000123456"
+        }
+      }
+    },
+    "claims": {
+      "exp - nbf": 300,
+      "iat": "\u003cnow\u003e",
+      "iss": "mykey",
+      "sha256": "\u003csha256 of the body\u003e"
+    },
+    "contentType": "application/webhook+json",
+    "jwtHeader": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "userAgent": "LiveKit"
+  },
+  {
+    "body": {
+      "createdAt": "\u003cnow\u003e",
+      "event": "participant_joined",
+      "id": "EV_ and 12 characters",
+      "participant": {
+        "attributes": {
+          "a": "b"
+        },
+        "identity": "alice",
+        "isPublisher": true,
+        "joinedAt": "1700000001",
+        "name": "Alice",
+        "permission": {
+          "canPublish": true,
+          "canPublishData": true,
+          "canPublishSources": [
+            "CAMERA",
+            "MICROPHONE"
+          ],
+          "canSubscribe": true
+        },
+        "sid": "PA_aParticipant",
+        "state": "ACTIVE",
+        "version": 3
+      },
+      "room": {
+        "creationTime": "1700000000",
+        "creationTimeMs": "1700000000123",
+        "emptyTimeout": 300,
+        "enabledCodecs": [
+          {
+            "mime": "audio/opus"
+          },
+          {
+            "fmtpLine": "x=1",
+            "mime": "video/VP8"
+          }
+        ],
+        "maxParticipants": 10,
+        "metadata": "some metadata",
+        "name": "a-room",
+        "numParticipants": 1,
+        "sid": "RM_aRoomOfTheTest",
+        "version": {
+          "ticks": 2,
+          "unixMicro": "1700000000123456"
+        }
+      }
+    },
+    "claims": {
+      "exp - nbf": 300,
+      "iat": "\u003cnow\u003e",
+      "iss": "mykey",
+      "sha256": "\u003csha256 of the body\u003e"
+    },
+    "contentType": "application/webhook+json",
+    "jwtHeader": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "userAgent": "LiveKit"
+  },
+  {
+    "body": {
+      "createdAt": "\u003cnow\u003e",
+      "event": "track_published",
+      "id": "EV_ and 12 characters",
+      "participant": {
+        "identity": "alice",
+        "sid": "PA_aParticipant"
+      },
+      "room": {
+        "creationTime": "1700000000",
+        "creationTimeMs": "1700000000123",
+        "emptyTimeout": 300,
+        "enabledCodecs": [
+          {
+            "mime": "audio/opus"
+          },
+          {
+            "fmtpLine": "x=1",
+            "mime": "video/VP8"
+          }
+        ],
+        "maxParticipants": 10,
+        "metadata": "some metadata",
+        "name": "a-room",
+        "numParticipants": 1,
+        "sid": "RM_aRoomOfTheTest",
+        "version": {
+          "ticks": 2,
+          "unixMicro": "1700000000123456"
+        }
+      },
+      "track": {
+        "codecs": [
+          {
+            "cid": "a-cid",
+            "mid": "1",
+            "mimeType": "video/VP8",
+            "videoLayerMode": "ONE_SPATIAL_LAYER_PER_STREAM"
+          }
+        ],
+        "disableRed": true,
+        "height": 720,
+        "layers": [
+          {
+            "bitrate": 150000,
+            "height": 180,
+            "ssrc": 1111,
+            "width": 320
+          },
+          {
+            "bitrate": 1700000,
+            "height": 720,
+            "quality": "HIGH",
+            "rid": "f",
+            "ssrc": 2222,
+            "width": 1280
+          }
+        ],
+        "mid": "1",
+        "mimeType": "video/VP8",
+        "name": "camera",
+        "sid": "TR_aTrack",
+        "simulcast": true,
+        "source": "CAMERA",
+        "stream": "camera",
+        "type": "VIDEO",
+        "version": {
+          "unixMicro": "1700000002000000"
+        },
+        "width": 1280
+      }
+    },
+    "claims": {
+      "exp - nbf": 300,
+      "iat": "\u003cnow\u003e",
+      "iss": "mykey",
+      "sha256": "\u003csha256 of the body\u003e"
+    },
+    "contentType": "application/webhook+json",
+    "jwtHeader": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "userAgent": "LiveKit"
+  },
+  {
+    "body": {
+      "createdAt": "\u003cnow\u003e",
+      "event": "participant_left",
+      "id": "EV_ and 12 characters",
+      "participant": {
+        "attributes": {
+          "a": "b"
+        },
+        "identity": "alice",
+        "isPublisher": true,
+        "joinedAt": "1700000001",
+        "name": "Alice",
+        "permission": {
+          "canPublish": true,
+          "canPublishData": true,
+          "canPublishSources": [
+            "CAMERA",
+            "MICROPHONE"
+          ],
+          "canSubscribe": true
+        },
+        "sid": "PA_aParticipant",
+        "state": "ACTIVE",
+        "version": 3
+      },
+      "room": {
+        "creationTime": "1700000000",
+        "creationTimeMs": "1700000000123",
+        "emptyTimeout": 300,
+        "enabledCodecs": [
+          {
+            "mime": "audio/opus"
+          },
+          {
+            "fmtpLine": "x=1",
+            "mime": "video/VP8"
+          }
+        ],
+        "maxParticipants": 10,
+        "metadata": "some metadata",
+        "name": "a-room",
+        "numParticipants": 1,
+        "sid": "RM_aRoomOfTheTest",
+        "version": {
+          "ticks": 2,
+          "unixMicro": "1700000000123456"
+        }
+      }
+    },
+    "claims": {
+      "exp - nbf": 300,
+      "iat": "\u003cnow\u003e",
+      "iss": "mykey",
+      "sha256": "\u003csha256 of the body\u003e"
+    },
+    "contentType": "application/webhook+json",
+    "jwtHeader": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "userAgent": "LiveKit"
+  },
+  {
+    "body": {
+      "createdAt": "\u003cnow\u003e",
+      "event": "room_finished",
+      "id": "EV_ and 12 characters",
+      "room": {
+        "creationTime": "1700000000",
+        "creationTimeMs": "1700000000123",
+        "emptyTimeout": 300,
+        "enabledCodecs": [
+          {
+            "mime": "audio/opus"
+          },
+          {
+            "fmtpLine": "x=1",
+            "mime": "video/VP8"
+          }
+        ],
+        "maxParticipants": 10,
+        "metadata": "some metadata",
+        "name": "a-room",
+        "numParticipants": 1,
+        "sid": "RM_aRoomOfTheTest",
+        "version": {
+          "ticks": 2,
+          "unixMicro": "1700000000123456"
+        }
+      },
+      "roomEndReason": "ROOM_END_IDLE_TIMEOUT"
+    },
+    "claims": {
+      "exp - nbf": 300,
+      "iat": "\u003cnow\u003e",
+      "iss": "mykey",
+      "sha256": "\u003csha256 of the body\u003e"
+    },
+    "contentType": "application/webhook+json",
+    "jwtHeader": {
+      "alg": "HS256",
+      "typ": "JWT"
+    },
+    "userAgent": "LiveKit"
+  }
+]

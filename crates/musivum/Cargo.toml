@@ -24,6 +24,12 @@ musivum-protocol = { version = "0.0.0", path = "../musivum-protocol" }
 parking_lot = "0.13.0"
 pbjson-types = "0.9"
 rand = "0.10.3"
+# The HTTP client webhooks are sent with (protocol/webhook/httpclient.rs): rustls with ring and
+# the system's root certificates, no OpenSSL.
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots"] }
+# Its errors, to tell a certificate that is not trusted (protocol/webhook/retryablehttp.rs).
+# Already in the build through rtc and reqwest.
+rustls = { version = "0.23.46", default-features = false }
 # The WebRTC library musivum stands on (docs/webrtc-library.md). Its RTP crate is patched in
 # the workspace root (third_party/rtc-rtp).
 rtc = "0.21"
@@ -48,5 +54,5 @@ musivum-fakes = { version = "0.0.0", path = "../musivum-fakes" }
 # AES-GCM for a test of the buffer that upstream writes with Go's crypto/aes. Already in the
 # build through rtc.
 ring = "0.17.14"
-tokio = { version = "1.54.1", features = ["test-util", "rt-multi-thread", "macros"] }
+tokio = { version = "1.54.1", features = ["test-util", "rt-multi-thread", "macros", "io-util"] }
 tracing-subscriber = "0.3.23"
