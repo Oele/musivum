@@ -83,6 +83,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
 | (new, in place of `sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`) | `crates/musivum-fakes`, `testutils/fakes.rs` | | A procedural macro that makes a trait's fake at compile time, with counterfeiter's calls. 18 tests of its own; the uses of fakes in `downtrack_downstream_integration_test.go` and `room_test.go` were written out with it line for line as a check. A trait of 150 methods adds about a third of a second to a check of the tests. |
 | (new) | `webrtc/track.rs`, `webrtc/peerconnection/` | | Written new: the traits `pkg/sfu` meets the WebRTC library through, and musivum's peer connection on `rtc`. Twelve tests. See `docs/webrtc-library.md`. |
+| `pkg/routing/interfaces.go` (the message sink and source, `ParticipantInit`), `messagechannel.go`, `errors.go` | `routing/` (same names, with `message.rs`) | 1 / 1 | Only what one node needs: no router, no relay between nodes. A message is an enum of signal request and signal response. A reader awaits `recv()` or blocks on `blocking_recv()`. Four tests added. |
+| `pkg/rtc/signalling/` (ten files) | `rtc/signalling/` (same names, with `localparticipant.rs`) | 2 / 2 | The three interfaces are traits with default method bodies where Go embeds an "unimplemented" struct. `localparticipant.rs` is a narrow trait of the 23 methods the handler and the signaller call on the participant, to be replaced by `types::LocalParticipant` when that is ported. Nine messages built by `signalling.rs` are compared byte for byte with the original's. Nothing of psrpc is ported. `ParticipantCloseReason` and `SignallingCloseReason` of `types/interfaces.go` are ported with it. |
 | `pkg/rtc/dynacast/` (six files) | `rtc/dynacast/` (same names) | 3 / 3 | The base is generic over the state of its manager, which its one lock guards as upstream. The listener is held weakly (the media track is listener and owner). A manager dropped without `close()` notifies nobody afterwards. `RegressTo` with nothing to regress to does nothing where Go dereferences nil. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
@@ -112,6 +114,11 @@ with the same pseudo-random inputs (34,021 lines of output, identical).
   0001-01-01 (the zero time, see above).
 - **Float to integer out of range in `rtpstats`.** `fraction_lost` of an interval in which
   every expected packet was lost is 255 here and 0 in Go on amd64 (`uint8(256.0)`).
+- **Protocol messages in the log are not redacted.** Upstream logs a message through
+  `logger.Proto`, which leaves out fields marked as sensitive (metadata, names, attributes,
+  the TURN credential). The port logs a message with `Debug`, in full. The lines concerned
+  are at debug level ("handling signal request", "sent signal response", a participant's
+  init). To be settled for the whole crate before it serves real users.
 - **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
   files) are left out: counting allocations needs an allocator of the test binary's own,
   which needs `unsafe`, and the workspace forbids it.
@@ -202,6 +209,10 @@ What looked wrong or fragile upstream and was ported as it is:
   taken for a rollover of the sequence number: 65,536 ahead, about 63,000 packets counted
   lost (seen in the run). `Test_RTPStatsReceiver_Update` starts at a random sequence number
   and fails when that is within 13 of 65535, upstream and in the port.
+- `rtc/signalling`: `signallerAsync.WriteMessage` warns "unknown message type" for a
+  message that is no signal response and then writes it to the sink anyway; the handler
+  drops the errors of `HandleOffer` and `UpdateMetadata` without logging them, and logs the
+  others.
 - protocol `sdp`: `SDPFragment.Unmarshal` never recognises a plain `a=end-of-candidates`;
   `PatchICECredentialAndCandidatesIntoSDP` writes the candidates into every media section;
   `ExtractStreamID` returns the second token of `a=msid`, which is the track id.
