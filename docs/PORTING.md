@@ -78,6 +78,13 @@ was checked:
 - **ua-parser/uap-go** (Apache-2.0; its `uaparser/` MIT): read for the shapes of its results
   and `ToVersionString`. Its regular expressions (uap-core) are not used: `service/useragent.rs`
   is a small recogniser written new, held against the original's answers for 41 user agents.
+- **mackerelio/go-osstat v0.2.8** (Apache-2.0, Hatena), which LiveKit's `hwstats` reads the
+  system's load with: its Linux readers of `/proc/loadavg`, `/proc/stat` and `/proc/meminfo`
+  are ported in `routing/hwstats/osstat.rs`. Its notice is in `NOTICE`.
+- **frostbyte73/core v0.1.1** (MIT), small helpers LiveKit uses: its `Throttle` is ported in
+  `routing/hwstats/cpu.rs`. Its notice is in `NOTICE`.
+- **livekit/psrpc v0.8.2** (Apache-2.0), LiveKit's RPC between nodes: read for what its
+  local bus does for a single node; `routing/bus.rs` stands in its place, written new.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers

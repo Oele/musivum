@@ -264,7 +264,7 @@ the code is written against the Rust library. X = left out.
 | `pkg/utils` | 585 / 373 | Ported: `opsqueue`, `changenotifier`, `incrementaldispatcher`, `math`, `slice`. |
 | `pkg/clientconfiguration` | 348 / 189 | Ported: per-client settings (which browsers get which codecs disabled and the like). The rules are written in a script language upstream (tengo); they become Rust conditions. |
 | `pkg/service` | 12820 / 4793 | Written new and small. Read for behaviour: `rtcservice.go` (the WebSocket endpoint and its query parameters), `signal.go`, `wsprotocol.go`, `roommanager.go` (starting a session: 1,261 lines of which the single-node path is a fraction), `auth.go`, `roomservice.go` and `twirp.go` (the room API), `turn.go`. Left out: Redis stores, agents, SIP, ingress, egress, WHIP, WebTransport. |
-| `pkg/routing` | 1592 / 50 | Left out, except the two interfaces a participant talks through (`MessageSink`, `MessageSource`) and the shape of a local node. |
+| `pkg/routing` | 1592 / 50 | One node's part: the message sink and source, the local router and node, its statistics and the selector's limits. The relay between nodes (`redisrouter.go`, psrpc) is left out; a local bus stands where psrpc's was. |
 | `pkg/telemetry` | 1786 / 950 | Left out as a service. The few calls that carry events webhooks need (participant joined, left, track published) go to a small trait. |
 | `pkg/telemetry/prometheus` | 1432 / 127 | See "How Go becomes Rust". |
 | `pkg/agent`, `pkg/metric` | 5300 | Left out. |
