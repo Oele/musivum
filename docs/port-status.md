@@ -48,6 +48,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/codecmunger/` (four files) | `sfu/codecmunger/` (same names, with `orderedmap.rs`) | 8 / 8 | `update_and_get` returns the header by value, as the original does at the pin. The ordered map is written new on the standard library. A hand-made VP8 descriptor with `m` set and header size 0 differs (Go computes -1 and marshals). Also run against the original: 24,000 steps, 25,818 lines with the munger's full state, identical. |
 | `pkg/sfu/streamtrackermanager.go` | `sfu/streamtrackermanager.rs` | none upstream | Eight tests added, their expected events and states printed by the Go original for the same steps. The listener is held weakly. `Bitrates` and `ReceiverCodecState` of `receiver_base.go` are in `sfu/receiver_base.rs` ahead of the receiver. |
 | `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender` and `DownTrackListener` as traits with fakes. `DownTrackStreamAllocatorListener` follows with the down track. |
+| `pkg/sfu/pacer/` (six files) | `sfu/pacer/` (same names) | 2 / 2 | Ten tests added: what each of the three pacers stamps and tells the estimator, compared with a run of the original (header bytes, sizes, send times where LiveKit's rounding differs from pion's). A packet owns its parts: no pools and no scratch buffers, at the cost of two small allocations per send for the stamped extensions. `Pacer` has a fake. One assertion on allocations left out. |
 | `pkg/sfu/rtpmunger.go` | `sfu/rtpmunger.rs` | 9 / 9 | `update_and_get_sn_ts` returns the parameters together with the error, as the original does. Also run against the original: 6,000 operations, 13,548 lines of results and state, identical. |
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
@@ -213,6 +214,11 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `pacer`: the estimator is told of a packet, and gives out a transport-wide sequence
+  number for it, before the extension is stamped, so a stamp that fails leaves a number
+  that is never sent. The size it is told is the caller's header size, not the header as
+  sent. The leaky bucket's worker looks at its stop signal only inside its send loop: with
+  a bitrate of 0 and bytes owed it never ends and never sends again.
 - `streamtrackermanager.go`: `UpdateTrackInfo` while unmuted resets every tracker, so each
   active layer is reported stopped until its next packet. `RemoveTracker` leaves the layer
   available and tells the listener nothing; on a layer of a dependency descriptor stream it
