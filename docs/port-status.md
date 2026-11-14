@@ -74,6 +74,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/types/protocol_version.go`, `trafficstats.go` | `rtc/types/` (same names) | none upstream | Five tests added. `livekit.StreamType` is written out (its proto file is not compiled here). |
 | `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
 | `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
+| `pkg/clientconfiguration/` (four files) | `clientconfiguration/` (same names, with `semver.rs`) | 4 / 4 | A rule is a closure written through `script_match!` with the upstream expression as its body, token for token; the client's fields carry the script language's comparisons. Two table cases that expect a script error are compile errors here. `NewScriptMatch` with a string at run time is left out (nothing feeds it). Also run against the original with 989 clients and 1,962 version pairs: all agreed; 93 lines pinned. |
 | `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
 | (new, in place of `sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`) | `crates/musivum-fakes`, `testutils/fakes.rs` | | A procedural macro that makes a trait's fake at compile time, with counterfeiter's calls. 18 tests of its own; the uses of fakes in `downtrack_downstream_integration_test.go` and `room_test.go` were written out with it line for line as a check. A trait of 150 methods adds about a third of a second to a check of the tests. |
 | (new) | `webrtc/track.rs`, `webrtc/peerconnection/` | | Written new: the traits `pkg/sfu` meets the WebRTC library through, and musivum's peer connection on `rtc`. Twelve tests. See `docs/webrtc-library.md`. |
@@ -227,6 +228,11 @@ What looked wrong or fragile upstream and was ported as it is:
   sequence number 0 in the sequencer's first millisecond reads as an invalid slot.
   `rtpmunger_test.go`: `require.Error(t, err, errOutOfOrderSequenceNumberCacheMiss)` does
   not compare the error.
+- `clientconfiguration/match.go`: a version that is not valid semver (any with four parts,
+  such as `9.1.2.3`) is compared as a string, byte by byte, so Safari `9.1.2.3` counts as
+  later than `18.3` and `100.0.0.0` as earlier. `==` on versions is semver equality
+  (`18.3.0` equals `18.3`). A matching rule that is not merged returns its configuration
+  alone and drops what merged rules before it gave.
 - `pkg/rtc`: `CanHandleReconnectResponse` panics on a `ClientInfo` without a message.
   `UserPacketDeduper` takes a nonce of 16 zero bytes for a duplicate at first sight.
   `RTPStatsDiffToTrafficStats` clamps lost packets at zero while padding and out-of-order

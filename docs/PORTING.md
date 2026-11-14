@@ -56,6 +56,12 @@ was checked:
   in, and **counterfeiter** (MIT), which generates the fakes LiveKit's tests use: both read
   to see what they do, nothing copied (`sfu/codecmunger/orderedmap.rs` and
   `crates/musivum-fakes` are written new).
+- **d5/tengo v2.17.0** (MIT), the script language LiveKit's per-client rules are written
+  in: read to see what its operators do on the types the rules use; nothing copied
+  (`clientconfiguration/match.rs` gives the client's fields those comparisons).
+- **golang.org/x/mod** `semver` and **google.golang.org/protobuf** (both BSD-3-Clause): read
+  for how versions are compared and what a merge into nothing does; nothing copied
+  (`clientconfiguration/semver.rs` is written new and held against the original by a test).
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
