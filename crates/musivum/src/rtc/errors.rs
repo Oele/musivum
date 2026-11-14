@@ -50,6 +50,19 @@ pub enum Error {
     #[error("participant is not given permission to subscribe to metrics")]
     NoSubscribeMetricsPermission,
 
+    // subscriptionmanager.go: it defines no errors of its own and tells these three apart,
+    // which are errAlreadySubscribed of mediatracksubscriptions.go, and ErrNotOpen and
+    // ErrNoReceiver of mediatrackreceiver.go
+    #[error("already subscribed")]
+    AlreadySubscribed,
+    #[error("track is not open")]
+    NotOpen,
+    #[error("cannot subscribe without a receiver in place")]
+    NoReceiver,
+    // Go's context.DeadlineExceeded, which WaitUntilSubscribed returns when its time is up
+    #[error("context deadline exceeded")]
+    DeadlineExceeded,
+
     // errors of other packages that the methods of `types/interfaces.go` pass on: of the
     // sink a participant's messages are written to, of the signal handler and the limits on
     // a participant's metadata, of the down track a subscription makes, of the peer

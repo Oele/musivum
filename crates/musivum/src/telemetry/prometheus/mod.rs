@@ -48,14 +48,17 @@
 
 mod collectors;
 mod packets;
+mod rooms;
 
 pub use collectors::*;
 pub use packets::*;
+pub use rooms::*;
 
 /// Every metric of the package as it stands now, for whoever serves them.
 pub fn gather() -> Vec<MetricFamily> {
     let mut families = Vec::new();
     packets::collect(&mut families);
+    rooms::collect(&mut families);
     families
 }
 
@@ -75,6 +78,9 @@ mod tests {
                 "livekit_forward_latency",
                 "livekit_forward_latency_ns",
                 "livekit_rtx_capped_total",
+                "livekit_track_subscribe_counter",
+                "livekit_pubsubtime_ms",
+                "livekit_subscribe_pace_shadow_delay_ms",
             ]
         );
         assert_eq!(families[0].label_names, ["direction"]);

@@ -13,6 +13,7 @@ mod clientinfo;
 mod errors;
 mod participant_data_blob;
 mod subscribepacer;
+mod subscriptionmanager;
 #[cfg(test)]
 pub mod testutils;
 mod user_packet_deduper;
@@ -22,5 +23,6 @@ pub use clientinfo::*;
 pub use errors::*;
 pub use participant_data_blob::*;
 pub use subscribepacer::*;
+pub use subscriptionmanager::*;
 pub use user_packet_deduper::*;
 pub use utils::*;
