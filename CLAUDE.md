@@ -43,9 +43,9 @@ What goes into this repository has to be free to be here under the Apache Licens
 
 - `reference/livekit` is the pinned upstream source (`scripts/fetch-reference.sh`). It is not
   committed. The pin is `upstream.toml`.
-- This repository may become public. No host names, addresses, account names or log extracts
+- This repository is public. No host names, addresses, account names or log extracts
   of real servers in code, comments, commit messages or documents.
 - Before a commit: `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`,
   `cargo test --workspace`.
-- Do not publish to crates.io, make the repository public, or post in LiveKit's or anybody
-  else's issue tracker without the owner saying so.
+- Do not publish to crates.io, or post in LiveKit's or anybody else's issue tracker, without
+  the owner saying so.
