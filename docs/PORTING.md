@@ -114,6 +114,14 @@ was checked:
   `telemetry/prometheus/exposition.rs` and `musivum-server/src/service/promserver.rs`, nothing
   copied. **munnerz/goautoneg** (BSD-3-Clause): the order in which it parses an `Accept`
   header, followed in `exposition.rs`.
+- **pion/turn v5.0.13** (MIT), the TURN server LiveKit embeds: its server side (`server.go`,
+  `lt_cred.go`, the relay address generators, `internal/server`, `internal/allocation`,
+  `internal/auth`, `internal/ipnet`) is ported in `webrtc/turn/`, with **pion/stun v3.1.7**'s
+  list of known attributes and `ForEach`. Not ported: its client, RFC 6062 TCP relays (LiveKit
+  refuses them), its virtual network. Pion's notice is in `NOTICE`.
+- **pires/go-proxyproto v0.15.0** (Apache-2.0): read for how LiveKit's TURN listener treats
+  the PROXY protocol; `service/proxyproto.rs` is written new from **HAProxy's PROXY protocol
+  specification** (v1 and v2).
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers

@@ -98,6 +98,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/service/roommanager.go`, `signal.go` (the server half) | `service/roommanager.rs`, `signal.rs` | 1 / 2 | The room manager of one node: sessions started through the local router create or find the room, make and join the participant, and run its signal loop; resumes; the room-side operations of the room API. Six tests added on a real room manager through the router (the join response for protocols 16 and 18 compared with the original's, a second participant announced, a mute, close and idle close, a resume, every room-side operation with the original's errors). Not ported: the egress test of `roommanager_test.go`. Left out: agents, egress, WHIP, the embedded TURN server's part of the ICE servers. |
 | `pkg/service/roomservice.go`, `twirp.go`; the room and participant servers of protocol `rpc` | `service/roomservice.rs`, `twirp.rs`, `protojson.rs`; `routing/rpc.rs` | 4 / 5 | The room API over Twirp (`/twirp/livekit.RoomService/<Method>`, protobuf and JSON), framework-neutral like the rest of `service`. psrpc's room and participant servers are traits registered per topic on the local bus. 61 requests (every method in both encodings, missing token or grant, limits, not found, routing errors, malformed bodies) answered with the same status, content type and body as the original's Twirp server. Not ported: `TestAgentDispatchMetadataLimits` (agents). The room manager is the room's and each participant's server on the bus (registered per topic, killed at close and at `Stop`, as upstream); the binary serves the prefix. |
 | `pkg/service/rtcservice.go` | `service/rtcservice.rs` | 1 / 1 | The signalling endpoint (`/rtc`, `/rtc/v1` and their `validate`), framework-neutral: a server authenticates, calls `v0`/`v1`, and runs the `RtcUpgrade` it gets on the upgraded socket. Gorilla's handshake checks are made in its order. Six tests added, their expected values from one run of the original: the `StartSession` of five requests (`join_request` gzip and plain, the query form, reconnects), a session over an in-memory socket, twelve `validate` cases, the refusals. |
+| pion/turn's server side (`server.go`, `server_config.go`, `lt_cred.go`, the relay address generators, `internal/server`, `internal/allocation`, `internal/auth`, `internal/ipnet`, `internal/proto`) | `webrtc/turn/` | 49 / 61 | The TURN server, on tokio with rustls; message types of `rtc-stun`/`rtc-turn`. Not ported: the client, RFC 6062 TCP relays (Connect, ConnectionBind: LiveKit refuses TCP relays; a TCP Allocate gets LiveKit's 508, Connect and ConnectionBind get no answer where LiveKit's answers 447 and 400; browsers send neither) with their 12 tests, and the virtual network (`TestServerVNet`). Tests use ephemeral ports or 39545..=39559, never 3478. |
+| `pkg/service/turn.go`, `turnrelay.go`, `turnquota.go`; `pkg/telemetry/statsconn.go`'s relay generator | `service/turn.rs`, `turnrelay.rs`, `turnquota.rs`, `proxyproto.rs` (new); `telemetry/statsconn.rs` | 35 / 35 | LiveKit's embedded TURN server: UDP and TLS listeners (certificate files, `external_tls`, the PROXY protocol), the relay policy (only the node's media ports; `allow_restricted_peer_cidrs`, `deny_peer_cidrs`), the per-user quota, credentials from the API keys handed out in the join response. Wired into `musivum-server` (made in `Start`, closed in `Stop`). A relay-only variant of the browser call (`RELAY=1 tests/call/run.sh`, Chrome with `iceTransportPolicy: 'relay'`, TURN on ports 39540..39559) gives 21 of 21 against musivum, over UDP and TLS and over TLS alone, as against LiveKit. |
 | `cmd/server/main.go`, `commands.go`, `pkg/service/server.go` | `crates/musivum-server` (`main.rs`, `commands.rs`, `service/server.rs`, `service/utils.rs` for the middlewares) | | The server binary: LiveKit's flags and environment (compared with LiveKit's `getConfig` at the pin), dev mode, `generate-keys`, `ports`, `create-join-token`; binding, the health check, graceful stop, the request body limit, path normalisation, authentication. The WebSocket adapter for `SignalWebSocket` on axum (`axumws.rs`, new): no permessage-deflate, which tungstenite does not have, so the server declines it and runs uncompressed. Prometheus' endpoint is served on `prometheus.port` with basic auth (`promserver.rs`, `basic_auth.rs`): the text format only, no gzip, no Go runtime metrics. 23 tests and the endpoint's. `tests/call/run.sh musivum` starts it; the call fails at `/rtc` (404) until the signalling endpoint is wired in. |
 | `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
 | (new, in place of `sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`) | `crates/musivum-fakes`, `testutils/fakes.rs` | | A procedural macro that makes a trait's fake at compile time, with counterfeiter's calls. 18 tests of its own; the uses of fakes in `downtrack_downstream_integration_test.go` and `room_test.go` were written out with it line for line as a check. A trait of 150 methods adds about a third of a second to a check of the tests. |
@@ -146,7 +148,7 @@ connection layer (`webrtc/peerconnection`) does not have yet; each is logged whe
 IPv6, `interfaces`/`ips` (a socket per address), `udp_port` as a range, `port_range_start`/`_end`
 (the first free ports of the range, as many as processors, given to connections in turn),
 `use_stun_port_as_ice` and ICE over TCP (`tcp_port`, `force_tcp`) are applied
-(`docs/webrtc-library.md`). TURN is being ported.
+(`docs/webrtc-library.md`). LiveKit's embedded TURN server is ported (`turn:`).
 
 ## Where the port cannot be the original
 
@@ -293,6 +295,10 @@ What looked wrong or fragile upstream and was ported as it is:
 - `pkg/service/rtcservice.go`: a `WrappedJoinRequest` with an unknown compression goes on
   with an empty join request; `JoinRequest.sync_state` is never copied into the session;
   after gorilla refuses an upgrade, `HandleError` writes its own text after gorilla's body.
+- `pkg/service/turn.go`: the TURN URL given to clients always says port 443, whatever
+  `turn.tls_port` is. pion/turn: `errMinPortNotZero`'s text says "MaxPort"; `Server.Close`
+  closes the listeners but not the accepted TCP connections; `DeleteAllocation` and
+  `Manager.Close` close allocations, and run their callbacks, with the manager's lock held.
 - `cmd/server`: `ports` prints a single UDP port as `%!s(int=39502)`; `--node-ip` does not
   replace a node IP already in the file (the error is dropped); `create-join-token` panics
   when the keys come only from a key file (here it reads them).
@@ -541,6 +547,4 @@ participant).
 
 ## In progress, not on `main`
 
-LiveKit's embedded
-TURN server (ported from pion/turn, with a relay-only variant of the browser call as its
-proof).
+Nothing at the moment.

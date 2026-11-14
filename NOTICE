@@ -25,7 +25,7 @@ which carry the same notice as above. The files under crates/musivum-protocol/pr
 copies from https://github.com/livekit/protocol.
 
 Parts of musivum are a port to Rust of code from the Pion project (https://github.com/pion:
-rtp, rtcp, sdp, interceptor, webrtc). Each such file says so at its top. Pion carries this
+rtp, rtcp, sdp, interceptor, webrtc, turn, stun). Each such file says so at its top. Pion carries this
 licence:
 
     MIT License
@@ -73,7 +73,7 @@ crates/musivum/src/protocol/auth/jwt.rs is in part a port to Rust of golang-jwt
     CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
     THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-crates/musivum/src/protocol/utils/base62.rs is a port to Rust of the encoder of
+crates/musivum/src/protocol/utils/base62.rs is a port to Rust of the encoder and decoder of
 jxskiss/base62 (https://github.com/jxskiss/base62), which is under the MIT License (the
 text above) with this notice:
 
