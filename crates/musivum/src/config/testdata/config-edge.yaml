@@ -137,3 +137,8 @@ api:
 metric:
   timestamper_config:
     one_way_delay_estimator_max_batch: 5
+prometheus_port: 0x2329
+prometheus:
+  port: 9_100
+  username: 1234
+  password: ~

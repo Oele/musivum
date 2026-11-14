@@ -1,0 +1,70 @@
+# HELP musivum_test_counter_total A counter.
+# TYPE musivum_test_counter_total counter
+musivum_test_counter_total{node_id="ND_abc",node_type="SERVER"} 1.234567e+06
+# HELP musivum_test_direction_total Help with a \\backslash,\na newline and "quotes".
+# TYPE musivum_test_direction_total counter
+musivum_test_direction_total{direction="",node_id="ND_abc",node_type="SERVER"} 5
+musivum_test_direction_total{direction="a\"b\\c\nd",node_id="ND_abc",node_type="SERVER"} 3
+musivum_test_direction_total{direction="incoming",node_id="ND_abc",node_type="SERVER"} 1
+musivum_test_direction_total{direction="outgoing",node_id="ND_abc",node_type="SERVER"} 42
+musivum_test_direction_total{direction="é€ 	{x=\"1\"}",node_id="ND_abc",node_type="SERVER"} 4
+# HELP musivum_test_floats How numbers are written.
+# TYPE musivum_test_floats gauge
+musivum_test_floats{case="big",node_id="ND_abc",node_type="SERVER"} 123456
+musivum_test_floats{case="e-4",node_id="ND_abc",node_type="SERVER"} 0.0001
+musivum_test_floats{case="e-5",node_id="ND_abc",node_type="SERVER"} 1e-05
+musivum_test_floats{case="e100",node_id="ND_abc",node_type="SERVER"} 1e+100
+musivum_test_floats{case="e21",node_id="ND_abc",node_type="SERVER"} 1e+21
+musivum_test_floats{case="e6",node_id="ND_abc",node_type="SERVER"} 1e+06
+musivum_test_floats{case="e6_plus",node_id="ND_abc",node_type="SERVER"} 1.234567e+06
+musivum_test_floats{case="frac",node_id="ND_abc",node_type="SERVER"} 1234.5678
+musivum_test_floats{case="half",node_id="ND_abc",node_type="SERVER"} 0.5
+musivum_test_floats{case="inf",node_id="ND_abc",node_type="SERVER"} +Inf
+musivum_test_floats{case="max",node_id="ND_abc",node_type="SERVER"} 1.7976931348623157e+308
+musivum_test_floats{case="min_positive",node_id="ND_abc",node_type="SERVER"} 5e-324
+musivum_test_floats{case="minus_one",node_id="ND_abc",node_type="SERVER"} -1
+musivum_test_floats{case="nan",node_id="ND_abc",node_type="SERVER"} NaN
+musivum_test_floats{case="neg_e6",node_id="ND_abc",node_type="SERVER"} -1e+06
+musivum_test_floats{case="neg_inf",node_id="ND_abc",node_type="SERVER"} -Inf
+musivum_test_floats{case="neg_small",node_id="ND_abc",node_type="SERVER"} -2.5e-07
+musivum_test_floats{case="neg_zero",node_id="ND_abc",node_type="SERVER"} 0
+musivum_test_floats{case="one",node_id="ND_abc",node_type="SERVER"} 1
+musivum_test_floats{case="third",node_id="ND_abc",node_type="SERVER"} 0.3333333333333333
+musivum_test_floats{case="two_pow_53_plus_one",node_id="ND_abc",node_type="SERVER"} 9.007199254740992e+15
+musivum_test_floats{case="zero",node_id="ND_abc",node_type="SERVER"} 0
+# HELP musivum_test_gauge A gauge.
+# TYPE musivum_test_gauge gauge
+musivum_test_gauge{node_id="ND_abc",node_type="SERVER"} -0.5
+# HELP musivum_test_histogram A histogram.
+# TYPE musivum_test_histogram histogram
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="0.005"} 1
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="0.25"} 2
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="1"} 3
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="2.5"} 3
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="1e+06"} 4
+musivum_test_histogram_bucket{node_id="ND_abc",node_type="SERVER",le="+Inf"} 5
+musivum_test_histogram_sum{node_id="ND_abc",node_type="SERVER"} 2.000003551e+06
+musivum_test_histogram_count{node_id="ND_abc",node_type="SERVER"} 5
+# HELP musivum_test_histogram_vec Histograms by two labels.
+# TYPE musivum_test_histogram_vec histogram
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="audio",le="1"} 1
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="audio",le="10"} 1
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="audio",le="+Inf"} 1
+musivum_test_histogram_vec_sum{direction="incoming",node_id="ND_abc",node_type="SERVER",type="audio"} 1
+musivum_test_histogram_vec_count{direction="incoming",node_id="ND_abc",node_type="SERVER",type="audio"} 1
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="video",le="1"} 0
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="video",le="10"} 1
+musivum_test_histogram_vec_bucket{direction="incoming",node_id="ND_abc",node_type="SERVER",type="video",le="+Inf"} 1
+musivum_test_histogram_vec_sum{direction="incoming",node_id="ND_abc",node_type="SERVER",type="video"} 5
+musivum_test_histogram_vec_count{direction="incoming",node_id="ND_abc",node_type="SERVER",type="video"} 1
+musivum_test_histogram_vec_bucket{direction="outgoing",node_id="ND_abc",node_type="SERVER",type="audio",le="1"} 1
+musivum_test_histogram_vec_bucket{direction="outgoing",node_id="ND_abc",node_type="SERVER",type="audio",le="10"} 1
+musivum_test_histogram_vec_bucket{direction="outgoing",node_id="ND_abc",node_type="SERVER",type="audio",le="+Inf"} 2
+musivum_test_histogram_vec_sum{direction="outgoing",node_id="ND_abc",node_type="SERVER",type="audio"} 20.5
+musivum_test_histogram_vec_count{direction="outgoing",node_id="ND_abc",node_type="SERVER",type="audio"} 2
+# HELP musivum_test_plain_total Without constant labels.
+# TYPE musivum_test_plain_total counter
+musivum_test_plain_total 7
+# HELP musivum_test_zero_total 
+# TYPE musivum_test_zero_total counter
+musivum_test_zero_total{node_id="ND_abc",node_type="SERVER"} 0

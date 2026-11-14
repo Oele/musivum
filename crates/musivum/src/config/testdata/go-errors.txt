@@ -30,3 +30,6 @@ error=could not parse config: yaml: unmarshal errors:
   line 49: cannot unmarshal !!seq into string
   line 50: cannot unmarshal !!map into string
   line 52: cannot unmarshal !!map into []string
+  line 55: cannot unmarshal !!seq into uint32
+  line 56: field user not found in type config.PrometheusConfig
+  line 57: cannot unmarshal !!map into string

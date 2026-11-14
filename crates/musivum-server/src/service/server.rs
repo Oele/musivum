@@ -23,7 +23,8 @@
 //   `AxumSignalWebSocket`.
 // - Not here, with what they belong to: the Twirp servers of egress, ingress, SIP and agent
 //   dispatch, WHIP, the agent endpoints and their tunnels (`drainAgentTunnels`), the IO info
-//   service, WebTransport, TURN, the listeners for Prometheus and for debugging, and the debug handlers of development mode
+//   service, WebTransport, TURN, the listener for debugging, and the debug handlers of
+//   development mode
 //   (`debugGoroutines`, which is Go's runtime, and `debugInfo`, which reads the room
 //   manager). Of `NewHTTPHandler`'s middleware, negroni's recovery and the CORS handler of
 //   rs/cors are not here (a handler that panics ends its connection; a browser on another
@@ -41,6 +42,8 @@
 //   in the server's time zone.
 // - Go's `ServeMux` redirects a path with `..` or a doubled slash inside it to its clean
 //   form; axum's router does not, and such a path is not found.
+// - The Prometheus listener (`promServer`) is `PromServer` of promserver.rs, made, started
+//   and stopped here where the original does it; it is stopped with the HTTP server.
 
 use std::io;
 use std::net::SocketAddr;
@@ -73,6 +76,7 @@ use parking_lot::Mutex;
 use tokio_util::sync::CancellationToken;
 
 use super::axumws::{AxumSignalWebSocket, set_read_limit};
+use super::promserver::PromServer;
 use super::utils::{RequestBodyLimiter, with_path_normalization};
 
 // the time `httpServer.Shutdown` is given
@@ -92,6 +96,10 @@ pub enum Error {
     AlreadyRunning,
     #[error("one of key-file or keys must be provided in order to support a secure installation")]
     KeysNotProvided,
+    #[error(
+        "prometheus username or password is set but not both, set both or nothing for unauthenticated access"
+    )]
+    PrometheusUsernameOrPassword,
     #[error(transparent)]
     Io(#[from] io::Error),
     #[error(transparent)]
@@ -384,6 +392,7 @@ pub struct LivekitServer {
     config: Arc<Config>,
     state: ServerState,
     http_server: axum::Router,
+    prom_server: Option<PromServer>,
     router: Arc<dyn Router>,
     room_manager: Arc<RoomManager>,
     signal_server: Arc<SignalServer>,
@@ -400,8 +409,10 @@ impl LivekitServer {
         let conf = state.config.clone();
         let http_server = new_http_handler(&conf, Some(state.key_provider.clone()), mux);
 
-        // prometheus_port, prometheus, debug_handler and webtransport are taken by the
-        // configuration and not read (see the header).
+        let prom_server = PromServer::new(&conf, state.current_node.as_ref())?;
+
+        // debug_handler and webtransport are taken by the configuration and not read (see the
+        // header).
 
         state.router.remove_dead_nodes()?;
 
@@ -413,6 +424,7 @@ impl LivekitServer {
             signal_server: state.signal_server.clone(),
             state,
             http_server,
+            prom_server,
             running: atomic::Bool::new(false),
             done_chan: CancellationToken::new(),
             closed_chan: CancellationToken::new(),
@@ -462,12 +474,17 @@ impl LivekitServer {
 
         // ensure we could listen
         let mut listeners = Vec::new();
+        let mut prom_listeners = Vec::new();
         for addr in &addresses {
             let ln = listen(addr, self.config.port).await?;
             self.local_addrs.lock().push(ln.local_addr()?);
             listeners.push(ln);
 
-            // the listeners for Prometheus and for debugging: not here
+            if let Some(prom_server) = &self.prom_server {
+                prom_listeners.push(prom_server.listen(addr).await?);
+            }
+
+            // the listener for debugging: not here
         }
 
         // WebTransport: not here
@@ -494,10 +511,18 @@ impl LivekitServer {
             } else {
                 values.push(("rtc.portICERange", &ice_port_range));
             }
+            let prom_port = self.prom_server.as_ref().map(PromServer::port);
+            if let Some(prom_port) = &prom_port {
+                values.push(("portPrometheus", prom_port));
+            }
             if !self.config.region.is_empty() {
                 values.push(("region", &self.config.region));
             }
             logger::get_logger().infow("starting LiveKit server", &values);
+        }
+
+        if let Some(prom_server) = &self.prom_server {
+            prom_server.serve(prom_listeners);
         }
 
         self.signal_server.start()?;
@@ -555,6 +580,9 @@ impl LivekitServer {
         // wait for shutdown
         shutdown.cancel();
         let _ = tokio::time::timeout(SHUTDOWN_TIMEOUT.to_std(), http_closed.cancelled()).await;
+        if let Some(prom_server) = &self.prom_server {
+            prom_server.shutdown();
+        }
 
         // the debug server, WebTransport and TURN: not here
 
@@ -625,7 +653,7 @@ impl Drop for UnregisterNode<'_> {
 }
 
 // `net.Listen("tcp", net.JoinHostPort(addr, port))`.
-async fn listen(addr: &str, port: u32) -> io::Result<tokio::net::TcpListener> {
+pub(super) async fn listen(addr: &str, port: u32) -> io::Result<tokio::net::TcpListener> {
     if addr.is_empty() {
         return match tokio::net::TcpListener::bind(("::", port as u16)).await {
             Ok(ln) => Ok(ln),

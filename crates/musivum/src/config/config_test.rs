@@ -546,7 +546,7 @@ fn assert_equals_the_original(conf: Config, original: &str) -> usize {
 fn test_default_config_equals_the_original() {
     let conf = Config::new("", true).unwrap();
     let compared = assert_equals_the_original(conf, include_str!("testdata/go-default.txt"));
-    assert_eq!(315, compared);
+    assert_eq!(319, compared);
 }
 
 // New for musivum: LiveKit's sample file with the options it has as comments set
@@ -570,14 +570,7 @@ fn test_sample_config_equals_the_original() {
         .map(|(section, _)| *section)
         .collect();
     assert_eq!(
-        vec![
-            "prometheus",
-            "redis",
-            "ingress",
-            "node_selector",
-            "signal_relay",
-            "psrpc"
-        ],
+        vec!["redis", "ingress", "node_selector", "signal_relay", "psrpc"],
         present
     );
     for section in present {
@@ -592,10 +585,10 @@ fn test_sample_config_equals_the_original() {
             "{section}:\n{log}"
         );
     }
-    assert_eq!(6, log.lines().count(), "{log}");
+    assert_eq!(5, log.lines().count(), "{log}");
 
     let compared = assert_equals_the_original(conf, include_str!("testdata/go-sample.txt"));
-    assert_eq!(320, compared);
+    assert_eq!(324, compared);
 }
 
 // New for musivum: a configuration that writes its values in the less common ways YAML has
@@ -606,7 +599,7 @@ fn test_sample_config_equals_the_original() {
 fn test_edge_config_equals_the_original() {
     let conf = Config::new(include_str!("testdata/config-edge.yaml"), true).unwrap();
     let compared = assert_equals_the_original(conf, include_str!("testdata/go-edge.txt"));
-    assert_eq!(353, compared);
+    assert_eq!(357, compared);
 }
 
 // New for musivum: what is wrong in a configuration is said in the original's words, all

@@ -8,8 +8,10 @@
 //! is a `static` that counts into atomics from the start of the process, so nothing has to
 //! be initialized (there is no `Init`) and the library has no dependency for it. A test reads
 //! a collector back directly (`PROM_FORWARD_LATENCY_HIST.snapshot()`); whoever serves
-//! metrics reads all of them with [`gather`] and adds the labels of the node (`node_id`,
-//! `node_type`), which upstream attaches to every collector.
+//! metrics reads all of them with [`gather`], adds the labels of the node (`node_id`,
+//! `node_type`), which upstream attaches to every collector, with
+//! [`MetricFamily::with_const_labels`], and writes them in Prometheus' text format with
+//! [`encode_text`] (`exposition.rs`).
 //!
 //! # Adding a function that ported code calls
 //!
@@ -48,6 +50,7 @@
 
 mod collectors;
 mod datapacket;
+mod exposition;
 mod node;
 mod packets;
 mod quality;
@@ -55,6 +58,7 @@ mod rooms;
 
 pub use collectors::*;
 pub use datapacket::*;
+pub use exposition::*;
 pub use node::*;
 pub use packets::*;
 pub use quality::*;

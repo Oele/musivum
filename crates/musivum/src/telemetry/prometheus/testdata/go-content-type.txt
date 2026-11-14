@@ -1,0 +1,17 @@
+	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.6,application/openmetrics-text;version=0.0.1;q=0.5,text/plain;version=1.0.0;escaping=allow-utf-8;q=0.4,text/plain;version=0.0.4;q=0.3,*/*;q=0.2	text/plain; version=0.0.4; charset=utf-8; escaping=allow-utf-8
+application/openmetrics-text;version=1.0.0,application/openmetrics-text;version=0.0.1;q=0.75,text/plain;version=0.0.4;q=0.5,*/*;q=0.1	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+text/plain	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+*/*	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+*	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+application/json	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+text/plain;version=0.0.4;escaping=dots	text/plain; version=0.0.4; charset=utf-8; escaping=dots
+text/plain; version=0.0.4; escaping=values	text/plain; version=0.0.4; charset=utf-8; escaping=values
+text/plain;escaping=bogus	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+text/plain;version=0.0.4;escaping=values;q=0.1, text/plain;escaping=allow-utf-8;q=0.9	text/plain; version=0.0.4; charset=utf-8; escaping=allow-utf-8
+text/*;escaping=allow-utf-8	text/plain; version=0.0.4; charset=utf-8; escaping=allow-utf-8
+text/plain;version=1.0.0;escaping=dots	text/plain; version=0.0.4; charset=utf-8; escaping=dots
+*/*;escaping=values, text/plain;q=0.5	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+text/html;escaping=dots;q=0.9, application/json;escaping=values	text/plain; version=0.0.4; charset=utf-8; escaping=dots
+text/plain;escaping=dots=x, text/plain/;escaping=values;q=0.5	text/plain; version=0.0.4; charset=utf-8; escaping=underscores
+text/plain;q=x;escaping=dots, application/xml;escaping=allow-utf-8	text/plain; version=0.0.4; charset=utf-8; escaping=dots

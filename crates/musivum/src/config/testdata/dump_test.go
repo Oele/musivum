@@ -33,8 +33,6 @@ import (
 )
 
 var musivumIgnored = map[string]bool{
-	"prometheus_port":          true,
-	"prometheus":               true,
 	"debug_handler":            true,
 	"webtransport":             true,
 	"redis":                    true,

@@ -6,12 +6,12 @@
 //   them as YAML and reading that into an empty struct; here it starts from a copy of
 //   `DEFAULT_CONFIG`, which is the same but for what YAML cannot tell apart.
 // - The sections for what musivum leaves out (`IgnoredSection`: Redis, the node selector,
-//   the relay and RPC between nodes, ingress, SIP, agents, the Prometheus and debug
-//   listeners, tracing, WebTransport, node statistics, and `room.room_configurations`) take
-//   any YAML and are not read; `Config::new` logs each one that a file has. Their structs
-//   and defaults (`WebTransportConfig`, `NodeSelectorConfig`, `SignalRelayConfig`,
-//   `RegionConfig`, `IngressConfig`, `SIPConfig`, `PrometheusConfig`, `DebugHandlerConfig`,
-//   `TracingConfig`, `NodeStatsConfig`) are not ported.
+//   the relay and RPC between nodes, ingress, SIP, agents, the debug listener, tracing,
+//   WebTransport, node statistics, and `room.room_configurations`) take any YAML and are not
+//   read; `Config::new` logs each one that a file has. Their structs and defaults
+//   (`WebTransportConfig`, `NodeSelectorConfig`, `SignalRelayConfig`, `RegionConfig`,
+//   `IngressConfig`, `SIPConfig`, `DebugHandlerConfig`, `TracingConfig`, `NodeStatsConfig`)
+//   are not ported.
 // - The command line is not ported: `GenerateCLIFlags`, `ToCLIFlagNames`, `cliDefaultText`,
 //   and the first half of `updateFromCLI`, which sets any key from a generated flag or its
 //   environment variable. Its second half, the flags `cmd/server` defines by hand, is kept
@@ -139,9 +139,9 @@ pub struct Config {
     pub bind_addresses: Vec<String>,
     // PrometheusPort is deprecated
     /// `prometheus_port` in YAML.
-    pub prometheus_port: IgnoredSection,
+    pub prometheus_port: u32,
     /// `prometheus` in YAML.
-    pub prometheus: IgnoredSection,
+    pub prometheus: PrometheusConfig,
     /// `debug_handler` in YAML.
     pub debug_handler: IgnoredSection,
     /// `webtransport` in YAML.
@@ -912,8 +912,23 @@ yaml_struct!(ApiConfig, "config.APIConfig", {
     enable_psrpc_for_get_list_particpants: "enable_psrpc_for_get_list_participants",
 });
 
-// PrometheusConfig and DebugHandlerConfig are not ported: the listeners they are for are
-// left out.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct PrometheusConfig {
+    /// `port` in YAML.
+    pub port: u32,
+    /// `username` in YAML.
+    pub username: String,
+    /// `password` in YAML.
+    pub password: String,
+}
+
+yaml_struct!(PrometheusConfig, "config.PrometheusConfig", {
+    port: "port",
+    username: "username",
+    password: "password",
+});
+
+// DebugHandlerConfig is not ported: the listener it is for is left out.
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ForwardStatsConfig {
@@ -1156,10 +1171,8 @@ impl Config {
 
     /// The parts of the configuration that are taken from a file and not read, by their
     /// names in YAML.
-    pub fn ignored_sections(&self) -> [(&'static str, &IgnoredSection); 14] {
+    pub fn ignored_sections(&self) -> [(&'static str, &IgnoredSection); 12] {
         [
-            ("prometheus_port", &self.prometheus_port),
-            ("prometheus", &self.prometheus),
             ("debug_handler", &self.debug_handler),
             ("webtransport", &self.web_transport),
             ("redis", &self.redis),

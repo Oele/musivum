@@ -50,3 +50,8 @@ turn:
     - {b: c}
 webhook:
   urls: {a: b}
+prometheus_port: 9100.5
+prometheus:
+  port: [1]
+  user: x
+  password: {a: b}
