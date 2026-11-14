@@ -15,7 +15,10 @@
 // that LiveKit's code names are here (one of them, `ErrStreamClosed`, is pion/sctp's, from
 // stream.go at v1.12.0), and `Other` for what the library underneath says.
 // `PacketSink` is new: it stands where pion has its buffer factory, and is told what pion
-// tells its interceptors about streams.
+// tells its interceptors about streams. The traits that stand for pion's types have `Any` as
+// a supertrait, so that the ported code can get the layer's type back where it holds one
+// behind the trait (`Arc<dyn RtpSender>` coerces to `Arc<dyn Any + Send + Sync>`, then
+// `downcast`), as Go code gets a pion pointer back from an interface.
 
 //! The seam between the ported media code and the peer connection: what `pkg/sfu` takes from
 //! pion's `webrtc` package as behaviour. A down track is a [`TrackLocal`] that the connection
@@ -25,6 +28,7 @@
 //!
 //! Nothing here knows the WebRTC library.
 
+use std::any::Any;
 use std::ops::{Deref, DerefMut};
 use std::sync::Arc;
 
@@ -104,7 +108,7 @@ pub trait TrackLocalContext: Send + Sync {
 /// TrackLocal is an interface that controls how the user can send media
 /// The user can provide their own TrackLocal implementations, or use
 /// the implementations in pkg/media.
-pub trait TrackLocal: Send + Sync {
+pub trait TrackLocal: Any + Send + Sync {
     /// Bind should implement the way how the media data flows from the Track to the PeerConnection
     /// This will be called internally after signaling is complete and the list of available
     /// codecs has been determined
@@ -137,7 +141,7 @@ pub trait TrackLocal: Send + Sync {
 /// These are the methods of pion's struct that LiveKit's `sfu.TrackRemote` interface names.
 /// `Read`, which LiveKit uses once to wait for a first packet, has no place here: the
 /// connection announces a track when its first packet has come.
-pub trait TrackRemote: Send + Sync {
+pub trait TrackRemote: Any + Send + Sync {
     /// ID is the unique identifier for this Track. This should be unique for the
     /// stream, but doesn't have to globally unique. A common example would be 'audio' or 'video'
     /// and StreamID would be 'desktop' or 'webcam'
@@ -209,7 +213,7 @@ impl DerefMut for RtpSendParameters {
 }
 
 /// RTPSender allows an application to control how a given Track is encoded and transmitted to a remote peer.
-pub trait RtpSender: Send + Sync {
+pub trait RtpSender: Any + Send + Sync {
     /// GetParameters describes the current configuration for the encoding and
     /// transmission of media on the sender's track.
     fn get_parameters(&self) -> RtpSendParameters;
@@ -228,14 +232,14 @@ pub trait RtpSender: Send + Sync {
 }
 
 /// An RTPReceiver allows an application to inspect the receipt of a TrackRemote.
-pub trait RtpReceiver: Send + Sync {
+pub trait RtpReceiver: Any + Send + Sync {
     /// GetParameters describes the current configuration for the encoding and
     /// transmission of media on the receiver's track.
     fn get_parameters(&self) -> RtpParameters;
 }
 
 /// RTPTransceiver represents a combination of an RTPSender and an RTPReceiver that share a common mid.
-pub trait RtpTransceiver: Send + Sync {
+pub trait RtpTransceiver: Any + Send + Sync {
     /// Sender returns the RTPTransceiver's RTPSender if it has one.
     fn sender(&self) -> Option<Arc<dyn RtpSender>>;
 
