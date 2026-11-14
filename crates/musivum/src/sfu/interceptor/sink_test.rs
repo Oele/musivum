@@ -710,6 +710,175 @@ async fn test_buffers_are_closed_with_their_stream_and_with_the_sink() {
     );
 }
 
+/// Reads packets from a buffer as `read` does: their sequence numbers with the arrival time
+/// the buffer has stamped them with.
+async fn read_arrivals(buffer: &Buffer, count: usize) -> Vec<(u16, i64)> {
+    let mut arrivals = Vec::new();
+    let mut buf = vec![0u8; 1500];
+    while arrivals.len() < count {
+        let read = tokio::time::timeout(WAIT, buffer.read_extended_async(&mut buf))
+            .await
+            .unwrap_or_else(|_| panic!("no packet after {arrivals:?}"));
+        if let Some(packet) = read.expect("the buffer is open") {
+            arrivals.push((packet.packet.sequence_number, packet.arrival));
+        }
+    }
+    arrivals
+}
+
+/// A packet is stamped with the arrival time the connection gives with it, not with the time
+/// at which the sink writes it into the buffer: one that waits for the buffer to be bound,
+/// one that goes into a bound buffer, and one that comes as a retransmission.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_packets_are_stamped_with_the_arrival_time_given() {
+    let f = fixture();
+    f.sink.bind_remote_stream(&vp8_stream(1000, 2000));
+    f.sink.bind_remote_stream(&declared_rtx_stream(2000));
+
+    // Times of the buffer's clock that no clock gives now: some milliseconds ago, a
+    // microsecond apart.
+    let start = time::now().unix_nano();
+    let arrival = |i: i64| start - 5_000_000 + 1_000 * i;
+    let at = |i: i64| time::Time::from_unix_nano(arrival(i));
+
+    f.sink.on_rtp(1000, media(1000, 1, &[]), at(1));
+    let (buffer, _) = f.bind(1000);
+    f.sink.on_rtp(1000, media(1000, 2, &[]), at(2));
+    f.sink.on_rtp(1000, media(1000, 4, &[]), at(4));
+    f.sink.on_rtp(2000, rtx(2000, 1, 3, &[]), at(3));
+
+    assert_eq!(
+        vec![
+            (1, arrival(1)),
+            (2, arrival(2)),
+            (4, arrival(4)),
+            (3, arrival(3))
+        ],
+        read_arrivals(&buffer, 4).await
+    );
+    f.sink.close();
+}
+
+/// The streams the connection sends, as it tells its sink of them: a receiver's reference
+/// time report is answered in the name of each, from when its track is bound until it is
+/// unbound.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_local_streams_answer_reference_time_reports() {
+    let f = fixture_with(HashMap::new(), Some(RttFromXrFactory::new(|_| {})));
+    // the streams in whose name a delay since the last receiver report was written
+    let answered = Arc::new(Mutex::new(Vec::<u32>::new()));
+    f.sink.bind_rtcp_writer(Arc::new({
+        let answered = answered.clone();
+        move |pkts: &[Box<dyn rtcp::Packet>]| -> Result<(), webrtc::Error> {
+            for pkt in pkts {
+                if let Some(xr) = pkt.as_any().downcast_ref::<ExtendedReport>()
+                    && xr.reports.iter().any(|report| {
+                        report
+                            .as_any()
+                            .downcast_ref::<rtcp::extended_report::DLRRReportBlock>()
+                            .is_some()
+                    })
+                {
+                    answered.lock().push(xr.sender_ssrc);
+                }
+            }
+            Ok(())
+        }
+    }));
+    // through the door the connection uses
+    let sink: &dyn PacketSink = f.sink.as_ref();
+    let report = || -> Vec<Box<dyn rtcp::Packet>> {
+        vec![Box::new(ExtendedReport {
+            sender_ssrc: 9,
+            reports: vec![Box::new(ReceiverReferenceTimeReportBlock {
+                ntp_timestamp: 0x1122334455667788,
+            })],
+        })]
+    };
+
+    // nothing is sent yet
+    sink.on_rtcp(&report(), time::now());
+    assert!(answered.lock().is_empty());
+
+    sink.bind_local_stream(&vp8_stream(5001, 5101));
+    sink.bind_local_stream(&vp8_stream(5002, 0));
+    sink.on_rtcp(&report(), time::now());
+    assert_eq!(vec![5001, 5002], *answered.lock());
+
+    // the track of the first is unbound
+    sink.unbind_local_stream(&vp8_stream(5001, 5101));
+    sink.on_rtcp(&report(), time::now());
+    assert_eq!(vec![5001, 5002, 5002], *answered.lock());
+
+    // after the sink was closed nothing is answered any more
+    f.sink.close();
+    sink.bind_local_stream(&vp8_stream(5003, 0));
+    sink.on_rtcp(&report(), time::now());
+    assert_eq!(3, answered.lock().len());
+}
+
+/// When the connection says that it has closed, the sink closes what it holds, as `close`
+/// does; whoever closes the connection may have called that already, or call it after.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_closed_closes_the_buffers() {
+    let f = fixture();
+    f.sink.bind_remote_stream(&vp8_stream(1000, 2000));
+    f.sink.bind_remote_stream(&declared_rtx_stream(2000));
+    let (buffer, _) = f.bind(1000);
+    f.rtp(media(1000, 1, &[]));
+    f.rtp(media(3003, 1, &[]));
+    // an RTCP reader of a stream the connection sends
+    f.sink.on_rtcp(
+        &[Box::new(PictureLossIndication {
+            sender_ssrc: 9,
+            media_ssrc: 5001,
+        })],
+        time::now(),
+    );
+    assert_eq!(vec![1], read(&buffer, 1).await);
+    let closed = Arc::new(Mutex::new(Vec::new()));
+    buffer.on_final_rtp_stats({
+        let closed = closed.clone();
+        move |_| closed.lock().push(1000)
+    });
+    let open = |ssrcs: &[u32]| -> Vec<u32> {
+        ssrcs
+            .iter()
+            .copied()
+            .filter(|&ssrc| f.factory.get_buffer(ssrc).is_some())
+            .collect()
+    };
+    assert_eq!(vec![1000, 2000, 3003], open(&[1000, 2000, 3003]));
+    assert!(f.factory.get_rtcp_reader(5001).is_some());
+
+    // through the door the connection uses
+    let sink: &dyn PacketSink = f.sink.as_ref();
+    sink.closed();
+    assert!(open(&[1000, 2000, 3003]).is_empty());
+    for ssrc in [1000, 2000, 3003, 5001] {
+        assert!(f.factory.get_rtcp_reader(ssrc).is_none(), "ssrc {ssrc}");
+    }
+    assert_eq!(vec![1000], *closed.lock());
+
+    // nothing is made after it, and closing again in either way is nothing
+    f.rtp(media(1000, 2, &[]));
+    f.sink.bind_remote_stream(&vp8_stream(4004, 0));
+    assert!(open(&[1000, 4004]).is_empty());
+    f.sink.close();
+    sink.closed();
+    assert_eq!(vec![1000], *closed.lock());
+
+    // the other way round: closed by whoever closes the connection, before the connection
+    // says so
+    let f = fixture();
+    f.sink.bind_remote_stream(&vp8_stream(1000, 0));
+    f.sink.close();
+    assert!(f.factory.get_buffer(1000).is_none());
+    let sink: &dyn PacketSink = f.sink.as_ref();
+    sink.closed();
+    assert!(f.factory.get_buffer(1000).is_none());
+}
+
 // ---------------------------------------------------------------------------------------
 // Two connections
 // ---------------------------------------------------------------------------------------
@@ -1081,6 +1250,37 @@ async fn test_published_stream_with_rtx() {
     server.close();
     assert!(server.factory.get_buffer(ssrc).is_none());
     assert!(server.factory.get_buffer(rtx_ssrc).is_none());
+}
+
+/// A connection that is closed tells its sink, and the sink closes the buffers of the
+/// connection's streams: nobody has to call the sink's `close`.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_closing_the_connection_closes_the_buffers() {
+    let server = Server::new();
+    let client = Client::new();
+    connect(&client, &server, str::to_string).await;
+
+    let context = client.track.context();
+    let (ssrc, rtx_ssrc) = (context.ssrc(), context.ssrc_retransmission());
+    client.write_media(ssrc, 1, &[]);
+    eventually_async(|| server.buffer_of(ssrc).is_some(), WAIT, TICK).await;
+    let buffer = server.buffer_of(ssrc).unwrap();
+    assert_eq!(vec![1], read(&buffer, 1).await);
+    assert!(server.factory.get_buffer(rtx_ssrc).is_some());
+
+    server.pc.close().unwrap();
+    eventually_async(
+        || {
+            server.factory.get_buffer(ssrc).is_none()
+                && server.factory.get_buffer(rtx_ssrc).is_none()
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+    // closing the sink after that is nothing
+    server.sink.close();
+    client.pc.close().unwrap();
 }
 
 /// A simulcast publisher as browsers do it: no SSRCs in the description, three layers named

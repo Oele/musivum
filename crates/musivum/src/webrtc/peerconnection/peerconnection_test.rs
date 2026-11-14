@@ -127,22 +127,40 @@ fn media_engine() -> MediaEngine {
 type Hook<T> = Mutex<Option<Box<dyn Fn(T) + Send + Sync>>>;
 type Tracks = Arc<Mutex<Vec<(Arc<TrackRemote>, Arc<RtpReceiver>)>>>;
 
+/// A call a connection made to its sink: packets by their SSRC, remote streams by theirs.
+#[derive(Clone, Debug, PartialEq)]
+enum SinkCall {
+    Rtp(u32),
+    Rtcp,
+    BindRemote(u32),
+    UnbindRemote(u32),
+    BindLocal(StreamInfo),
+    UnbindLocal(StreamInfo),
+    Closed,
+}
+
 /// What a connection handed to its sink.
 #[derive(Default)]
 struct Recorder {
     rtp: Mutex<Vec<(u32, Bytes)>>,
     rtcp: Mutex<Vec<Vec<Box<dyn rtcp::Packet>>>>,
     bound: Mutex<Vec<StreamInfo>>,
+    // Every call, in the order they were made.
+    calls: Mutex<Vec<SinkCall>>,
     // Called for every RTP packet (with its SSRC) and for every RTCP packet, after it was
     // recorded.
     on_rtp: Hook<u32>,
     on_rtcp: Hook<()>,
+    // Called when the sink is told of a local stream, bound (true) or unbound (false), after
+    // that was recorded.
+    on_local: Hook<bool>,
 }
 
 impl PacketSink for Recorder {
     fn on_rtp(&self, ssrc: u32, packet: Bytes, arrival: Time) {
         assert!(!arrival.is_zero());
         self.rtp.lock().push((ssrc, packet));
+        self.calls.lock().push(SinkCall::Rtp(ssrc));
         if let Some(f) = self.on_rtp.lock().as_ref() {
             f(ssrc);
         }
@@ -150,6 +168,7 @@ impl PacketSink for Recorder {
 
     fn on_rtcp(&self, packets: &[Box<dyn rtcp::Packet>], _arrival: Time) {
         self.rtcp.lock().push(packets.to_vec());
+        self.calls.lock().push(SinkCall::Rtcp);
         if let Some(f) = self.on_rtcp.lock().as_ref() {
             f(());
         }
@@ -157,10 +176,48 @@ impl PacketSink for Recorder {
 
     fn bind_remote_stream(&self, info: &StreamInfo) {
         self.bound.lock().push(info.clone());
+        self.calls.lock().push(SinkCall::BindRemote(info.ssrc));
+    }
+
+    fn unbind_remote_stream(&self, info: &StreamInfo) {
+        self.calls.lock().push(SinkCall::UnbindRemote(info.ssrc));
+    }
+
+    fn bind_local_stream(&self, info: &StreamInfo) {
+        self.calls.lock().push(SinkCall::BindLocal(info.clone()));
+        if let Some(f) = self.on_local.lock().as_ref() {
+            f(true);
+        }
+    }
+
+    fn unbind_local_stream(&self, info: &StreamInfo) {
+        self.calls.lock().push(SinkCall::UnbindLocal(info.clone()));
+        if let Some(f) = self.on_local.lock().as_ref() {
+            f(false);
+        }
+    }
+
+    fn closed(&self) {
+        self.calls.lock().push(SinkCall::Closed);
     }
 }
 
 impl Recorder {
+    /// The calls about local streams, in order.
+    fn local_calls(&self) -> Vec<SinkCall> {
+        self.calls
+            .lock()
+            .iter()
+            .filter(|call| matches!(call, SinkCall::BindLocal(_) | SinkCall::UnbindLocal(_)))
+            .cloned()
+            .collect()
+    }
+
+    /// Where in the order of calls the first such call is.
+    fn position(&self, call: &SinkCall) -> Option<usize> {
+        self.calls.lock().iter().position(|c| c == call)
+    }
+
     fn rtp_of(&self, ssrc: u32) -> Vec<Bytes> {
         self.rtp
             .lock()
@@ -188,6 +245,8 @@ struct TestTrack {
     kind: RtpCodecType,
     context: Mutex<Option<Arc<dyn TrackLocalContext>>>,
     codec: Mutex<Option<RtpCodecParameters>>,
+    // The payload types of the codecs the context had when the track was bound.
+    offered: Mutex<Vec<u8>>,
     binds: AtomicUsize,
     unbinds: AtomicUsize,
 }
@@ -199,9 +258,18 @@ impl TestTrack {
             kind,
             context: Mutex::new(None),
             codec: Mutex::new(None),
+            offered: Mutex::new(Vec::new()),
             binds: AtomicUsize::new(0),
             unbinds: AtomicUsize::new(0),
         })
+    }
+
+    /// How often the track was bound and how often unbound.
+    fn bound_and_unbound(&self) -> (usize, usize) {
+        (
+            self.binds.load(Ordering::SeqCst),
+            self.unbinds.load(Ordering::SeqCst),
+        )
     }
 
     fn is_bound(&self) -> bool {
@@ -223,8 +291,9 @@ impl TestTrack {
 
 impl TrackLocal for TestTrack {
     fn bind(&self, t: Arc<dyn TrackLocalContext>) -> Result<RtpCodecParameters, Error> {
-        let codec = t
-            .codec_parameters()
+        let offered = t.codec_parameters();
+        *self.offered.lock() = offered.iter().map(|c| c.payload_type).collect();
+        let codec = offered
             .into_iter()
             .find(|c| !c.mime_type.eq_ignore_ascii_case(MIME_TYPE_RTX))
             .ok_or(Error::UnsupportedCodec)?;
@@ -1919,4 +1988,517 @@ async fn test_settings_per_connection() {
         peer.pc.close().unwrap();
     }
     eventually_async(|| node.connection_count() == 0, WAIT, TICK).await;
+}
+
+/// A transceiver is used again for another track, as LiveKit does for a subscription that
+/// comes back: the track of its sender is replaced without a negotiation. The first track is
+/// unbound, the second is bound with what the media section has, and what it writes arrives
+/// on the SSRC the first one had.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_replace_track() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let needed = Arc::new(AtomicUsize::new(0));
+    server.pc.on_negotiation_needed({
+        let needed = needed.clone();
+        move || {
+            needed.fetch_add(1, Ordering::SeqCst);
+        }
+    });
+
+    // A track that is replaced before its sender was ever bound is let go of, and the one
+    // that took its place is bound when the negotiation is done.
+    let never = TestTrack::new("never", RtpCodecType::Video);
+    let first = TestTrack::new("first", RtpCodecType::Video);
+    let sender = server.pc.add_track(never.clone()).unwrap();
+    sender.replace_track(Some(first.clone())).unwrap();
+    assert!(sender.track().is_some_and(|t| t.id() == "first"));
+    negotiate(&server.pc, &client.pc);
+    connected(&server, &client).await;
+    eventually_async(|| first.is_bound(), WAIT, TICK).await;
+    assert_eq!(never.bound_and_unbound(), (0, 0));
+    assert_eq!(first.bound_and_unbound(), (1, 0));
+    let offer = server.pc.current_local_description().unwrap().sdp;
+    assert!(offer.contains("a=msid:stream first"), "{offer}");
+
+    let context = first.context();
+    let (ssrc, rtx_ssrc) = (context.ssrc(), context.ssrc_retransmission());
+    assert_ne!(rtx_ssrc, 0);
+    let first_writer = first.writer();
+    let one = header(ssrc, VP8, 1);
+    first_writer.write_rtp(&one, &[1; 50]).unwrap();
+    eventually_async(|| client.sink.rtp_of(ssrc).len() == 1, WAIT, TICK).await;
+    eventually_async(|| client.track_of(ssrc).is_some(), WAIT, TICK).await;
+    let negotiations = needed.load(Ordering::SeqCst);
+
+    // The second track, through the seam, as the ported code holds a sender.
+    let second = TestTrack::new("second", RtpCodecType::Video);
+    let seam: Arc<dyn crate::webrtc::RtpSender> = sender.clone();
+    seam.replace_track(Some(second.clone())).unwrap();
+    // At once: the sender has the new track, and the writer of the old one writes no more.
+    assert!(sender.track().is_some_and(|t| t.id() == "second"));
+    assert_eq!(
+        first_writer.write_rtp(&header(ssrc, VP8, 2), &[1; 50]),
+        Err(Error::ClosedPipe)
+    );
+    // From the connection's task: the first is unbound and the second bound, each once.
+    eventually_async(|| second.is_bound(), WAIT, TICK).await;
+    assert_eq!(first.bound_and_unbound(), (1, 1));
+    assert_eq!(second.bound_and_unbound(), (1, 0));
+    // It was bound with what the media section has: the stream's SSRCs, and the codecs that
+    // were negotiated, not the one the first track chose of them.
+    let context = second.context();
+    assert_eq!(
+        (context.ssrc(), context.ssrc_retransmission()),
+        (ssrc, rtx_ssrc)
+    );
+    assert_eq!(*second.offered.lock(), *first.offered.lock());
+    assert!(second.offered.lock().len() > 1);
+    assert!(second.offered.lock().contains(&VP8_RTX));
+    assert_eq!(second.payload_type(), VP8);
+    assert_eq!(sender.get_parameters().encodings[0].ssrc, ssrc);
+
+    // What it writes arrives on the same stream, and the client sees no other track.
+    let two = header(ssrc, VP8, 2);
+    second.writer().write_rtp(&two, &[2; 50]).unwrap();
+    eventually_async(|| client.sink.rtp_of(ssrc).len() == 2, WAIT, TICK).await;
+    assert_eq!(
+        client.sink.rtp_of(ssrc),
+        vec![marshalled(&one, &[1; 50]), marshalled(&two, &[2; 50])]
+    );
+    assert_eq!(client.tracks.lock().len(), 1);
+    // Nothing was negotiated for it, and nothing is asked to be.
+    assert_eq!(needed.load(Ordering::SeqCst), negotiations);
+    assert_eq!(server.pc.signaling_state(), SignalingState::Stable);
+    assert_eq!(server.pc.get_transceivers().len(), 1);
+
+    // The sink was told of the stream of the first track, of its end, and of the stream of
+    // the second, which is the same stream.
+    let local = server.sink.local_calls();
+    let info = match local.first() {
+        Some(SinkCall::BindLocal(info)) => info.clone(),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!(
+        local,
+        vec![
+            SinkCall::BindLocal(info.clone()),
+            SinkCall::UnbindLocal(info.clone()),
+            SinkCall::BindLocal(info.clone()),
+        ]
+    );
+    assert_eq!((info.ssrc, info.ssrc_retransmission), (ssrc, rtx_ssrc));
+    assert_eq!(
+        (info.payload_type, info.payload_type_retransmission),
+        (VP8, VP8_RTX)
+    );
+    assert!(info.mime_type.eq_ignore_ascii_case(MIME_TYPE_VP8));
+    assert_eq!(info.clock_rate, 90000);
+    assert!(
+        info.rtp_header_extensions
+            .iter()
+            .any(|e| e.uri == sdp::TRANSPORT_CC_URI && e.id != 0)
+    );
+
+    // A track of another kind is refused, and the sender keeps the one it has.
+    let audio = TestTrack::new("audio", RtpCodecType::Audio);
+    assert!(sender.replace_track(Some(audio.clone())).is_err());
+    assert!(sender.track().is_some_and(|t| t.id() == "second"));
+    let three = header(ssrc, VP8, 3);
+    second.writer().write_rtp(&three, &[2; 50]).unwrap();
+
+    // The track is taken away: it is unbound, and the sender has none. Then the sender is
+    // given one again, which is bound as the second was.
+    sender.replace_track(None).unwrap();
+    assert!(sender.track().is_none());
+    eventually_async(|| second.bound_and_unbound() == (1, 1), WAIT, TICK).await;
+    let third = TestTrack::new("third", RtpCodecType::Video);
+    sender.replace_track(Some(third.clone())).unwrap();
+    eventually_async(|| third.is_bound(), WAIT, TICK).await;
+    assert_eq!(third.context().ssrc(), ssrc);
+    let four = header(ssrc, VP8, 4);
+    third.writer().write_rtp(&four, &[3; 50]).unwrap();
+    eventually_async(|| client.sink.rtp_of(ssrc).len() == 4, WAIT, TICK).await;
+    assert_eq!(server.sink.local_calls().len(), 5);
+    assert_eq!(audio.bound_and_unbound(), (0, 0));
+
+    // The next negotiation names the track the sender has now, in the same media section
+    // and on the same SSRC, and binds nothing again.
+    negotiate(&server.pc, &client.pc);
+    let offer = server.pc.current_local_description().unwrap().sdp;
+    assert!(offer.contains("a=msid:stream third"), "{offer}");
+    assert!(offer.contains(&format!("a=ssrc:{ssrc} ")), "{offer}");
+    assert_eq!(offer.matches("m=video").count(), 1, "{offer}");
+    let five = header(ssrc, VP8, 5);
+    third.writer().write_rtp(&five, &[3; 50]).unwrap();
+    eventually_async(|| client.sink.rtp_of(ssrc).len() == 5, WAIT, TICK).await;
+    assert_eq!(third.bound_and_unbound(), (1, 0));
+
+    // A sender whose track was removed takes no other, and neither does one of a connection
+    // that was closed.
+    server.pc.remove_track(&sender).unwrap();
+    eventually_async(|| third.bound_and_unbound() == (1, 1), WAIT, TICK).await;
+    assert_eq!(
+        sender.replace_track(Some(second.clone())),
+        Err(Error::Other("Sender has already been stopped".to_string()))
+    );
+    server.pc.close().unwrap();
+    assert_eq!(sender.replace_track(None), Err(Error::ConnectionClosed));
+    assert_eq!(second.bound_and_unbound(), (1, 1));
+    client.pc.close().unwrap();
+}
+
+/// A transceiver that is stopped, as LiveKit stops one it kept for a track and could not
+/// use: the track of its sender is unbound, it sends no more, and the next negotiation says
+/// so. A track of its kind gets another transceiver from then on.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_transceiver_stop() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let video = TestTrack::new("video", RtpCodecType::Video);
+    let audio = TestTrack::new("audio", RtpCodecType::Audio);
+    server.pc.add_track(video.clone()).unwrap();
+    let audio_sender = server.pc.add_track(audio.clone()).unwrap();
+    negotiate(&server.pc, &client.pc);
+    connected(&server, &client).await;
+    eventually_async(|| video.is_bound() && audio.is_bound(), WAIT, TICK).await;
+    let (video_ssrc, audio_ssrc) = (video.context().ssrc(), audio.context().ssrc());
+    let audio_writer = audio.writer();
+    video
+        .writer()
+        .write_rtp(&header(video_ssrc, VP8, 1), &[1; 30])
+        .unwrap();
+    audio_writer
+        .write_rtp(&header(audio_ssrc, OPUS, 1), &[2; 30])
+        .unwrap();
+    eventually_async(
+        || client.track_of(video_ssrc).is_some() && client.track_of(audio_ssrc).is_some(),
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // The audio transceiver is stopped, through the seam.
+    let transceiver = server.pc.get_transceivers()[1].clone();
+    assert_eq!(transceiver.kind(), RtpCodecType::Audio);
+    let seam: Arc<dyn crate::webrtc::RtpTransceiver> = transceiver.clone();
+    seam.stop().unwrap();
+    // At once: it has no direction any more, and the track's writer writes no more.
+    assert_eq!(transceiver.direction(), RtpTransceiverDirection::Inactive);
+    assert_eq!(
+        audio_writer.write_rtp(&header(audio_ssrc, OPUS, 2), &[2; 30]),
+        Err(Error::ClosedPipe)
+    );
+    // From the connection's task: the track is unbound, and the sink is told.
+    eventually_async(|| audio.bound_and_unbound() == (1, 1), WAIT, TICK).await;
+    eventually_async(
+        || {
+            matches!(
+                server.sink.local_calls().last(),
+                Some(SinkCall::UnbindLocal(info)) if info.ssrc == audio_ssrc
+            )
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+    // Stopping it again is nothing, and its sender takes no other track.
+    seam.stop().unwrap();
+    assert!(
+        audio_sender
+            .replace_track(Some(TestTrack::new("other", RtpCodecType::Audio)))
+            .is_err()
+    );
+    assert_eq!(audio.bound_and_unbound(), (1, 1));
+    // The other transceiver is as it was.
+    assert_eq!(video.bound_and_unbound(), (1, 0));
+    video
+        .writer()
+        .write_rtp(&header(video_ssrc, VP8, 2), &[1; 30])
+        .unwrap();
+    eventually_async(|| client.sink.rtp_of(video_ssrc).len() == 2, WAIT, TICK).await;
+
+    // The next negotiation tells the other side: the media section is still there, inactive.
+    negotiate(&server.pc, &client.pc);
+    let offer = server.pc.current_local_description().unwrap().sdp;
+    let audio_section = offer.split("m=").find(|m| m.starts_with("audio")).unwrap();
+    assert!(audio_section.contains("a=inactive"), "{offer}");
+    assert!(audio_section.contains("a=mid:1"), "{offer}");
+    assert_eq!(
+        client.pc.get_transceivers()[1].current_direction(),
+        RtpTransceiverDirection::Inactive
+    );
+
+    // A track of that kind gets a transceiver of its own now, and a stream of its own.
+    let again = TestTrack::new("again", RtpCodecType::Audio);
+    server.pc.add_track(again.clone()).unwrap();
+    assert_eq!(server.pc.get_transceivers().len(), 3);
+    negotiate(&server.pc, &client.pc);
+    eventually_async(|| again.is_bound(), WAIT, TICK).await;
+    assert_ne!(again.context().ssrc(), audio_ssrc);
+    assert_eq!(server.pc.get_transceivers()[2].mid(), "2");
+
+    // The other side's sink was told that the stream of the stopped transceiver is over.
+    eventually_async(
+        || {
+            client
+                .sink
+                .position(&SinkCall::UnbindRemote(audio_ssrc))
+                .is_some()
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // What a stopped transceiver received is unbound at the sink. (A packet first: `rtc`
+    // forgets what the stream of a receiver is at every negotiation and learns it again
+    // from the stream's next packet. A transceiver that is stopped in between unbinds
+    // nothing.)
+    assert!(
+        client
+            .sink
+            .position(&SinkCall::UnbindRemote(video_ssrc))
+            .is_none()
+    );
+    video
+        .writer()
+        .write_rtp(&header(video_ssrc, VP8, 3), &[1; 30])
+        .unwrap();
+    eventually_async(|| client.sink.rtp_of(video_ssrc).len() == 3, WAIT, TICK).await;
+    client.pc.get_transceivers()[0].stop().unwrap();
+    eventually_async(
+        || {
+            client
+                .sink
+                .position(&SinkCall::UnbindRemote(video_ssrc))
+                .is_some()
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // A transceiver of a connection that was closed is not stopped.
+    server.pc.close().unwrap();
+    assert_eq!(seam.stop(), Err(Error::ConnectionClosed));
+    client.pc.close().unwrap();
+}
+
+/// The sink is told of the streams a connection sends, in order with everything else it is
+/// told, and that the connection has closed: once, after everything else.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_sink_is_told_of_local_streams_and_of_the_end() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let video = TestTrack::new("video", RtpCodecType::Video);
+    // What the track had been told when the sink was told of its stream.
+    let track_then = Arc::new(Mutex::new(Vec::new()));
+    *server.sink.on_local.lock() = Some(Box::new({
+        let (video, track_then) = (video.clone(), track_then.clone());
+        move |bound| track_then.lock().push((bound, video.bound_and_unbound()))
+    }));
+    server.pc.add_track(video.clone()).unwrap();
+    negotiate(&server.pc, &client.pc);
+    connected(&server, &client).await;
+    eventually_async(|| video.is_bound(), WAIT, TICK).await;
+    let (ssrc, rtx_ssrc) = (
+        video.context().ssrc(),
+        video.context().ssrc_retransmission(),
+    );
+
+    // The server's sink: the stream it sends, then RTCP about it from the client.
+    eventually_async(|| !server.sink.local_calls().is_empty(), WAIT, TICK).await;
+    client.pc.write_rtcp(&pli(ssrc)).unwrap();
+    eventually_async(
+        || server.sink.position(&SinkCall::Rtcp).is_some(),
+        WAIT,
+        TICK,
+    )
+    .await;
+    let info = match server.sink.calls.lock().first() {
+        Some(SinkCall::BindLocal(info)) => info.clone(),
+        other => panic!("{other:?}"),
+    };
+    assert_eq!((info.ssrc, info.ssrc_retransmission), (ssrc, rtx_ssrc));
+    assert_eq!(info.payload_type, video.payload_type());
+
+    // The client's sink: the stream it receives before the stream's packets. The server
+    // goes on writing while the client closes.
+    let writer = video.writer();
+    for seq in 0..200 {
+        writer
+            .write_rtp(&header(ssrc, VP8, seq), &[5; 100])
+            .unwrap();
+        if seq == 20 {
+            eventually_async(|| !client.sink.rtp.lock().is_empty(), WAIT, TICK).await;
+            client.pc.close().unwrap();
+        }
+    }
+    eventually_async(
+        || client.sink.calls.lock().last() == Some(&SinkCall::Closed),
+        WAIT,
+        TICK,
+    )
+    .await;
+    assert!(
+        client.sink.position(&SinkCall::BindRemote(ssrc)).unwrap()
+            < client.sink.position(&SinkCall::Rtp(ssrc)).unwrap()
+    );
+
+    // The server closes: its track is unbound, then the sink is told of the stream's end,
+    // and last of all that the connection has closed.
+    server.pc.close().unwrap();
+    eventually_async(
+        || server.sink.calls.lock().last() == Some(&SinkCall::Closed),
+        WAIT,
+        TICK,
+    )
+    .await;
+    {
+        let calls = server.sink.calls.lock();
+        let rtcp = calls.iter().filter(|c| **c == SinkCall::Rtcp).count();
+        assert!(rtcp >= 1);
+        let mut expected = vec![SinkCall::BindLocal(info.clone())];
+        expected.extend(std::iter::repeat_n(SinkCall::Rtcp, rtcp));
+        expected.push(SinkCall::UnbindLocal(info.clone()));
+        expected.push(SinkCall::Closed);
+        assert_eq!(*calls, expected);
+    }
+    assert_eq!(
+        *track_then.lock(),
+        vec![(true, (1, 0)), (false, (1, 1))],
+        "the sink is told after the track"
+    );
+
+    // Nothing comes after it on either side, and the connections have let go of their sinks.
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    for peer in [&server, &client] {
+        let calls = peer.sink.calls.lock();
+        assert_eq!(calls.last(), Some(&SinkCall::Closed));
+        assert_eq!(
+            calls.iter().filter(|c| **c == SinkCall::Closed).count(),
+            1,
+            "{calls:?}"
+        );
+    }
+    eventually_async(
+        || Arc::strong_count(&server.sink) == 1 && Arc::strong_count(&client.sink) == 1,
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // A connection whose last handle is dropped tells its sink too.
+    let node = Node::new(NodeConfig::default()).unwrap();
+    let sink = Arc::new(Recorder::default());
+    let pc = PeerConnection::new(
+        &node,
+        Configuration {
+            packet_sink: Some(sink.clone()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    drop(pc);
+    eventually_async(
+        || *sink.calls.lock() == [SinkCall::Closed] && Arc::strong_count(&sink) == 1,
+        WAIT,
+        TICK,
+    )
+    .await;
+}
+
+/// The codec a payload type stands for, asked of the connection as pion's media engine is
+/// asked for a stream nobody announced: the codec as it was negotiated, with the header
+/// extensions of its kind.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_codec_of_a_payload_type() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let video = TestTrack::new("video", RtpCodecType::Video);
+    let audio = TestTrack::new("audio", RtpCodecType::Audio);
+    let init = Some(RtpTransceiverInit {
+        direction: RtpTransceiverDirection::Sendonly,
+    });
+    for track in [&video, &audio] {
+        client
+            .pc
+            .add_transceiver_from_track(track.clone(), init)
+            .unwrap();
+    }
+    // Before anything was negotiated there is no telling.
+    for peer in [&server, &client] {
+        assert_eq!(
+            peer.pc.get_rtp_parameters_by_payload_type(VP8).err(),
+            Some(Error::CodecNotFound)
+        );
+    }
+    negotiate(&client.pc, &server.pc);
+    connected(&client, &server).await;
+    eventually_async(|| video.is_bound() && audio.is_bound(), WAIT, TICK).await;
+
+    // (uri, id), in an order of their own: the library keeps them in a map.
+    let sorted = |extensions: Vec<crate::webrtc::RtpHeaderExtensionParameter>| {
+        let mut extensions: Vec<(String, i32)> =
+            extensions.into_iter().map(|e| (e.uri, e.id)).collect();
+        extensions.sort();
+        extensions
+    };
+
+    // The server, which receives: a retransmission codec says which codec it repairs, and
+    // comes with the header extensions of video under the ids the sender uses.
+    let rtx = server
+        .pc
+        .get_rtp_parameters_by_payload_type(VP8_RTX)
+        .unwrap();
+    assert_eq!(rtx.codecs.len(), 1);
+    assert_eq!(rtx.codecs[0].payload_type, VP8_RTX);
+    assert!(rtx.codecs[0].mime_type.eq_ignore_ascii_case(MIME_TYPE_RTX));
+    assert_eq!(rtx.codecs[0].clock_rate, 90000);
+    assert_eq!(rtx.codecs[0].sdp_fmtp_line, "apt=96");
+    let video_extensions = sorted(video.context().header_extensions());
+    assert_eq!(sorted(rtx.header_extensions.clone()), video_extensions);
+    assert!(
+        video_extensions
+            .iter()
+            .any(|(uri, _)| uri == sdp::SDES_REPAIR_RTP_STREAM_ID_URI)
+    );
+
+    let vp9 = server.pc.get_rtp_parameters_by_payload_type(VP9).unwrap();
+    assert!(vp9.codecs[0].mime_type.eq_ignore_ascii_case(MIME_TYPE_VP9));
+    assert_eq!(vp9.codecs[0].sdp_fmtp_line, "profile-id=0");
+
+    // An audio codec comes with the header extensions of audio.
+    let opus = server.pc.get_rtp_parameters_by_payload_type(OPUS).unwrap();
+    assert_eq!(opus.codecs.len(), 1);
+    assert!(
+        opus.codecs[0]
+            .mime_type
+            .eq_ignore_ascii_case(MIME_TYPE_OPUS)
+    );
+    assert_eq!(
+        (opus.codecs[0].clock_rate, opus.codecs[0].channels),
+        (48000, 2)
+    );
+    let audio_extensions = sorted(audio.context().header_extensions());
+    assert_eq!(sorted(opus.header_extensions.clone()), audio_extensions);
+    assert_ne!(audio_extensions, video_extensions);
+
+    // A payload type nothing was negotiated for.
+    assert_eq!(
+        server.pc.get_rtp_parameters_by_payload_type(77).err(),
+        Some(Error::CodecNotFound)
+    );
+
+    // The side that only sends says the same.
+    let sent = client
+        .pc
+        .get_rtp_parameters_by_payload_type(VP8_RTX)
+        .unwrap();
+    assert_eq!(sent.codecs, rtx.codecs);
+    assert_eq!(sorted(sent.header_extensions), video_extensions);
+
+    client.pc.close().unwrap();
+    server.pc.close().unwrap();
 }
