@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/musivum", "crates/musivum-fakes", "crates/musivum-protocol"]
+members = ["crates/musivum", "crates/musivum-fakes", "crates/musivum-protocol", "crates/musivum-server"]
 
 [workspace.package]
 version = "0.0.0"

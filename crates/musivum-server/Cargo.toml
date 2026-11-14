@@ -1,0 +1,45 @@
+[package]
+name = "musivum-server"
+description = "The server around musivum: LiveKit's server command for one node, on tokio and axum"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+# Nothing to publish yet.
+publish = false
+
+[lints]
+workspace = true
+
+[[bin]]
+name = "musivum-server"
+path = "src/main.rs"
+
+[dependencies]
+# The HTTP server and its WebSocket. HTTP/1 only, as LiveKit's server speaks it without TLS.
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio", "ws"] }
+bytes = "1.12.1"
+# The command line (main.rs): urfave/cli upstream.
+clap = { version = "4.6.1", features = ["derive"] }
+# Splitting the WebSocket into a reading and a writing half (service/axumws.rs).
+futures-util = { version = "0.3.34", default-features = false, features = ["sink", "std"] }
+# The bounded request body of RequestBodyLimiter (service/utils.rs).
+http-body-util = "0.1.3"
+musivum = { version = "0.0.0", path = "../musivum" }
+musivum-protocol = { version = "0.0.0", path = "../musivum-protocol" }
+parking_lot = "0.13.0"
+thiserror = "2.0.21"
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros", "net", "signal", "sync", "time"] }
+tokio-util = "0.7.20"
+# Layers laid over the whole router, before routing (service/server.rs). axum has it already.
+tower = { version = "0.5.3", default-features = false, features = ["util"] }
+tracing = "0.1.44"
+# Writing the log (logger.rs): zap upstream.
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["ansi", "fmt", "json", "registry", "std", "tracing-log"] }
+# The WebSocket library under axum's (the same version), for the kinds of its errors.
+tungstenite = { version = "0.29.0", default-features = false }
+
+[dev-dependencies]
+serde_json = "1.0.154"
+tokio-tungstenite = "0.29.0"

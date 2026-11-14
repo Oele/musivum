@@ -4,6 +4,8 @@
 #
 #   ./run.sh reference     LiveKit itself (livekit-server, which has to be the pinned
 #                          version), started here with reference-livekit.yaml
+#   ./run.sh musivum       musivum (target/release/musivum-server, built here), started
+#                          with musivum.yaml, which has the same ports
 #
 # Everything listens on the loopback interface, on ports 39500 to 39511.
 set -euo pipefail
@@ -22,6 +24,11 @@ case "$TARGET" in
     livekit-server --config reference-livekit.yaml > out/reference-server.log 2>&1 &
     URL=ws://127.0.0.1:39500
     ;;
+  musivum)
+    (cd ../.. && nice -n 10 cargo build --release -p musivum-server)
+    ../../target/release/musivum-server --config musivum.yaml > out/musivum-server.log 2>&1 &
+    URL=ws://127.0.0.1:39500
+    ;;
   *)
     echo "unknown target: $TARGET" >&2; exit 2 ;;
 esac
@@ -32,6 +39,8 @@ for _ in $(seq 50); do
   (exec 3<>/dev/tcp/127.0.0.1/39500) 2>/dev/null && break
   sleep 0.1
 done
+# The server's health check on /: 200 and "OK" once its node is up.
+echo "health check: $(curl -s -w ' (%{http_code})' http://127.0.0.1:39500/ || true)"
 # With TAP=1 the clients go through sigtap.js, which writes the signalling they exchange
 # with the server to out/<target>-signalling.jsonl.
 if [ "${TAP:-}" = 1 ]; then

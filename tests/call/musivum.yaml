@@ -1,0 +1,15 @@
+# musivum for the call test: reference-livekit.yaml's configuration, with the same ports,
+# for target/release/musivum-server. Its WebRTC sockets are bound to all IPv4 addresses on
+# those ports and advertise 127.0.0.1 only.
+port: 39500
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 39501
+  udp_port: 39502
+  use_external_ip: false
+  node_ip: 127.0.0.1
+keys:
+  calltestkey: calltestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info
