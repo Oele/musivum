@@ -43,9 +43,9 @@
 // - A subscribed track without a media track (`media_track()` is `None`) and a data down
 //   track without a data track: where the original calls a method on the nil track, nothing
 //   is done for it here.
-// - Errors: `errAlreadySubscribed`, `ErrNotOpen` and `ErrNoReceiver` are of files that are
-//   not ported yet and are variants of the package's `Error`; `context.DeadlineExceeded` is
-//   `Error::DeadlineExceeded`. `*rtcerr.InvalidStateError`, which pion's `RemoveTrack`
+// - Errors: `ErrNotOpen` and `ErrNoReceiver` are of `mediatrackreceiver.go`, which is not
+//   ported yet, and are variants of the package's `Error` already; `context.DeadlineExceeded`
+//   is `Error::DeadlineExceeded`. `*rtcerr.InvalidStateError`, which pion's `RemoveTrack`
 //   returns for a connection that is closed, and for nothing else, is
 //   `Error::Webrtc(webrtc::Error::ConnectionClosed)`.
 // - The callbacks of the params take the track id and the error by reference; the callback

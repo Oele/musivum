@@ -66,6 +66,11 @@ was checked:
   a node's advertised addresses follow from its NAT 1:1 mappings (`gather.go`,
   `external_ip_mapper.go`) are followed in `mediatransportutil/rtcconfig/webrtc_config.rs`,
   reduced to what that package configures.
+- **gopkg.in/yaml.v3 v3.0.1**: its decoder (`decode.go`, `resolve.go`, Apache-2.0, Canonical)
+  is followed in `config/yaml.rs`, so that a LiveKit configuration file is read as LiveKit
+  reads it (which scalars are bools and numbers, decoding onto defaults, strict mode). Its
+  files that derive from libyaml (MIT) were not used; the YAML syntax is read by
+  `saphyr-parser`. Its notice is in `NOTICE`.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
@@ -109,5 +114,5 @@ port the changed tests, move the pin. Ported files stay close to their originals
 - Clients without UDP: LiveKit offers TCP and an embedded TURN server over TLS. `rtc` has
   ICE over TCP; a TURN server would have to be found or built.
 - Proposing the padding size field to webrtc-rs, so that `third_party/rtc-rtp` can go.
-- Whether the server binary should accept LiveKit's own configuration file, so that it can
-  be swapped in for `livekit-server` without changes.
+- (Settled: the server reads LiveKit's own configuration file, `crate::config`. Sections for
+  what musivum leaves out are accepted and ignored, with a log line each.)

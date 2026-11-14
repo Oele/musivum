@@ -14,17 +14,15 @@
 // export_test.rs). The fake receiver is not made its own RED and primary receiver, which
 // nothing here asks for and which would make it hold itself.
 //
-// Not ported, each for what it needs:
-// - `TestPionVNetForwardingSpike`: pion's virtual network and peer connections; it has
-//   nothing of the down track in it.
-// - `TestDownTrackSendsProbePackets`: the stream allocator (`AddTrack`) and both bandwidth
-//   estimators behind the pacer. What it asserts of the down track is asserted here, with a
-//   fake stream allocator listener, by `probe_packets_go_out_on_the_rtx_stream_as_padding`,
-//   which is new.
-// - `TestDownTrackResumesAfterBandwidthPause`, with `testResumeAfterBandwidthPause` and
-//   `countingPacer`: the stream allocator running, the remote bandwidth estimator, and a
-//   receiver whose estimate is capped (the test's own REMB model).
+// The harness is also what the tests of the stream allocator make their down tracks with
+// (`new_bound_down_track_with_ssrcs`, sfu/streamallocator/streamallocator_test.rs).
+//
+// Not ported: `TestPionVNetForwardingSpike`, which is pion's virtual network and peer
+// connections and has nothing of the down track in it.
 // `TestDownTrackWriteRTPNoAlloc` is here without its assertion on allocations.
+// `TestDownTrackResumesAfterBandwidthPause` runs its two cases one after the other in one
+// test, as the original runs its sub-tests, and takes as long as the original (about a
+// minute): it waits on real timers. `testing.Short()` has no counterpart: it always runs.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Weak};
@@ -38,17 +36,22 @@ use super::export_test::{
     NACK_IGNORE_WINDOW_FOR_TEST,
 };
 use super::{DownTrack, DownTrackParams, RTP_PADDING_MAX_PAYLOAD_SIZE};
-use crate::go::time::Duration;
+use crate::go::atomic;
+use crate::go::time::{self, Duration, Time};
+use crate::infow;
+use crate::mediatransportutil::bucket;
 use crate::mediatransportutil::codec;
 use crate::protocol::codecs::mime;
 use crate::protocol::livekit;
 use crate::protocol::logger;
 use crate::sfu::buffer;
 use crate::sfu::bwe;
+use crate::sfu::bwe::{remotebwe, sendsidebwe};
 use crate::sfu::ccutils;
 use crate::sfu::pacer;
 use crate::sfu::packettrailer;
 use crate::sfu::rtpextension::abscapturetime as act;
+use crate::sfu::streamallocator;
 use crate::sfu::testutils;
 use crate::sfu::{
     Bitrates, DownTrackListener, DownTrackStreamAllocatorListener, Error, FakeDownTrackListener,
@@ -58,6 +61,7 @@ use crate::sfu::{
 use crate::testutils::eventually_async;
 use crate::webrtc;
 use crate::webrtc::rtcp;
+use crate::webrtc::rtcp::payload_feedbacks::receiver_estimated_maximum_bitrate::ReceiverEstimatedMaximumBitrate;
 use crate::webrtc::rtcp::receiver_report::ReceiverReport;
 use crate::webrtc::rtcp::reception_report::ReceptionReport;
 use crate::webrtc::rtcp::transport_feedbacks::transport_layer_cc::TransportLayerCc;
@@ -274,7 +278,7 @@ fn opus_codec_params() -> webrtc::RtpCodecParameters {
     }
 }
 
-fn vp8_codec_params() -> webrtc::RtpCodecParameters {
+pub(in crate::sfu) fn vp8_codec_params() -> webrtc::RtpCodecParameters {
     webrtc::RtpCodecParameters {
         rtp_codec_capability: webrtc::RtpCodecCapability {
             mime_type: webrtc::MIME_TYPE_VP8.to_string(),
@@ -288,9 +292,9 @@ fn vp8_codec_params() -> webrtc::RtpCodecParameters {
 
 // `vnettest.MediaEngineConfig`, as far as these tests set it.
 #[derive(Clone, Copy, Default)]
-struct MediaEngineConfig {
-    video: bool,             // VP8 and its RTX codec; otherwise opus
-    header_extensions: bool, // abs-send-time + transport-cc
+pub(in crate::sfu) struct MediaEngineConfig {
+    pub(in crate::sfu) video: bool, // VP8 and its RTX codec; otherwise opus
+    pub(in crate::sfu) header_extensions: bool, // abs-send-time + transport-cc
 }
 
 // What the two peer connections of the original negotiate for a media engine made by
@@ -391,9 +395,9 @@ impl webrtc::RtpSender for TestSender {
     }
 }
 
-struct DownTrackHarness {
-    dt: Arc<DownTrack>,
-    receiver: Arc<FakeTrackReceiver>,
+pub(in crate::sfu) struct DownTrackHarness {
+    pub(in crate::sfu) dt: Arc<DownTrack>,
+    pub(in crate::sfu) receiver: Arc<FakeTrackReceiver>,
     capture: Arc<PacketCapture>,
 
     // what the down track holds weakly, or not at all, and the peer connections of the
@@ -417,6 +421,31 @@ async fn new_bound_down_track(
     rtx_budget: Option<RtxBudgetLimit>,
     rcv_opt: impl FnOnce(&FakeTrackReceiver),
 ) -> DownTrackHarness {
+    new_bound_down_track_with_ssrcs(
+        factory,
+        codec_params,
+        p,
+        me_cfg,
+        rtx_budget,
+        (TEST_SSRC, TEST_SSRC_RTX),
+        rcv_opt,
+    )
+    .await
+}
+
+// `new_bound_down_track` for a test with several down tracks on one connection: each has
+// SSRCs of its own (the stream and its retransmission stream), as pion gives every sender
+// its own in the original. Also what the tests of the stream allocator make their down
+// tracks with.
+pub(in crate::sfu) async fn new_bound_down_track_with_ssrcs(
+    factory: Arc<buffer::Factory>,
+    codec_params: webrtc::RtpCodecParameters,
+    p: Arc<dyn pacer::Pacer>,
+    me_cfg: MediaEngineConfig,
+    rtx_budget: Option<RtxBudgetLimit>,
+    ssrcs: (u32, u32),
+    rcv_opt: impl FnOnce(&FakeTrackReceiver),
+) -> DownTrackHarness {
     let capture = Arc::new(PacketCapture::default());
 
     let rcv = new_fake_track_receiver(&codec_params);
@@ -429,7 +458,7 @@ async fn new_bound_down_track(
 
     // vnettest.SignalPair: the connection binds the track when the negotiation is done
     let bound = dt
-        .bind(new_context(me_cfg, &capture))
+        .bind(new_context_with_ssrcs(me_cfg, &capture, ssrcs))
         .expect("the down track binds");
     assert!(!bound.mime_type.is_empty(), "the codec was negotiated");
     dt.set_connected();
@@ -507,19 +536,32 @@ fn new_context(
     me_cfg: MediaEngineConfig,
     capture: &Arc<PacketCapture>,
 ) -> Arc<dyn webrtc::TrackLocalContext> {
-    let (codecs, header_extensions, ssrc_rtx) = negotiate(me_cfg);
+    new_context_with_ssrcs(me_cfg, capture, (TEST_SSRC, TEST_SSRC_RTX))
+}
+
+fn new_context_with_ssrcs(
+    me_cfg: MediaEngineConfig,
+    capture: &Arc<PacketCapture>,
+    (ssrc, ssrc_rtx): (u32, u32),
+) -> Arc<dyn webrtc::TrackLocalContext> {
+    let (codecs, header_extensions, negotiated_ssrc_rtx) = negotiate(me_cfg);
     Arc::new(TestContext {
         codecs,
         header_extensions,
-        ssrc: TEST_SSRC,
-        ssrc_rtx,
+        ssrc,
+        // no retransmission stream where the codec has none
+        ssrc_rtx: if negotiated_ssrc_rtx == 0 {
+            0
+        } else {
+            ssrc_rtx
+        },
         write_stream: Arc::new(FarSide {
             capture: capture.clone(),
         }),
     })
 }
 
-fn new_buffer_factory() -> Arc<buffer::Factory> {
+pub(in crate::sfu) fn new_buffer_factory() -> Arc<buffer::Factory> {
     buffer::FactoryOfBufferFactory::new(500, 500).create_buffer_factory()
 }
 
@@ -1648,10 +1690,243 @@ fn feed_receiver_report(dt: &DownTrack, last_seq_no: u16) {
     );
 }
 
-// New for musivum, in the place of `TestDownTrackSendsProbePackets`, which wires the down
-// track to a real stream allocator and to both bandwidth estimators and is not ported (see
-// the head of this file). What that test asserts of the down track is asserted here with a
-// fake stream allocator listener in the allocator's place, once per type of estimator: the
+// TestDownTrackSendsProbePackets exercises the WriteProbePackets RTX probe path
+// while wiring the DownTrack to a real StreamAllocator + Pacer + BWE. It runs
+// against BOTH bandwidth estimators (send-side / remote).
+//
+// The RTX probe packets are captured at the pacer as the DownTrack builds them (they
+// are padding-only on the RTX stream and are not surfaced as a media track by the
+// pion receiver, so far-side capture is not reliable for them). Each probe is
+// verified to be on the RTX SSRC/payload type, carry the padding bit, declare a full
+// padding size, and serialize a full padding block whose trailing byte is the
+// padding count.
+//
+// The media path is exercised end-to-end over real pion with the allocator, the
+// pacer and the specific BWE wired in; BWE estimate values themselves are
+// intentionally not asserted (they are timing dependent) — the test verifies the
+// pipeline stays healthy and the probe serialization is correct with each estimator.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_down_track_sends_probe_packets() {
+    type MakeBwe = fn() -> Arc<dyn bwe::Bwe>;
+    let cases: [(&str, MakeBwe); 2] = [
+        ("sendside", || {
+            sendsidebwe::SendSideBwe::new(sendsidebwe::SendSideBweParams {
+                config: sendsidebwe::DEFAULT_SEND_SIDE_BWE_CONFIG,
+                logger: logger::get_logger(),
+            })
+        }),
+        ("remote", || {
+            remotebwe::RemoteBwe::new(remotebwe::RemoteBweParams {
+                config: remotebwe::DEFAULT_REMOTE_BWE_CONFIG,
+                logger: logger::get_logger(),
+            })
+        }),
+    ];
+
+    for (name, make_bwe) in cases {
+        let factory = new_buffer_factory();
+
+        let b = make_bwe();
+        let cp = Arc::new(CapturingPacer::new(pacer::PassThrough::new(
+            logger::get_logger(),
+            Some(b.clone()),
+        )));
+
+        // header extensions (abs-send-time for remote BWE, transport-cc for send-side)
+        // are needed for the DownTrack to pick up an ext id, which WriteProbePackets
+        // requires.
+        let dh = new_bound_down_track(
+            factory,
+            vp8_codec_params(),
+            cp.clone(),
+            MediaEngineConfig {
+                video: true,
+                header_extensions: true,
+            },
+            None,
+            |_| {},
+        )
+        .await;
+
+        assert_ne!(0, dh.dt.ssrc_rtx(), "{name}: RTX ssrc should be negotiated");
+        assert_ne!(
+            0,
+            dh.dt.payload_type_rtx_for_test(),
+            "{name}: RTX payload type should be negotiated"
+        );
+
+        let sa = streamallocator::StreamAllocator::new(
+            streamallocator::StreamAllocatorParams {
+                config: streamallocator::DEFAULT_STREAM_ALLOCATOR_CONFIG,
+                bwe: b.clone(),
+                pacer: cp.clone(),
+                rtt_getter: Some(Box::new(|| (0.0, false))),
+                logger: logger::get_logger(),
+            },
+            true,
+            false,
+        );
+        // AddTrack wires the allocator as the DownTrack's stream-allocator listener
+        // (which is what supplies the BWE type used to resolve the abs-send-time /
+        // transport-cc ext id that WriteProbePackets requires). We intentionally do
+        // NOT Start() the allocator's event loop: its asynchronous re-allocation would
+        // race with (and override) the layer we force below, making the forwarding
+        // non-deterministic. The probe path is driven directly instead.
+        sa.add_track(
+            dh.dt.clone(),
+            streamallocator::AddTrackParams {
+                source: livekit::TrackSource::Camera,
+                publisher_id: "fake-pub".into(),
+                ..Default::default()
+            },
+        );
+
+        // now that the StreamAllocator listener is set and negotiation is complete,
+        // (re)resolve the negotiated header extension ids.
+        dh.dt.set_rtp_header_extensions_for_test();
+        // expected an abs-send-time or transport-cc ext id to be negotiated
+        eventually_async(
+            || {
+                let (abs, twcc) = dh.dt.ext_ids_for_test();
+                abs != 0 || twcc != 0
+            },
+            secs(3),
+            TICK,
+        )
+        .await;
+
+        // force a valid target/current layer so the video forwarder will forward.
+        dh.dt.force_forward_layer_for_test(buffer::VideoLayer {
+            spatial: 0,
+            temporal: 0,
+        });
+
+        // forward a keyframe end-to-end (exercises DownTrack + allocator + pacer + BWE)
+        // and verify it arrives with the expected header/payload.
+        let vp8 = codec::Vp8 {
+            first_byte: 0x10,
+            s: true,
+            picture_id: 1,
+            is_key_frame: true,
+            ..Default::default()
+        };
+        let keyframe_payload = distinctive_payload(0x50, 60);
+        let mut ep = testutils::get_test_ext_packet_vp8(
+            &testutils::TestExtPacketParams {
+                sequence_number: 6000,
+                timestamp: 270000,
+                ssrc: 0x44444444,
+                payload_type: 96,
+                payload_size: 60,
+                is_key_frame: true,
+                marker: true,
+                ..Default::default()
+            },
+            &vp8,
+        )
+        .unwrap();
+        ep.packet.payload = Bytes::from(keyframe_payload.clone());
+        assert_eq!(
+            1,
+            dh.dt.write_rtp(&ep, 0),
+            "{name}: keyframe should forward"
+        );
+        assert!(dh.dt.rtp_stats_active_for_test(), "{name}");
+
+        // expected forwarded media to arrive over the full pipeline
+        eventually_async(|| dh.capture.count() >= 1, secs(10), TICK).await;
+
+        let media = dh.capture.all()[0].clone();
+        assert_eq!(
+            dh.dt.ssrc(),
+            media.ssrc,
+            "{name}: forwarded media on wrong SSRC"
+        );
+        assert_eq!(
+            96, media.payload_type,
+            "{name}: forwarded media has wrong payload type"
+        );
+        assert!(
+            !media.header.padding,
+            "{name}: forwarded media must not carry padding bit"
+        );
+        // the forwarder prepends the VP8 payload descriptor, so the media bytes
+        // appear as a suffix of the forwarded payload.
+        assert!(
+            media.payload.ends_with(&keyframe_payload),
+            "{name}: forwarded media payload mismatch"
+        );
+
+        // satisfy the RR precondition deterministically, referencing the
+        // subscriber-facing sequence number of the forwarded keyframe.
+        feed_receiver_report(&dh.dt, media.sequence_number);
+
+        // emit RTX probe packets.
+        const NUM_PROBE: usize = 3;
+        // expected WriteProbePackets to emit RTX probe packets
+        eventually_async(
+            || {
+                dh.dt.write_probe_packets(2000, true);
+                cp.probe_packets().len() >= NUM_PROBE
+            },
+            secs(5),
+            TICK,
+        )
+        .await;
+
+        // every probe packet must be on the RTX stream, carry the padding bit, declare
+        // the full padding size, and have no payload: pion serializes the padding from
+        // the header.
+        for pr in &cp.probe_packets() {
+            assert_eq!(2, pr.hdr.version, "{name}: probe packet version");
+            assert_eq!(
+                dh.dt.ssrc_rtx(),
+                pr.hdr.ssrc,
+                "{name}: probe packet must be on the RTX stream"
+            );
+            assert_eq!(
+                dh.dt.payload_type_rtx_for_test(),
+                pr.hdr.payload_type as u32,
+                "{name}: probe packet must use the RTX payload type"
+            );
+            assert!(
+                pr.hdr.padding,
+                "{name}: probe packet must carry padding bit"
+            );
+            assert_eq!(
+                RTP_PADDING_MAX_PAYLOAD_SIZE, pr.hdr.padding_size as usize,
+                "{name}: probe packet must set header.PaddingSize"
+            );
+            assert_eq!(
+                0, pr.payload_len,
+                "{name}: probe packet must have no payload"
+            );
+        }
+
+        // the BWE is wired and exercised (the pacer records every send into it);
+        // its state must be queryable without panicking. Exact estimate values are
+        // timing dependent and intentionally not asserted.
+        let _ = b.congestion_state();
+
+        // Not in the original: the estimator in use is the one that decided which header
+        // extension the down track took, and the allocator, which was not started, has
+        // the track.
+        let want_ids = if b.r#type() == bwe::BweType::Remote {
+            (1, 0)
+        } else {
+            (0, 2)
+        };
+        assert_eq!(want_ids, dh.dt.ext_ids_for_test(), "{name}");
+        assert!(sa.is_bwe_enabled(&dh.dt), "{name}");
+        assert_eq!(b.r#type(), sa.bwe_type(), "{name}");
+
+        cp.stop();
+    }
+}
+
+// New for musivum, next to `TestDownTrackSendsProbePackets`: what that test asserts of the
+// down track, with a fake stream allocator listener in the allocator's place and no
+// estimator, once per type of estimator, and what it leaves out: the
 // listener is what makes the down track take the id of the estimator's header extension,
 // without which it sends no probes; a forwarded key frame arrives; a receiver report for
 // the stream opens the way for probes; and every probe is padding only, on the RTX stream.
@@ -1945,6 +2220,393 @@ async fn test_down_track_key_frame_requester_arms_only_while_pending() {
     eventually_async(|| dh.receiver.send_pli_call_count() > before, secs(5), TICK).await;
 
     pacer::Pacer::stop(&*p);
+}
+
+// -----------------------------------------------------------------------------
+// pause/resume: probing resumes a track paused by congestion
+// -----------------------------------------------------------------------------
+
+// countingPacer counts the bytes handed to the pacer (media, padding and probes),
+// which is what a receiver sees arrive on an unconstrained link.
+struct CountingPacer {
+    pacer: Arc<dyn pacer::Pacer>,
+
+    samples: Mutex<Vec<RateSample>>,
+
+    // forwarded media packets, counted here as the far side buffer is unbound and
+    // stops surfacing packets after it fills up; the pass-through pacer writes
+    // inside Enqueue, so a counted packet is already on the wire
+    media_packets: atomic::Int64,
+}
+
+struct RateSample {
+    at: Time,
+    bytes: usize,
+}
+
+impl CountingPacer {
+    fn new(pacer: Arc<dyn pacer::Pacer>) -> CountingPacer {
+        CountingPacer {
+            pacer,
+            samples: Mutex::new(Vec::new()),
+            media_packets: atomic::Int64::new(0),
+        }
+    }
+
+    // bitrate over the trailing window.
+    fn bitrate(&self, window: Duration) -> i64 {
+        let mut samples = self.samples.lock();
+        let cutoff = time::now().add(-window);
+        let mut total = 0;
+        samples.retain(|s| {
+            let keep = s.at.after(cutoff);
+            if keep {
+                total += s.bytes;
+            }
+            keep
+        });
+        ((total * 8) as f64 / window.seconds()) as i64
+    }
+}
+
+impl pacer::Pacer for CountingPacer {
+    fn enqueue(&self, p: pacer::Packet) {
+        let size = p.header_size + p.payload.len() + p.header.padding_size as usize;
+        if !p.is_probe && !p.is_rtx && !p.payload.is_empty() {
+            self.media_packets.add(1);
+        }
+        self.samples.lock().push(RateSample {
+            at: time::now(),
+            bytes: size,
+        });
+        self.pacer.enqueue(p);
+    }
+
+    fn stop(&self) {
+        self.pacer.stop();
+    }
+
+    fn set_interval(&self, interval: Duration) {
+        self.pacer.set_interval(interval);
+    }
+
+    fn set_bitrate(&self, bitrate: i64) {
+        self.pacer.set_bitrate(bitrate);
+    }
+
+    fn time_since_last_sent_packet(&self) -> Duration {
+        self.pacer.time_since_last_sent_packet()
+    }
+
+    fn set_pacer_probe_observer_listener(
+        &self,
+        listener: Option<Arc<dyn pacer::PacerProbeObserverListener>>,
+    ) {
+        self.pacer.set_pacer_probe_observer_listener(listener);
+    }
+
+    fn start_probe_cluster(&self, pci: ccutils::ProbeClusterInfo) {
+        self.pacer.start_probe_cluster(pci);
+    }
+
+    fn end_probe_cluster(
+        &self,
+        probe_cluster_id: ccutils::ProbeClusterId,
+    ) -> ccutils::ProbeClusterInfo {
+        self.pacer.end_probe_cluster(probe_cluster_id)
+    }
+}
+
+// TestDownTrackResumesAfterBandwidthPause reproduces livekit/livekit#5009.
+//
+// Default server congestion control (remote BWE / REMB, pass-through pacer, padding
+// probes) drives a real DownTrack over real pion on vnet. A two layer simulcast
+// stream is forwarded, the receiver estimate is capped below the lowest layer for
+// 20s, then uncapped. The receiver estimate is a libwebrtc-like REMB model: under the
+// cap it reports the cap; after it, the estimate only grows (8%/s) while it is below
+// 1.5x the incoming rate + 10 kbps, like AimdRateControl does.
+//
+// With allow pause the video must come back within a bound after the cap is lifted,
+// as it does without allow pause.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_down_track_resumes_after_bandwidth_pause() {
+    for allow_pause in [false, true] {
+        test_resume_after_bandwidth_pause(allow_pause).await;
+    }
+}
+
+async fn test_resume_after_bandwidth_pause(allow_pause: bool) {
+    const LAYER0_BPS: i64 = 80_000;
+    const LAYER1_BPS: i64 = 170_000;
+    const CAPPED_BPS: f64 = 60_000.0; // below the lowest layer, so allow pause pauses
+    const FPS: i64 = 30; // ~one packet per frame, so a layer is ~30 packets/s like a 360p camera
+
+    let name = format!("allowPause={allow_pause}");
+    let factory = new_buffer_factory();
+
+    let b = remotebwe::RemoteBwe::new(remotebwe::RemoteBweParams {
+        config: remotebwe::DEFAULT_REMOTE_BWE_CONFIG,
+        logger: logger::get_logger(),
+    });
+    let cp = Arc::new(CountingPacer::new(pacer::PassThrough::new(
+        logger::get_logger(),
+        None,
+    )));
+
+    let dh = new_bound_down_track(
+        factory,
+        vp8_codec_params(),
+        cp.clone(),
+        MediaEngineConfig {
+            video: true,
+            header_extensions: true,
+        },
+        None,
+        |r| {
+            // layer switches without sender reports from the fake publisher
+            r.video_layer_mode_returns(
+                livekit::video_layer::Mode::OneSpatialLayerPerStreamIncompleteRtcpSr,
+            );
+        },
+    )
+    .await;
+    let dt = dh.dt.clone();
+
+    let mut brs = Bitrates::default();
+    brs[0][0] = LAYER0_BPS;
+    brs[1][0] = LAYER1_BPS;
+    dh.receiver.get_layered_bitrate_returns((vec![0, 1], brs));
+
+    // publisher side packet buffers, the real bucket at the max video size, so
+    // retransmissions and RTX probes read the same history a real receiver has
+    let new_bucket = || {
+        bucket::Bucket::<u64, u16>::new(500, bucket::RTP_MAX_PKT_SIZE, bucket::RTP_SEQ_NUM_OFFSET)
+            .expect("the bucket is made")
+    };
+    let buckets = Arc::new(Mutex::new([new_bucket(), new_bucket()]));
+    let read_buckets = buckets.clone();
+    dh.receiver
+        .read_rtp_calls(move |buf: &mut [u8], layer: u8, esn: u64| {
+            let buckets = read_buckets.lock();
+            Ok(buckets[layer as usize].get_packet(buf, esn)?)
+        });
+
+    let sa = streamallocator::StreamAllocator::new(
+        streamallocator::StreamAllocatorParams {
+            config: streamallocator::DEFAULT_STREAM_ALLOCATOR_CONFIG,
+            bwe: b.clone(),
+            pacer: cp.clone(),
+            rtt_getter: Some(Box::new(|| (0.05, true))),
+            logger: logger::get_logger(),
+        },
+        true,
+        allow_pause,
+    );
+    sa.on_stream_state_change(|update| {
+        infow!(logger::get_logger(), "TEST: stream state update", "update" => update);
+        Ok(())
+    });
+    sa.add_track(
+        dt.clone(),
+        streamallocator::AddTrackParams {
+            source: livekit::TrackSource::Camera,
+            publisher_id: "fake-pub".into(),
+            ..Default::default()
+        },
+    );
+    dt.set_rtp_header_extensions_for_test();
+    let (abs, _) = dt.ext_ids_for_test();
+    assert_ne!(
+        0, abs,
+        "{name}: abs-send-time must be negotiated for remote BWE"
+    );
+    sa.start();
+
+    dt.up_track_max_published_layer_change(1);
+    dt.up_track_max_temporal_layer_seen_change(0);
+    dt.set_max_spatial_layer(1);
+    dt.set_max_temporal_layer(0);
+    dt.up_track_layers_change();
+    dt.up_track_bitrate_availability_change();
+
+    // publisher: both simulcast layers, one packet per frame, key frame every second
+    let stop = tokio_util::sync::CancellationToken::new();
+    let publisher = {
+        let stop = stop.clone();
+        let dt = dt.clone();
+        let buckets = buckets.clone();
+        tokio::spawn(async move {
+            let sizes = [
+                (LAYER0_BPS / 8 / FPS) as usize,
+                (LAYER1_BPS / 8 / FPS) as usize,
+            ];
+            let mut sn = [0u16; 2];
+            let mut ts = [0u32; 2];
+            let mut pid = [0u16; 2];
+            sn[1] = 30000;
+            let mut ticker = new_test_ticker(StdDuration::from_secs(1) / FPS as u32);
+            let mut frame = 0;
+            loop {
+                tokio::select! {
+                    _ = stop.cancelled() => return,
+                    _ = ticker.tick() => {}
+                }
+                for layer in 0..2i32 {
+                    let l = layer as usize;
+                    sn[l] = sn[l].wrapping_add(1);
+                    ts[l] = ts[l].wrapping_add(90000 / FPS as u32);
+                    pid[l] = pid[l].wrapping_add(1);
+                    let is_key = frame % FPS == 0;
+                    let Ok(ep) = testutils::get_test_ext_packet_vp8(
+                        &testutils::TestExtPacketParams {
+                            sequence_number: sn[l],
+                            timestamp: ts[l],
+                            ssrc: 0x1000 + layer as u32,
+                            payload_type: 96,
+                            payload_size: sizes[l],
+                            is_key_frame: is_key,
+                            marker: true,
+                            arrival_time: time::now(),
+                            video_layer: buffer::VideoLayer {
+                                spatial: layer,
+                                temporal: 0,
+                            },
+                            ..Default::default()
+                        },
+                        &codec::Vp8 {
+                            first_byte: 0x10,
+                            s: true,
+                            picture_id: pid[l],
+                            is_key_frame: is_key,
+                            ..Default::default()
+                        },
+                    ) else {
+                        continue;
+                    };
+                    {
+                        let mut buckets = buckets.lock();
+                        let _ = buckets[l].add_packet_with_sequence_number(
+                            &ep.raw_packet,
+                            ep.ext_sequence_number,
+                        );
+                    }
+                    dt.write_rtp(&ep, layer);
+                }
+                frame += 1;
+            }
+        })
+    };
+
+    // receiver: libwebrtc-like REMB
+    let capped = Arc::new(atomic::Bool::new(false));
+    let receiver = {
+        let stop = stop.clone();
+        let dt = dt.clone();
+        let cp = cp.clone();
+        let capped = capped.clone();
+        tokio::spawn(async move {
+            let mut est = 2_000_000f64;
+            const INTERVAL: Duration = Duration::from_millis(200);
+            let mut ticker = new_test_ticker(INTERVAL.to_std());
+            loop {
+                tokio::select! {
+                    _ = stop.cancelled() => return,
+                    _ = ticker.tick() => {}
+                }
+                let incoming = cp.bitrate(Duration::from_secs(1)) as f64;
+                if capped.load() {
+                    est = est.min(CAPPED_BPS);
+                } else {
+                    let limit = 1.5 * incoming + 10_000.0;
+                    if est < limit {
+                        est = (est * (1.0 + 0.08 * INTERVAL.seconds())).min(limit);
+                    }
+                }
+                let remb = ReceiverEstimatedMaximumBitrate {
+                    sender_ssrc: 1,
+                    bitrate: est as f32,
+                    ssrcs: vec![dt.ssrc()],
+                };
+                if let Ok(raw) = rtcp::packet::marshal(&[Box::new(remb)]) {
+                    dt.handle_rtcp_for_test(&raw);
+                }
+            }
+        })
+    };
+
+    // RR precondition for probes
+    // no media forwarded
+    eventually_async(|| dh.capture.count() > 0, secs(10), TICK).await;
+    feed_receiver_report(&dt, dh.capture.all()[0].sequence_number);
+
+    let media_rate = |window: StdDuration| {
+        let cp = cp.clone();
+        async move {
+            let before = cp.media_packets.load();
+            tokio::time::sleep(window).await;
+            cp.media_packets.load() - before
+        }
+    };
+
+    tokio::time::sleep(secs(3)).await;
+    let before_cap = media_rate(secs(1)).await;
+    assert!(
+        before_cap > 5,
+        "{name}: media should flow before the cap ({before_cap} packets in 1s)"
+    );
+
+    infow!(logger::get_logger(), "TEST: capping");
+    capped.store(true);
+    tokio::time::sleep(secs(20)).await;
+    let capped_packets = media_rate(secs(2)).await;
+    infow!(
+        logger::get_logger(),
+        "TEST: capped media",
+        "packetsIn2s" => capped_packets,
+        "deficient" => dt.is_deficient(),
+    );
+    if allow_pause {
+        assert_eq!(
+            0, capped_packets,
+            "{name}: video should be paused under the cap"
+        );
+    }
+
+    infow!(logger::get_logger(), "TEST: uncapping");
+    capped.store(false);
+    let uncapped_at = time::now();
+    // `require.Eventually` with a condition that takes a second: tried every 10 ms after
+    // the last try, for 20 s
+    let resumed = tokio::time::timeout(secs(20), async {
+        loop {
+            if media_rate(secs(1)).await >= FPS / 2 {
+                return;
+            }
+            tokio::time::sleep(StdDuration::from_millis(10)).await;
+        }
+    })
+    .await;
+    assert!(
+        resumed.is_ok(),
+        "{name}: video did not resume within 20s of lifting the cap"
+    );
+    infow!(logger::get_logger(), "TEST: resumed", "after" => time::since(uncapped_at));
+
+    // t.Cleanup, in the order the original runs them: the publisher and the receiver end,
+    // then the allocator stops, then the pacer
+    stop.cancel();
+    publisher.await.unwrap();
+    receiver.await.unwrap();
+    sa.stop();
+    pacer::Pacer::stop(&*cp);
+}
+
+// Go's `time.NewTicker(d)`: the first tick comes after `d`, and ticks that the receiver is
+// too slow for are dropped.
+fn new_test_ticker(d: StdDuration) -> tokio::time::Interval {
+    let mut ticker = tokio::time::interval_at(tokio::time::Instant::now() + d, d);
+    ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    ticker
 }
 
 // -----------------------------------------------------------------------------

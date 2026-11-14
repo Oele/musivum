@@ -26,6 +26,7 @@ mod rtpmunger;
 pub mod rtpstats;
 mod rtxbudget;
 mod sequencer;
+pub mod streamallocator;
 pub mod streamtracker;
 mod streamtrackermanager;
 #[cfg(test)]

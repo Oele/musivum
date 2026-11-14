@@ -50,16 +50,25 @@ pub enum Error {
     #[error("participant is not given permission to subscribe to metrics")]
     NoSubscribeMetricsPermission,
 
-    // subscriptionmanager.go: it defines no errors of its own and tells these three apart,
-    // which are errAlreadySubscribed of mediatracksubscriptions.go, and ErrNotOpen and
-    // ErrNoReceiver of mediatrackreceiver.go
+    // uptrackmanager.go
+    #[error("either participant identity or SID needed")]
+    SubscriptionPermissionNeedsId,
+
+    // mediatracksubscriptions.go (`errAlreadySubscribed`, which datatrack.go returns too)
     #[error("already subscribed")]
     AlreadySubscribed,
+
+    // datatrack.go (`errReceiverClosed`)
+    #[error("datatrack is closed")]
+    ReceiverClosed,
+
+    // subscriptionmanager.go: it defines no errors of its own. It tells these two apart, which
+    // are ErrNotOpen and ErrNoReceiver of mediatrackreceiver.go,
     #[error("track is not open")]
     NotOpen,
     #[error("cannot subscribe without a receiver in place")]
     NoReceiver,
-    // Go's context.DeadlineExceeded, which WaitUntilSubscribed returns when its time is up
+    // and WaitUntilSubscribed returns Go's context.DeadlineExceeded when its time is up
     #[error("context deadline exceeded")]
     DeadlineExceeded,
 
@@ -77,6 +86,10 @@ pub enum Error {
     Webrtc(#[from] crate::webrtc::Error),
     #[error(transparent)]
     DataChannelRpc(#[from] crate::protocol::utils::DataChannelRpcError),
+    // of the supervisor of a participant's publications, which `OperationMonitor::check`
+    // returns
+    #[error(transparent)]
+    Supervisor(#[from] crate::rtc::supervisor::Error),
 }
 
 #[cfg(test)]

@@ -1,0 +1,32 @@
+error=could not parse config: yaml: unmarshal errors:
+  line 3: cannot unmarshal !!str `abc` into uint32
+  line 4: cannot unmarshal !!int `5` into bool
+  line 5: field unknown_key not found in type config.Config
+  line 6: cannot unmarshal !!str `127.0.0.1` into []string
+  line 7: cannot unmarshal !!seq into map[string]string
+  line 9: cannot unmarshal !!int `-1` into uint32
+  line 10: cannot unmarshal !!float `9999999...` into int
+  line 12: cannot unmarshal !!int `500` into time.Duration
+  line 13: cannot unmarshal !!str `fast` into time.Duration
+  line 14: field nope not found in type sfu.PLIThrottleConfig
+  line 16: cannot unmarshal !!map into []config.TURNServer
+  line 17: cannot unmarshal !!str `yes` into config.CongestionControlConfig
+  line 18: cannot unmarshal !!str `maybe` into bool
+  line 19: cannot unmarshal !!seq into rtcconfig.InterfacesConfig
+  line 21: cannot unmarshal !!str `twelve` into int
+  line 24: cannot unmarshal !!str `audio/opus` into config.CodecSpec
+  line 25: cannot unmarshal !!seq into string
+  line 27: field fmtp not found in type config.CodecSpec
+  line 28: cannot unmarshal !!int `4294967296` into uint32
+  line 31: mapping key "min" already defined at line 30
+  line 33: cannot unmarshal !!str `a lot o...` into float32
+  line 34: cannot unmarshal !!int `2147483648` into int32
+  line 39: cannot unmarshal !!str `x` into int32
+  line 40: cannot unmarshal !!int `5` into time.Duration
+  line 42: cannot unmarshal !!str `oops` into streamtracker.StreamTrackerPacketConfig
+  line 44: cannot unmarshal !!str `debug` into map[string]string
+  line 45: field jsno not found in type config.LoggingConfig
+  line 47: cannot unmarshal !!int `65536` into uint16
+  line 49: cannot unmarshal !!seq into string
+  line 50: cannot unmarshal !!map into string
+  line 52: cannot unmarshal !!map into []string

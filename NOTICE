@@ -78,3 +78,8 @@ jxskiss/base62 (https://github.com/jxskiss/base62), which is under the MIT Licen
 text above) with this notice:
 
     Copyright (c) 2019 Shawn Wang <jxskiss@126.com>
+
+crates/musivum/src/config/yaml.rs follows the decoder of gopkg.in/yaml.v3 (decode.go and
+resolve.go), which are under the Apache License, Version 2.0 with this notice:
+
+    Copyright 2011-2016 Canonical Ltd.

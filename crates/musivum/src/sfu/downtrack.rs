@@ -3650,4 +3650,4 @@ mod export_test;
 
 #[cfg(test)]
 #[path = "downtrack_downstream_integration_test.rs"]
-mod downtrack_downstream_integration_test;
+pub(super) mod downtrack_downstream_integration_test;
