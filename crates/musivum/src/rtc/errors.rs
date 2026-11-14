@@ -97,6 +97,57 @@ pub enum Error {
     // return where nothing handles them
     #[error(transparent)]
     Transport(#[from] crate::rtc::transport::Error),
+
+    // transport.go
+    #[error("no ICE transport")]
+    NoIceTransport,
+    #[error("ICE restart without local SDP settled")]
+    IceRestartWithoutLocalSdp,
+    #[error("ICE restart on closed peer connection")]
+    IceRestartOnClosedPeerConnection,
+    #[error("no transceiver")]
+    NoTransceiver,
+    #[error("no sender")]
+    NoSender,
+    #[error("mid not found")]
+    MidNotFound,
+    #[error("not using synchronous local candidates mode")]
+    NotSynchronousLocalCandidatesMode,
+    #[error("no remote description")]
+    NoRemoteDescription,
+    #[error("no local description")]
+    NoLocalDescription,
+    #[error("invalid sdp fragment")]
+    InvalidSdpFragment,
+    #[error("could not get bundle mid")]
+    NoBundleMid,
+    #[error("media mid does not match bundle mid")]
+    MidMismatch,
+    #[error("ice credential mismatch")]
+    IceCredentialMismatch,
+    // the errors transport.go makes where it returns them (`errors.New`)
+    #[error("data tracks not enabled")]
+    DataTracksNotEnabled,
+    #[error("unknown data channel label")]
+    UnknownDataChannelLabel,
+    #[error("cannot forward non user data packet")]
+    CannotForwardNonUserDataPacket,
+    // what `proto.Unmarshal` says of a data packet that does not decode, as text
+    #[error("{0}")]
+    ProtoUnmarshal(String),
+    // `errors.Wrap(err, message)` of github.com/pkg/errors, with which transport.go says what
+    // it was doing when the connection failed it; the cause is kept, as `errors.Is` finds it
+    #[error("{message}: {cause}")]
+    Wrap {
+        message: &'static str,
+        cause: Box<Error>,
+    },
+    // errors of other packages that transport.go passes on: of the SDP helpers of LiveKit's
+    // protocol, and of the writer of a data channel
+    #[error(transparent)]
+    Sdp(#[from] crate::protocol::sdp::Error),
+    #[error(transparent)]
+    DataChannelWriter(#[from] crate::sfu::datachannel::Error),
 }
 
 #[cfg(test)]
