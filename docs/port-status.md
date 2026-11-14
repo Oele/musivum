@@ -43,6 +43,12 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/utils/helpers.go` | `sfu/utils/helpers.rs` | none upstream | Five tests added. pion's `interceptor.RTPHeaderExtension` is `webrtc::interceptor::RtpHeaderExtension`. |
 | `pkg/sfu/bwe/remotebwe/` (four files) | `sfu/bwe/remotebwe/` (same names) | none upstream | 22 tests added, their expected values printed by the Go original for the same calls with the same sleeps. The config `Default`s are Go's zero values; the original's defaults are the `DEFAULT_...` constants. |
 | `pkg/sfu/streamtracker/` (five files) | `sfu/streamtracker/` (same names) | 2 / 2 | Eleven tests added, with values from the original. A worker holds its tracker strongly, as a goroutine does: a tracker dropped without `stop()` keeps ticking. `testutils.WithTimeout` is `testutils::with_timeout` and `with_timeout_async`. |
+| `pkg/sfu/videolayerselector/` (eleven files) and `temporallayerselector/` (four) | `sfu/videolayerselector/` (same names) | 20 / 20 | Two assertions on allocations left out. `reference_test.rs` runs 675 commands and expects what the original prints for them (simulcast, VP9, the VP8 temporal selector, the constructors from another selector). The selector's `recover()` around the descriptor writer is `catch_unwind`; a packet whose descriptor lacks a part is not selected where Go would dereference nil. The `...FromOther` constructors take the old selector and its `Base`. |
+| `pkg/sfu/rtpmunger.go` | `sfu/rtpmunger.rs` | 9 / 9 | `update_and_get_sn_ts` returns the parameters together with the error, as the original does. Also run against the original: 6,000 operations, 13,548 lines of results and state, identical. |
+| `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
+| `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
+| `pkg/sfu/errors.go` | `sfu/errors.rs` | none upstream | The package's errors; empty upstream at the pin, the four values of the munger are defined in `downtrack.go` there. |
+| `pkg/telemetry/prometheus` (two functions of `packets.go`) | `telemetry/prometheus/` | | Written new: counters, gauges and histograms without a Prometheus dependency, readable by tests and by a later endpoint. Its module comment says how a function is added. |
 | `pkg/sfu/flexfec/decoder.go` | `sfu/flexfec/decoder.rs` | 19 / 19 | The lookup of media packets is handed to `decode_fec` with every packet instead of to the constructor (it reads the buffer's state under the buffer's lock). Three benchmarks left out. `reference_test.rs` compares decoder and encoder with 241 lines of the original's output, all three masks included. |
 | pion/interceptor `pkg/flexfec/flexfec_encoder_03.go`, `flexfec_coverage.go`, `flexfec_encoder.go`, `util/` | `webrtc/interceptor/flexfec/` (tests only) | 11 / 11 | The FlexFEC-03 encoder, for the decoder's tests. pion's own decoder, its interceptor and their tests are not ported. |
 | `pkg/sfu/testutils/rtptest/packet.go` | `sfu/testutils/rtptest.rs` | none upstream | |
@@ -56,6 +62,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/buffer/frameintegrity.go` | `sfu/buffer/frameintegrity.rs` | 3 / 3 | A frame entity is handed the packet history instead of pointing to it. Also compared with the original (100,000 queries): identical. |
 | `pkg/sfu/buffer/datastats.go` | `sfu/buffer/datastats.rs` | 2 / 2 | |
 | `pkg/sfu/buffer/rtcpreader.go` | `sfu/buffer/rtcpreader.rs` | none upstream | One test added. `Read` has no counterpart. `close` without a callback set does nothing (the original calls a nil function). |
+| `pkg/sfu/buffer/fps.go` | `sfu/buffer/fps.rs` | 3 / 3 | The VP9 and dependency descriptor calculators are handles whose state is shared with their per-layer views. Also run against the original with 3,000 generated streams: identical. |
+| `pkg/sfu/buffer/dependencydescriptorparser.go` | `sfu/buffer/dependencydescriptorparser.rs` | 7 / 7 | The assertion on allocations is left out. Decode targets are sorted with a stable sort (Go's is stable only up to 12 elements). Also run against the original with 680,650 packets: identical wherever the input bytes were. |
 | `pkg/sfu/buffer/streamstats.go` | `sfu/buffer/streamstats.rs` | none upstream | Written, not declared in the module yet: it needs `rtpstats`. |
 | `pkg/sfu/testutils/data.go` | `sfu/testutils/data.rs` | none upstream | Test helpers. The two test codecs are functions. |
 | `pkg/sfu/buffer/buffer_base.go` | `sfu/buffer/buffer_base.rs` | | Only the type `ExtPacket` so far, so that what takes packets from the buffer can be ported before it. |
@@ -190,6 +198,14 @@ What looked wrong or fragile upstream and was ported as it is:
   `timed_aggregator_test.go` have their arguments the wrong way round and cannot fail.
   `pkg/utils/opsqueue.go`: `Stop()` on a queue that was never started never closes its
   channel.
+- `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
+  a layer is not measured across a wrap until the window resets. `videolayerselector`:
+  `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `rtpmunger.go`: `updateSnOffset` sets the offset to 0 when the range map lookup fails,
+  where the sequencer's keeps the old one. `sequencer.go`: a packet with source and target
+  sequence number 0 in the sequencer's first millisecond reads as an invalid slot.
+  `rtpmunger_test.go`: `require.Error(t, err, errOutOfOrderSequenceNumberCacheMiss)` does
+  not compare the error.
 - `pkg/rtc`: `CanHandleReconnectResponse` panics on a `ClientInfo` without a message.
   `UserPacketDeduper` takes a nonce of 16 zero bytes for a duplicate at first sight.
   `RTPStatsDiffToTrafficStats` clamps lost packets at zero while padding and out-of-order
@@ -214,10 +230,7 @@ work in progress committed (not reviewed, not merged):
 
 | What | Branch | State when stopped |
 |---|---|---|
-| `sfu/buffer/fps.go`, the rest of `dependencydescriptorparser.go` | `worktree-agent-ad0a55f78e9baa649` | Both files written; the parser's test file was being written. |
 | `sfu/codecmunger` | `worktree-agent-af38123cbb04c7d54` | Partly written. |
-| `sfu/videolayerselector` with `temporallayerselector` | `worktree-agent-ac9dc30a6634ca5d6` | Written (25 files); was about to build. |
-| `sfu/rtpmunger.go`, `sequencer.go`, `rtxbudget.go`, `forwardstats.go`, `telemetry/prometheus` | `worktree-agent-af75858273bb71ed3` | The RTP munger done; the sequencer was next. |
 | `sfu/streamtrackermanager.go` | `worktree-agent-a4f0b6a686c461dee` | Just begun. |
 | `crates/musivum-fakes`: fakes of traits for tests, in the manner of counterfeiter | `worktree-agent-a7e87e6e01374d5a6` | The macro and its tests exist; a test with the port's real types was being added. |
 
