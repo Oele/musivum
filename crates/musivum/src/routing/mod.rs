@@ -9,8 +9,8 @@
 //!   [`MessageSource`]), the channel in the process that implements both
 //!   ([`MessageChannel`]) and what a session is started with ([`ParticipantInit`]);
 //! - the node ([`LocalNode`], [`LocalNodeImpl`]) and its statistics ([`NodeStats`]), which
-//!   [`prometheus`] and [`hwstats`] gather (both belong elsewhere and are here only for now,
-//!   see their descriptions), and the limits and choice of a node ([`selector`]);
+//!   `telemetry::prometheus::get_node_stats` gathers with the protocol's `hwstats`, and the
+//!   limits and choice of a node ([`selector`]);
 //! - the routers ([`Router`], [`MessageRouter`], [`LocalRouter`]) and what they call on the
 //!   node: the signal client ([`SignalClient`]), which starts a session on the node's signal
 //!   server, and the room manager client ([`RoomManagerClient`]), both through the bus of
@@ -34,8 +34,6 @@ mod nodestats;
 mod roommanager;
 mod signal;
 
-pub mod hwstats;
-pub mod prometheus;
 pub mod selector;
 
 pub use bus::*;

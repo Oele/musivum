@@ -15,8 +15,10 @@ mod secret;
 mod time_size_cache;
 mod timed_aggregator;
 mod timed_version;
+mod timeoutqueue;
 
 pub mod guid;
+pub mod hwstats;
 pub mod mono;
 pub mod pointer;
 pub mod rtputil;
@@ -34,3 +36,4 @@ pub use secret::*;
 pub use time_size_cache::*;
 pub use timed_aggregator::*;
 pub use timed_version::*;
+pub use timeoutqueue::*;

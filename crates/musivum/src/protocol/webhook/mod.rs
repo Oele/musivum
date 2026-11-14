@@ -13,20 +13,14 @@
 //! with one more for the extra webhooks of an egress. Each retries a failed POST
 //! ([`retryablehttp`], written new on reqwest). A notifier lives until it is stopped
 //! ([`QueuedNotifier::stop`]): stopping it without force sends what is queued first.
-//!
-//! Two helpers that upstream takes from elsewhere are here because nothing else uses them yet:
-//! `timeoutqueue` is `utils/timeoutqueue.go` of the protocol and `pool` is the `QueuePool`
-//! of `github.com/frostbyte73/core`.
 
 mod consts;
 mod filter;
 mod notifier;
-mod pool;
 mod resource_queue;
 mod resource_url_notifier;
 pub mod retryablehttp;
 mod stats;
-mod timeoutqueue;
 mod url_notifier;
 mod verifier;
 
@@ -34,7 +28,6 @@ pub use consts::*;
 pub use notifier::*;
 pub use resource_url_notifier::*;
 pub use stats::*;
-pub use timeoutqueue::*;
 pub use url_notifier::*;
 pub use verifier::*;
 

@@ -80,10 +80,10 @@ was checked:
   is a small recogniser written new, held against the original's answers for 41 user agents.
 - **mackerelio/go-osstat v0.2.8** (Apache-2.0, Hatena), which LiveKit's `hwstats` reads the
   system's load with: its Linux readers of `/proc/loadavg`, `/proc/stat` and `/proc/meminfo`
-  are ported in `routing/hwstats/osstat.rs`. Its notice is in `NOTICE`.
+  are ported in `protocol/utils/hwstats/osstat.rs`. Its notice is in `NOTICE`.
 - **frostbyte73/core v0.1.1** (MIT), small helpers LiveKit uses: its `Throttle` is ported in
-  `routing/hwstats/cpu.rs`, its `Pool` (with the part of `Fuse` it uses) in
-  `protocol/webhook/pool.rs`. Its notice is in `NOTICE`.
+  `go/core/throttle.rs`, its `Pool` (with the part of `Fuse` it uses) in
+  `go/core/pool.rs`. Its notice is in `NOTICE`.
 - **hashicorp/go-retryablehttp v0.7.8** (MPL-2.0), the HTTP client LiveKit sends webhooks
   with: its source was **not** opened, nor go-cleanhttp's. `protocol/webhook/retryablehttp.rs`
   is written new from its documentation (the README and the godoc of `NewClient`,

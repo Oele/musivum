@@ -105,6 +105,8 @@ mod tests {
                 "livekit_rtt_ms",
                 "livekit_participant_join_total",
                 "livekit_connection_total",
+                "livekit_room_total",
+                "livekit_room_duration_seconds",
                 "livekit_track_subscribe_counter",
                 "livekit_pubsubtime_ms",
                 "livekit_subscribe_pace_shadow_delay_ms",

@@ -14,11 +14,12 @@ use std::sync::Arc;
 
 use parking_lot::RwLock;
 
-use super::{Error, NodeStats, hwstats};
+use super::{Error, NodeStats};
 use crate::config::Config;
 use crate::go::time::{self, Time};
 use crate::protocol::livekit;
 use crate::protocol::utils::guid;
+use crate::protocol::utils::hwstats;
 
 #[cfg_attr(test, musivum_fakes::fake)]
 pub trait LocalNode: Send + Sync {
@@ -146,7 +147,7 @@ impl LocalNode for LocalNodeImpl {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::routing::prometheus;
+    use crate::telemetry::prometheus;
 
     // New for musivum: the original has no test of the local node. A node made from the
     // configuration has its address and region, and serves; its statistics, once updated,

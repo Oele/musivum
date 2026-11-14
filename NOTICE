@@ -111,7 +111,7 @@ It carries this licence:
     OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-crates/musivum/src/routing/hwstats/cpu.rs follows `Throttle` of frostbyte73/core
+crates/musivum/src/go/core/ follows `Throttle` and `QueuePool` of frostbyte73/core
 (https://github.com/frostbyte73/core), which carries this licence:
 
     MIT License
@@ -136,6 +136,6 @@ crates/musivum/src/routing/hwstats/cpu.rs follows `Throttle` of frostbyte73/core
     OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
     SOFTWARE.
 
-crates/musivum/src/routing/hwstats/osstat.rs follows the Linux readers of
+crates/musivum/src/protocol/utils/hwstats/osstat.rs follows the Linux readers of
 mackerelio/go-osstat (https://github.com/mackerelio/go-osstat), under the Apache License,
 Version 2.0, Copyright Hatena Co., Ltd.

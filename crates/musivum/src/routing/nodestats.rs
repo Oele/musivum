@@ -3,18 +3,18 @@
 // Changes: translated from Go to Rust. The configuration is pkg/config's `NodeStatsConfig`
 // with its `DefaultNodeStatsConfig`, both here because musivum's configuration does not read
 // `node_stats` (it is for the nodes of a cluster). The statistics come from
-// `prometheus::get_node_stats` of this module (see prometheus.rs), and their history is a
+// `telemetry::prometheus::get_node_stats`, and their history is a
 // ring of `Option`s, `None` where the original has nil. A configuration whose intervals give
 // a history of no length panics on the first update, as the original does.
 
 use parking_lot::RwLock;
 
-use super::prometheus;
 use crate::errorw;
 use crate::go::time::{self, Duration};
 use crate::protocol::livekit;
 use crate::protocol::logger;
-use crate::routing::hwstats;
+use crate::protocol::utils::hwstats;
+use crate::telemetry::prometheus;
 
 /// pkg/config's `NodeStatsConfig`.
 #[derive(Clone, Debug, PartialEq)]

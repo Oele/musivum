@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use super::{Counter, Gauge, Histogram, MetricFamily, MetricVec};
 use crate::go::atomic;
-use crate::go::time::{Duration, MILLISECOND};
+use crate::go::time::{self, Duration, MILLISECOND, Time};
 use crate::protocol::livekit;
 
 // read by the node's statistics upstream (`node.go`)
@@ -44,6 +44,7 @@ pub static PROM_PEER_CONNECTION: MetricVec<Counter, 2> =
     MetricVec::new(["transport", "state"], Counter::new);
 
 // Added for the telemetry service (`events.go`), from here on.
+pub(super) static ROOM_CURRENT: atomic::Int32 = atomic::Int32::new(0);
 pub(super) static PARTICIPANT_CURRENT: atomic::Int32 = atomic::Int32::new(0);
 pub(super) static TRACK_PUBLISHED_CURRENT: atomic::Int32 = atomic::Int32::new(0);
 pub(super) static TRACK_SUBSCRIBED_CURRENT: atomic::Int32 = atomic::Int32::new(0);
@@ -55,6 +56,19 @@ pub(super) static TRACK_SUBSCRIBE_SUCCESS: atomic::Int32 = atomic::Int32::new(0)
 // success rate by subtracting this from total attempts
 pub(super) static TRACK_SUBSCRIBE_USER_ERROR: atomic::Int32 = atomic::Int32::new(0);
 
+pub static PROM_ROOM_CURRENT: Gauge = Gauge::new();
+pub static PROM_ROOM_DURATION: Histogram<10> = Histogram::new([
+    5.0,
+    10.0,
+    60.0,
+    5.0 * 60.0,
+    10.0 * 60.0,
+    30.0 * 60.0,
+    60.0 * 60.0,
+    2.0 * 60.0 * 60.0,
+    5.0 * 60.0 * 60.0,
+    10.0 * 60.0 * 60.0,
+]);
 pub static PROM_PARTICIPANT_CURRENT: Gauge = Gauge::new();
 pub static PROM_TRACK_PUBLISHED_CURRENT: MetricVec<Gauge, 1> = MetricVec::new(["kind"], Gauge::new);
 pub static PROM_TRACK_SUBSCRIBED_CURRENT: MetricVec<Gauge, 1> =
@@ -114,6 +128,16 @@ pub static PROM_SESSION_DURATION: MetricVec<Histogram<15>, 1> =
 
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
+    families.push(MetricFamily::of(
+        "livekit_room_total",
+        "",
+        &PROM_ROOM_CURRENT,
+    ));
+    families.push(MetricFamily::of(
+        "livekit_room_duration_seconds",
+        "",
+        &PROM_ROOM_DURATION,
+    ));
     families.push(MetricFamily::of_vec(
         "livekit_track_subscribe_counter",
         "",
@@ -265,6 +289,19 @@ pub fn record_track_subscribe_cancels(num_cancels: i32) {
 }
 
 // Added for the telemetry service (`events.go`), from here on, in upstream's order.
+
+pub fn room_started() {
+    PROM_ROOM_CURRENT.add(1.0);
+    ROOM_CURRENT.inc();
+}
+
+pub fn room_ended(started_at: Time) {
+    if !started_at.is_zero() {
+        PROM_ROOM_DURATION.observe(time::since(started_at).0 as f64 / time::SECOND.0 as f64);
+    }
+    PROM_ROOM_CURRENT.sub(1.0);
+    ROOM_CURRENT.dec();
+}
 
 pub fn add_participant() {
     PROM_PARTICIPANT_CURRENT.add(1.0);

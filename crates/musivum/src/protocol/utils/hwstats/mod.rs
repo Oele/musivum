@@ -1,9 +1,7 @@
 //! LiveKit's protocol package `utils/hwstats`, as far as a node's statistics need it: the
 //! load of the CPUs and the memory in use, aware of the quotas of a cgroup.
 //!
-//! It belongs to the protocol (`crate::protocol::utils::hwstats`) and is here only because
-//! the port of `pkg/routing`, which needs it, could not touch anything outside `routing`; it
-//! is meant to move there as it is. Ported: the CPU monitor of `cpu.go`, `cpu_linux.go` and
+//! Ported: the CPU monitor of `cpu.go`, `cpu_linux.go` and
 //! `cpu_all.go`, the memory of `memory.go`, `memory_linux.go` and `memory_all.go`, and of
 //! `mackerelio/go-osstat` (Apache-2.0) what those read on Linux (`osstat.rs`). Not ported:
 //! the monitor of processes (`NewProcMonitor`, `monitorProcesses`, `aggregateMemoryStats`,

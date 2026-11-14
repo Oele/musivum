@@ -1,7 +1,7 @@
 // Ported from frostbyte73/core, pool.go at v0.1.1, with what it uses of fuse.go.
 // Copyright (c) 2023 David Colburn. Licensed under the MIT License.
 // Changes: translated from Go to Rust. It is the `core.QueuePool` that `URLNotifier` sends
-// with, in this module because nothing else of musivum uses it. A job is a future, which the
+// with. A job is a future, which the
 // worker, a task, awaits where the original calls a function. The `next` channel is a tokio
 // channel of one. `Fuse` is written out with what the pool needs of it: breaking it once,
 // whether it is broken, a future that ends when it is, and, new, a blocking wait for
@@ -21,18 +21,18 @@ use tokio_util::sync::CancellationToken;
 
 use crate::go::time;
 
-pub(super) const DEFAULT_QUEUE_SIZE: i64 = 100;
-pub(super) const DEFAULT_CAPACITY: i64 = 10;
+pub const DEFAULT_QUEUE_SIZE: i64 = 100;
+pub const DEFAULT_CAPACITY: i64 = 10;
 
-pub(super) type Job = Pin<Box<dyn Future<Output = ()> + Send>>;
+pub type Job = Pin<Box<dyn Future<Output = ()> + Send>>;
 
 #[derive(Clone, Copy, Debug, Default)]
-pub(super) struct QueueWorkerParams {
-    pub(super) queue_size: i64,
-    pub(super) drop_when_full: bool,
+pub struct QueueWorkerParams {
+    pub queue_size: i64,
+    pub drop_when_full: bool,
 }
 
-pub(super) struct QueuePool {
+pub struct QueuePool {
     inner: Mutex<QueuePoolInner>,
 
     capacity: usize,
@@ -45,7 +45,7 @@ struct QueuePoolInner {
     workers: Vec<Option<Arc<QueueWorker>>>,
 }
 
-pub(super) fn new_queue_pool(max_workers: i64, mut params: QueueWorkerParams) -> QueuePool {
+pub fn new_queue_pool(max_workers: i64, mut params: QueueWorkerParams) -> QueuePool {
     let max_workers = if max_workers <= 0 {
         DEFAULT_CAPACITY
     } else {
@@ -77,7 +77,7 @@ impl QueuePool {
         h as usize % self.capacity
     }
 
-    pub(super) fn submit(&self, key: &str, job: impl Future<Output = ()> + Send + 'static) -> bool {
+    pub fn submit(&self, key: &str, job: impl Future<Output = ()> + Send + 'static) -> bool {
         let mut p = self.inner.lock();
         if self.kill.is_broken() {
             drop(p);
@@ -93,7 +93,7 @@ impl QueuePool {
         w.submit(Box::pin(job))
     }
 
-    pub(super) fn drain(&self) {
+    pub fn drain(&self) {
         self.drain.once(|| {
             let p = self.inner.lock();
 
@@ -111,7 +111,7 @@ impl QueuePool {
         });
     }
 
-    pub(super) fn kill(&self) {
+    pub fn kill(&self) {
         self.kill.once(|| {
             let p = self.inner.lock();
             for w in p.workers.iter().flatten() {
@@ -243,7 +243,7 @@ impl QueueWorker {
 
 /// `core.Fuse`, with what the pool uses of it.
 #[derive(Default)]
-pub(super) struct Fuse {
+pub struct Fuse {
     token: CancellationToken,
     // the mutex of the original's `Once`; also what `wait_or` waits on
     m: Mutex<()>,
@@ -252,17 +252,17 @@ pub(super) struct Fuse {
 
 impl Fuse {
     // IsBroken returns true if the fuse has been broken
-    pub(super) fn is_broken(&self) -> bool {
+    pub fn is_broken(&self) -> bool {
         self.token.is_cancelled()
     }
 
     // Watch returns a channel which will close once the fuse is broken
-    pub(super) fn watch(&self) -> CancellationToken {
+    pub fn watch(&self) -> CancellationToken {
         self.token.clone()
     }
 
     // Break breaks the fuse. It returns true if it was broken by this call.
-    pub(super) fn break_fuse(&self) -> bool {
+    pub fn break_fuse(&self) -> bool {
         let mut broken = false;
         self.once(|| {
             broken = true;
@@ -271,7 +271,7 @@ impl Fuse {
     }
 
     // Once runs the callback and breaks the fuse
-    pub(super) fn once(&self, f: impl FnOnce()) {
+    pub fn once(&self, f: impl FnOnce()) {
         if self.token.is_cancelled() {
             return;
         }
@@ -301,7 +301,7 @@ impl Fuse {
 
 /// New: runs `f`, which blocks, so that the tasks of the runtime the caller is on keep
 /// running: on a thread of a multi-threaded runtime it hands that thread's tasks to another.
-pub(super) fn block_in_place<R>(f: impl FnOnce() -> R) -> R {
+pub fn block_in_place<R>(f: impl FnOnce() -> R) -> R {
     match tokio::runtime::Handle::try_current() {
         Ok(handle) if handle.runtime_flavor() == tokio::runtime::RuntimeFlavor::MultiThread => {
             tokio::task::block_in_place(f)

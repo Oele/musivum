@@ -37,7 +37,6 @@ use super::retryablehttp::{self, Response};
 use super::stats::{
     inc_dispatch_drop, inc_dispatch_failure, inc_dispatch_success, record_queue_length,
 };
-use super::timeoutqueue::{TimeoutQueue, TimeoutQueueItem};
 use super::{
     AUTH_HEADER, CONTENT_TYPE, CONTENT_TYPE_HEADER, DEFAULT_USER_AGENT, Error, USER_AGENT_HEADER,
 };
@@ -45,6 +44,7 @@ use crate::go::time::{self, Duration, MINUTE, SECOND, Time};
 use crate::protocol::auth::AccessToken;
 use crate::protocol::livekit;
 use crate::protocol::logger::Logger;
+use crate::protocol::utils::{TimeoutQueue, TimeoutQueueItem};
 
 const DEFAULT_TIMEOUT: Duration = Duration(5 * MINUTE.0);
 

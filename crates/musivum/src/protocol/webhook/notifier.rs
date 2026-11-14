@@ -140,7 +140,7 @@ pub fn new_default_notifier(
 
 impl QueuedNotifier for DefaultNotifier {
     fn stop(&self, force: bool) {
-        super::pool::block_in_place(|| {
+        crate::go::core::block_in_place(|| {
             std::thread::scope(|wg| {
                 for u in &self.notifiers {
                     wg.spawn(move || {

@@ -23,13 +23,13 @@ use super::notifier::{
     EventKeyFn, FieldsHook, FilterParams, HttpClientParams, NotifyOption, NotifyParams,
     ProcessedHook, QueuedNotifier, event_key, log_fields, log_kvs, webhook_info,
 };
-use super::pool::{QueuePool, QueueWorkerParams, new_queue_pool};
 use super::retryablehttp::{self, Response};
 use super::stats::{inc_dispatch_drop, inc_dispatch_failure, inc_dispatch_success};
 use super::{
     AUTH_HEADER, CONTENT_TYPE, CONTENT_TYPE_HEADER, DEFAULT_USER_AGENT, Error, USER_AGENT_HEADER,
 };
 use crate::go::atomic;
+use crate::go::core::{QueuePool, QueueWorkerParams, new_queue_pool};
 use crate::go::time::{self, Duration, MINUTE, Time};
 use crate::protocol::auth::AccessToken;
 use crate::protocol::livekit;

@@ -132,7 +132,7 @@ fn run_subprocess(name: &str, cpu_request_env: &str) -> SubprocessResult {
     let mut cmd = Command::new(std::env::current_exe().unwrap());
     cmd.args([
         "--exact",
-        "routing::hwstats::cpu::cpu_request_test::test_subprocess_worker",
+        "protocol::utils::hwstats::cpu::cpu_request_test::test_subprocess_worker",
         "--nocapture",
         "--test-threads=1",
     ]);

@@ -8,7 +8,7 @@
 // lock. `NewCPUStats` returns an `Arc`; its worker is a task that holds it until `Stop`. The
 // `osStatCPUMonitor` of `cpu_all.go` (Linux without cgroup files) and the
 // `nullStatCPUMonitor` of `cpu_null.go` (every system but Linux here) are at the end.
-// `core.Throttle` of frostbyte73/core (MIT) is `Throttle` below, ported with it.
+// `core.Throttle` of frostbyte73/core is `crate::go::core::Throttle`.
 // `strconv.ParseFloat` is Rust's, which takes neither hexadecimal nor underscores.
 
 use std::sync::{Arc, OnceLock};
@@ -18,7 +18,8 @@ use tokio_util::sync::CancellationToken;
 
 use super::{Error, num_cpu};
 use crate::go::atomic;
-use crate::go::time::{self, Duration};
+use crate::go::core::Throttle;
+use crate::go::time;
 use crate::protocol::logger;
 use crate::{errorw, infow};
 
@@ -213,89 +214,6 @@ pub(super) fn new_platform_cpu_monitor() -> Result<Box<dyn PlatformCpuMonitor>, 
     );
 
     Ok(Box::new(NullStatCpuMonitor))
-}
-
-// ---------------------------------------------------------------------------
-// frostbyte73/core, throttle.go at v0.1.1 (MIT): `core.Throttle`.
-
-// Throttle is a function throttler that takes a function as its argument.
-// If ready, it will execute immediately, and it will always wait the specified duration
-// between executions. If multiple functions are added within the same execution window,
-// only the last function added will be executed.
-pub(super) struct Throttle {
-    t: Arc<ThrottleInner>,
-}
-
-struct ThrottleInner {
-    period: Duration,
-    m: Mutex<ThrottleState>,
-}
-
-struct ThrottleState {
-    ready: bool,
-    // `timer`, which the original keeps and never reads, is not kept
-    next: Option<Box<dyn FnOnce() + Send>>,
-}
-
-impl Throttle {
-    pub(super) fn new(period: Duration) -> Throttle {
-        Throttle {
-            t: Arc::new(ThrottleInner {
-                period,
-                m: Mutex::new(ThrottleState {
-                    ready: true,
-                    next: None,
-                }),
-            }),
-        }
-    }
-
-    pub(super) fn call(&self, f: impl FnOnce() + Send + 'static) {
-        ThrottleInner::add(&self.t, Box::new(f));
-    }
-}
-
-impl ThrottleInner {
-    fn add(t: &Arc<ThrottleInner>, f: Box<dyn FnOnce() + Send>) {
-        let mut m = t.m.lock();
-        let ready = m.ready;
-        let mut f = Some(f);
-        if ready {
-            m.ready = false;
-            ThrottleInner::after_period(t);
-        } else {
-            m.next = f.take();
-        }
-        drop(m);
-
-        if let Some(f) = f {
-            f();
-        }
-    }
-
-    fn after_period(t: &Arc<ThrottleInner>) {
-        let weak = Arc::downgrade(t);
-        time::after_func(t.period, move || {
-            if let Some(t) = weak.upgrade() {
-                ThrottleInner::execute(&t);
-            }
-        });
-    }
-
-    fn execute(t: &Arc<ThrottleInner>) {
-        let mut m = t.m.lock();
-        let f = m.next.take();
-        if f.is_some() {
-            ThrottleInner::after_period(t);
-        } else {
-            m.ready = true;
-        }
-        drop(m);
-
-        if let Some(f) = f {
-            f();
-        }
-    }
 }
 
 #[cfg(test)]

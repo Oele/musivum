@@ -62,6 +62,8 @@ pub(super) static PACKETS_OUT: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static NACK_TOTAL: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static RETRANSMIT_BYTES: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static RETRANSMIT_PACKETS: atomic::Uint64 = atomic::Uint64::new(0);
+pub(super) static PARTICIPANT_SIGNAL_CONNECTED: atomic::Uint64 = atomic::Uint64::new(0);
+pub(super) static PARTICIPANT_RTC_INIT: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static PARTICIPANT_RTC_CONNECTED: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static PARTICIPANT_RTC_ACTIVE: atomic::Uint64 = atomic::Uint64::new(0);
 // Added for the participant (participant.go).
@@ -415,6 +417,56 @@ pub fn record_rtt(
                 country,
             ])
             .observe(rtt as f64);
+    }
+}
+
+pub fn increment_participant_join(join: u32) {
+    if join > 0 {
+        PARTICIPANT_SIGNAL_CONNECTED.add(u64::from(join));
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["signal_connected", "", ""])
+            .add(u64::from(join));
+    }
+}
+
+pub fn increment_participant_join_fail(fail: u32) {
+    if fail > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["signal_failed", "", ""])
+            .add(u64::from(fail));
+    }
+}
+
+pub fn increment_participant_join_validation_fail(validation_fail: u32) {
+    if validation_fail > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["signal_validation_failed", "", ""])
+            .add(u64::from(validation_fail));
+    }
+}
+
+pub fn increment_participant_join_upgrade_fail(upgrade_fail: u32) {
+    if upgrade_fail > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["signal_upgrade_failed", "", ""])
+            .add(u64::from(upgrade_fail));
+    }
+}
+
+pub fn increment_participant_join_write_initial_response_fail(write_initial_response_fail: u32) {
+    if write_initial_response_fail > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["signal_write_initial_response_failed", "", ""])
+            .add(u64::from(write_initial_response_fail));
+    }
+}
+
+pub fn increment_participant_rtc_init(init: u32) {
+    if init > 0 {
+        PARTICIPANT_RTC_INIT.add(u64::from(init));
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["rtc_init", "", ""])
+            .add(u64::from(init));
     }
 }
 

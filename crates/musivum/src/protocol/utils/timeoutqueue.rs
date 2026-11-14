@@ -1,7 +1,6 @@
 // Ported from LiveKit's protocol, utils/timeoutqueue.go at v1.53.1-0.20261023175527-46332a036e25.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
-// Changes: translated from Go to Rust. It belongs to `protocol::utils` and is here, with its
-// test, because `ResourceURLNotifier` is the one user of it so far. An item is an `Arc`, which
+// Changes: translated from Go to Rust. An item is an `Arc`, which
 // the queue and its owner share. Its time, its links and whether it was removed, which the
 // queue's lock guards upstream, are under a lock of the item's own that is only taken with the
 // queue's held; the links are `Arc`s both ways, which `remove` takes apart, and a queue that
