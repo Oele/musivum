@@ -18,6 +18,7 @@ pub mod mediatransportutil;
 pub mod protocol;
 pub mod rtc;
 pub mod sfu;
+pub mod utils;
 pub mod webrtc;
 
 #[cfg(test)]
