@@ -53,6 +53,13 @@
 //   atomic the callback owns.
 // - The two `OnSubscribed...Change` functions of the params get the protocol messages and
 //   the lists borrowed.
+// - `getReceiverLBThreshold` is 300 also without batch IO: the threshold is where LiveKit's
+//   receiver starts writing a packet to its down tracks on several threads, and the original
+//   ties it to what a write costs (~26us with the send inline, ~3.3us with batch IO). Here a
+//   write, send included, costs ~4.4us, as batched does there; at 20, a packet to 100
+//   subscribers took 144us where LiveKit takes 426us, for a quarter more CPU of the server
+//   and 10 to 25% more of a load generator that is all the subscribers (`docs/port-status.md`,
+//   "Under load"). At 300 it takes 440us.
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -440,7 +447,8 @@ impl MediaTrack {
             return 300;
         }
 
-        20
+        // musivum: 300 here too, see the header
+        300
     }
 
     // AddReceiver adds a new RTP receiver to the track, returns true when receiver represents a new codec

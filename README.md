@@ -37,7 +37,8 @@ at v1.13.11 (`upstream.toml`), file by file, with LiveKit's own tests ported alo
   runs of seven scenarios each) it behaves the same within the runs' spread, with one
   difference in how fast the frame rate climbs back after a cap is lifted. Under load (up to
   100 subscribers of one track, 10 calls of 4) every subscriber gets all its media; musivum
-  uses about half of LiveKit's memory and 4 to 18% more CPU.
+  uses about half of LiveKit's memory, and from 13% less CPU (50 subscribers in a room) to
+  8% more (calls of four).
 
 Not tested yet: Safari and WebKit (so Element X on iOS), LiveKit's native SDKs, more than one
 machine, real networks with address translation. It has not run in production. Expect rough

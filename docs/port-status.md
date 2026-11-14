@@ -264,29 +264,48 @@ subscriber counts about 10% fewer lost packets.
 `tests/load` (LiveKit's `lk load-test`), three runs of each scenario against each server
 (2026-11-14, the two taken in turn, each run started below a load average of 2;
 `tests/load/runs/`, `python3 -I tests/load/compare.py 'runs/*/reference' 'runs/*/musivum'`).
-In all 24 runs every subscriber gets all its media, with no loss and no join errors, up to
+In all runs every subscriber gets all its media, with no loss and no join errors, up to
 100 subscribers of one track and 10 calls of 4. musivum's memory is lower in every run (idle
-13 MB against 50; at the peak 49 to 63% of LiveKit's). Its CPU is higher in every run, by 4
-to 18%; the ranges are within 4% of each median, so the difference is real. Steady CPU in
-cores, median [range]:
+13 MB against 50; at the peak 49 to 63% of LiveKit's). Its CPU is lower than LiveKit's with
+50 subscribers in a room (b), level with 100 (d), and 4 to 8% higher in the small rooms (a,
+c). Steady CPU in cores, median [range]:
 
-| Scenario | LiveKit | musivum at first (one run) | musivum now |
-|---|---|---|---|
-| a: one room, 2 publishers, 10 subscribers | 0.049 [0.048–0.050] | 0.054 | 0.051 [0.051–0.053] |
-| b: the same with 50 subscribers | 0.202 [0.201–0.206] | 0.838 | 0.236 [0.235–0.237] |
-| c: 10 calls of 4 | 0.286 [0.281–0.286] | 0.340 | 0.309 [0.307–0.314] |
-| d: one publisher, 100 subscribers | 0.190 [0.189–0.194] | 0.467 | 0.225 [0.223–0.225] |
+| Scenario | LiveKit | musivum at first (one run) | after the fan-out change | now |
+|---|---|---|---|---|
+| a: one room, 2 publishers, 10 subscribers | 0.049 [0.048–0.050] | 0.054 | 0.051 [0.051–0.053] | the same |
+| b: the same with 50 subscribers | 0.202 [0.201–0.206] | 0.838 | 0.236 [0.235–0.237] | 0.176 [0.175–0.192] |
+| c: 10 calls of 4 | 0.286 [0.281–0.286] | 0.340 | 0.309 [0.307–0.314] | the same |
+| d: one publisher, 100 subscribers | 0.190 [0.189–0.194] | 0.467 | 0.225 [0.223–0.225] | 0.211 [0.186–0.212] |
 
-The load generator itself uses more CPU against musivum (b: 0.31 against 0.24 cores, d: 0.28
-against 0.25) while receiving the same media packets, so musivum sends it something more
-(RTCP, padding or probes); not looked into yet.
+"Now" is after the second change below, which only b and d reach; their three runs were taken
+late on 2026-11-14, when the machine was busier (LiveKit's own b and d came out 0.216 and
+0.195 then). Of two runs of d taken in turn with LiveKit's, the one on a quiet machine gave
+musivum 0.183 against LiveKit's 0.205, with the load generator at 0.267 cores against each.
+
+The load generator (all the subscribers in one Go process) used 10 to 30% more CPU against
+musivum, for the same media. What it gets was counted at both servers' sockets and signal
+connections (with counters in builds of both made for the purpose, not kept): the same RTP
+packets, in the same order, with the same header extensions (none: `lk` declines
+`abs-send-time`); the same sender and receiver reports; the same signal messages, type for
+type; 50 STUN binding requests a second more from musivum, 100 RTCP XR a second fewer.
+What differed was timing: musivum wrote a packet to 100 subscribers in 144 µs, LiveKit in
+426 µs, so the load generator found up to 100 of its goroutines ready at once and spent the
+difference in Go's scheduler and in cache misses on every packet it read. Not a cost a real
+subscriber, with a process of its own, would see; it went away with the second change.
 
 What closed the gap, found with `perf` on both servers: the ported fan-out of a packet to
 its down tracks started a thread of the operating system per worker for every packet, then
 ran on rayon's pool, whose idle threads spin between packets. It now runs as Go runs it: the
 caller is the first worker and starts more only while work is left, on a small pool of its
 own whose threads sleep as soon as the queue is empty (`go/sync.rs`, with Go's
-`sync.WaitGroup`). What is left is in the write of each packet: `rtc`'s sans-I/O pipeline
+`sync.WaitGroup`). The second change: a receiver writes a packet to its down tracks on
+several threads only from 300 of them, not from 20 (`rtc/mediatrack.rs`,
+`getReceiverLBThreshold`). LiveKit ties that threshold to what one write costs (26 µs with
+the send inline, 3.3 µs with its batch IO, where it is 300 too); here a write, send
+included, costs 4.4 µs, so waking threads for it cost more than it saved: with 100
+subscribers the serial fan-out takes 440 µs (LiveKit's parallel one 426) for 24% less CPU
+of the server than the parallel one, measured in turn. What is left, in the small rooms, is
+in the write of each packet: `rtc`'s sans-I/O pipeline
 passes it through every handler with queues and copies (19 to 25% of musivum's CPU in b),
 where pion writes straight through; closing that means changing the connection layer or
 `rtc`. Not measured yet: latency and freezes under load, runs of minutes, joins and leaves

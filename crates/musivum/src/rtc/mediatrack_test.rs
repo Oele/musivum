@@ -1015,3 +1015,28 @@ async fn closing_the_track_closes_it_and_lets_go_of_its_receivers() {
         )
     );
 }
+
+// New for musivum: a receiver writes a packet to its down tracks on several threads only from
+// 300 of them, with batch IO or without (see the header of mediatrack.rs).
+#[test]
+fn a_receiver_fans_out_on_several_threads_only_from_300_down_tracks() {
+    let ti = livekit::TrackInfo {
+        sid: "TR_fanout".to_string(),
+        r#type: livekit::TrackType::Video as i32,
+        ..Default::default()
+    };
+    for media_batch_io_enabled in [false, true] {
+        let mt = MediaTrack::new(
+            MediaTrackParams {
+                media_batch_io_enabled,
+                ..Default::default()
+            },
+            &ti,
+        );
+        assert_eq!(
+            300,
+            mt.get_receiver_lb_threshold(),
+            "batch IO {media_batch_io_enabled}"
+        );
+    }
+}
