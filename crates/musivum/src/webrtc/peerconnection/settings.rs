@@ -6,8 +6,8 @@
 //! name of pion's setter, a copy is a `clone()`, and `rtc`'s engine is built from it when the
 //! connection is made.
 //!
-//! Only settings that do something are here: those `rtc` 0.21 has, and the one that is the
-//! layer's own (the addresses a connection advertises). What LiveKit sets on pion's engine
+//! Only settings that do something are here: those `rtc` 0.21 has, and the two that are the
+//! layer's own (the addresses a connection advertises, and whether it dials over TCP). What LiveKit sets on pion's engine
 //! and has no counterpart is listed at the end of this file's description of
 //! [`SettingEngine`], so that nothing is taken to be set that is not.
 
@@ -27,15 +27,17 @@ use crate::webrtc::Error;
 /// not switched off), `SetDTLSEllipticCurves`, `SetDTLSInsecureSkipHelloVerify`,
 /// `SetDTLSRetransmissionInterval`, `SetDTLSConnectContextMaker` (no limit on the time of a
 /// handshake), `DisableCloseByDTLS`, `EnableSCTPZeroChecksum`, `SetSCTPMinCwnd`,
-/// `SetSCTPFastRtxWnd`, `SetSCTPCwndCAStep`, `EnableSped`, `EnableSctpSnap`,
-/// `DisableActiveTCP` (there is no ICE over TCP at all). Not here because the layer does it
+/// `SetSCTPFastRtxWnd`, `SetSCTPCwndCAStep`, `EnableSped`, `EnableSctpSnap`. Not here
+/// because the layer does it
 /// otherwise: `DetachDataChannels` and `EnableDataChannelBlockWrite` (a channel has `send`,
 /// which never waits), `SetFireOnTrackBeforeFirstRTP` (a track is announced with its first
 /// packet), `BufferFactory` (the connection's `PacketSink`), `DisableMediaEngineCopy` (a
 /// connection has the media engine it was given), `LoggerFactory` (the connection's logger),
 /// `SetInterfaceFilter`, `SetIPFilter`, `SetICEAddressRewriteRules`,
 /// `SetIncludeLoopbackCandidate` and `SetEphemeralUDPPortRange` (nothing is gathered: the
-/// outcome of these is `host_candidate_ips`).
+/// outcome of these is `host_candidate_ips`), `SetICETCPMux` (the node's TCP listener,
+/// [`Node::new_with_tcp`](super::Node::new_with_tcp)), `DisableActiveTCP` (`active_tcp`, the
+/// other way round).
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct SettingEngine {
     /// `SetLite`: whether the ICE agent of the connection is a lite one, which answers
@@ -66,8 +68,9 @@ pub struct SettingEngine {
     /// connection, so such a candidate is never resolved either.
     pub ice_multicast_dns_mode: MulticastDnsMode,
     /// `SetNetworkTypes`: the kinds of candidates the agent takes, its own and the other
-    /// side's. Empty: all the library knows. A node has UDP sockets only, so the TCP types
-    /// bring nothing.
+    /// side's. Empty: all the library knows. Without a TCP type the connection has no TCP
+    /// candidates, also on a node with a TCP listener; without a UDP type the agent drops
+    /// the UDP candidates the connection is given.
     pub network_types: Vec<NetworkType>,
     /// `SetSCTPMaxMessageSize`. 0: the library's (64 KiB).
     pub sctp_max_message_size: u32,
@@ -75,6 +78,15 @@ pub struct SettingEngine {
     pub sctp_max_receive_buffer_size: u32,
     /// `SetIgnoreRidPauseForRecv`.
     pub ignore_rid_pause_for_recv: bool,
+    /// pion's `DisableActiveTCP`, the other way round and off unless set: whether the
+    /// connection has active TCP candidates (one for each address it advertises, with port
+    /// 9) and dials the passive TCP candidates of the other side, once each, from a port of
+    /// the system's choosing. pion's agent dials unless told not to; LiveKit tells it not to
+    /// on a server ("clients should be dialing", `pkg/rtc/config.go`), and a server that
+    /// dialled whatever address a description names would let a client point it anywhere.
+    /// A client's connection, as in the layer's tests, sets it. Nothing happens without a TCP
+    /// type in `network_types` (when that is not empty).
+    pub active_tcp: bool,
     /// The addresses this connection gives as host candidates, each with the port of the
     /// node's socket, when they are not the node's own: what pion's agent makes of
     /// `SetICEAddressRewriteRules`, `SetIPFilter` and `SetInterfaceFilter` on the copy of the

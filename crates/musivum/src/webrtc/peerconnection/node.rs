@@ -23,9 +23,22 @@
 //! spreads over the runtime's threads. Writing does not go through a task at all: a
 //! connection pushes its datagrams into the socket from whatever thread it is called on.
 //!
-//! A node has a list of listeners with one entry. A second socket (IPv6) or a TCP listener is
-//! another entry: outgoing datagrams already name the local address and protocol they are
-//! for ([`Node::send`]), incoming ones the listener they came in on.
+//! A node has a list of listeners with one entry. A second socket (IPv6) is another entry:
+//! outgoing datagrams already name the local address and protocol they are for
+//! ([`Node::send`]), incoming ones the listener they came in on.
+//!
+//! # ICE over TCP
+//!
+//! A node made with [`Node::new_with_tcp`] also listens on a TCP port (LiveKit's
+//! `rtc.tcp_port`, pion's TCP mux), and its connections advertise passive TCP host candidates
+//! on it. A stream is given to a connection once, by the user name of the binding request
+//! that is its first frame, and everything that comes on it after that is the connection's;
+//! a stream whose first frame is no such request, or is too long, or comes too late, is
+//! closed. What a connection sends over TCP goes to the stream it has with that address. A
+//! connection whose settings allow it dials the passive candidates of the other side
+//! ([`SettingEngine::active_tcp`](super::SettingEngine::active_tcp)), once for each. A
+//! stream is closed when its connection is forgotten, and forgotten when it ends. Framing,
+//! limits and buffers are in `tcp.rs`.
 
 use std::collections::HashMap;
 use std::io;
@@ -36,9 +49,12 @@ use std::sync::{Arc, LazyLock, Weak};
 use bytes::BytesMut;
 use parking_lot::RwLock;
 use rtc::shared::{TransportContext, TransportProtocol};
-use tokio::net::UdpSocket;
-use tokio::sync::{Notify, mpsc};
+use tokio::net::tcp::OwnedReadHalf;
+use tokio::net::{TcpListener, TcpStream, UdpSocket};
+use tokio::sync::mpsc;
+use tokio_util::sync::{CancellationToken, DropGuard};
 
+use super::tcp::{self, ACTIVE_TCP_PORT, FrameReader, Writer};
 use crate::go::time::Time;
 use crate::protocol::logger::{self, Logger};
 use crate::{debugw, warnw};
@@ -92,8 +108,17 @@ pub struct NodeStats {
     /// Datagrams dropped because their connection's queue was full.
     pub datagrams_queue_full: u64,
     pub datagrams_sent: u64,
-    /// Datagrams the socket did not take (its buffer was full, or an error).
+    /// Datagrams the socket did not take (its buffer was full, or an error). Over TCP: a
+    /// packet for a stream that is not there or has ended, or that did not fit in its
+    /// buffer.
     pub datagrams_not_sent: u64,
+    /// TCP streams given to a connection: accepted with the user name of a connection, or
+    /// dialled and connected.
+    pub tcp_streams_opened: u64,
+    /// Of those, the streams that have ended, by either side.
+    pub tcp_streams_closed: u64,
+    /// Accepted streams that were closed before they were given to a connection.
+    pub tcp_streams_refused: u64,
 }
 
 struct Listener {
@@ -101,6 +126,13 @@ struct Listener {
     protocol: TransportProtocol,
     local_addr: SocketAddr,
     /// What clients are told: the advertised addresses with the socket's port.
+    candidates: Vec<SocketAddr>,
+}
+
+/// The TCP listener of a node, as the connections see it.
+struct TcpListenerInfo {
+    local_addr: SocketAddr,
+    /// The passive candidates: the advertised addresses with the listener's port.
     candidates: Vec<SocketAddr>,
 }
 
@@ -116,6 +148,18 @@ struct ConnectionRoutes {
     route: Route,
     ufrags: Vec<String>,
     addrs: Vec<SocketAddr>,
+    // The other ends of the connection's TCP streams.
+    streams: Vec<SocketAddr>,
+    // Whether the connection dials passive candidates.
+    active_tcp: bool,
+}
+
+/// A TCP stream of a connection, as the routes hold it. Dropping it ends the stream: its
+/// writer writes what it has and closes its half, its reader stops.
+struct StreamRoute {
+    serial: u64,
+    writer: Writer,
+    _close: DropGuard,
 }
 
 #[derive(Default)]
@@ -123,28 +167,37 @@ struct Routes {
     by_addr: HashMap<SocketAddr, Route>,
     by_ufrag: HashMap<String, Route>,
     connections: HashMap<u64, ConnectionRoutes>,
+    // TCP streams by their connection and the address of their other end.
+    streams: HashMap<(u64, SocketAddr), StreamRoute>,
 }
 
 struct NodeInner {
     logger: Logger,
     listeners: Vec<Listener>,
+    tcp: Option<TcpListenerInfo>,
     routes: RwLock<Routes>,
     next_id: AtomicU64,
+    next_stream: AtomicU64,
     // The connections whose task is still running.
     connections: AtomicUsize,
-    shutdown: Arc<Notify>,
+    // Cancelled when the node is closed or dropped: the tasks that read the sockets end, and
+    // so do the TCP streams (their tokens are children of this one).
+    shutdown: CancellationToken,
 
     datagrams_received: AtomicU64,
     datagrams_without_route: AtomicU64,
     datagrams_queue_full: AtomicU64,
     datagrams_sent: AtomicU64,
     datagrams_not_sent: AtomicU64,
+    tcp_streams_opened: AtomicU64,
+    tcp_streams_closed: AtomicU64,
+    tcp_streams_refused: AtomicU64,
 }
 
 impl Drop for NodeInner {
     fn drop(&mut self) {
-        // The task that reads the socket holds no reference to this; it is told to end.
-        self.shutdown.notify_one();
+        // The tasks that read the sockets hold no reference to this; they are told to end.
+        self.shutdown.cancel();
     }
 }
 
@@ -173,6 +226,19 @@ fn io_runtime() -> &'static tokio::runtime::Runtime {
 impl Node {
     /// Binds the socket and starts reading it.
     pub fn new(config: NodeConfig) -> io::Result<Node> {
+        Node::open(config, None)
+    }
+
+    /// Binds the socket and a TCP listener for ICE over TCP on the same address, at
+    /// `tcp_port` (LiveKit's `rtc.tcp_port`; 0 lets the system choose), and starts reading
+    /// both. The node's connections advertise passive TCP candidates with the listener's port
+    /// at the addresses they advertise for UDP, unless their settings leave TCP out
+    /// ([`SettingEngine::network_types`](super::SettingEngine::network_types)).
+    pub fn new_with_tcp(config: NodeConfig, tcp_port: u16) -> io::Result<Node> {
+        Node::open(config, Some(tcp_port))
+    }
+
+    fn open(config: NodeConfig, tcp_port: Option<u16>) -> io::Result<Node> {
         let ips = if config.nat_1to1_ips.is_empty() {
             if config.bind_address.ip().is_unspecified() {
                 return Err(io::Error::new(
@@ -197,18 +263,44 @@ impl Node {
             protocol: TransportProtocol::UDP,
             local_addr,
             candidates: ips
-                .into_iter()
-                .map(|ip| SocketAddr::new(ip, local_addr.port()))
+                .iter()
+                .map(|ip| SocketAddr::new(*ip, local_addr.port()))
                 .collect(),
         };
         debugw!(config.logger, "node socket bound", "address" => local_addr, "candidates" => listener.candidates);
 
-        let shutdown = Arc::new(Notify::new());
+        let mut tcp_listener = None;
+        let tcp = match tcp_port {
+            Some(port) => {
+                let std_listener =
+                    std::net::TcpListener::bind(SocketAddr::new(config.bind_address.ip(), port))?;
+                std_listener.set_nonblocking(true)?;
+                let local_addr = std_listener.local_addr()?;
+                tcp_listener = {
+                    let _guard = io_runtime().enter();
+                    Some(TcpListener::from_std(std_listener)?)
+                };
+                let info = TcpListenerInfo {
+                    local_addr,
+                    candidates: ips
+                        .iter()
+                        .map(|ip| SocketAddr::new(*ip, local_addr.port()))
+                        .collect(),
+                };
+                debugw!(config.logger, "node TCP listener bound", "address" => local_addr, "candidates" => info.candidates);
+                Some(info)
+            }
+            None => None,
+        };
+
+        let shutdown = CancellationToken::new();
         let inner = Arc::new(NodeInner {
             logger: config.logger,
             listeners: vec![listener],
+            tcp,
             routes: RwLock::new(Routes::default()),
             next_id: AtomicU64::new(1),
+            next_stream: AtomicU64::new(1),
             connections: AtomicUsize::new(0),
             shutdown: shutdown.clone(),
             datagrams_received: AtomicU64::new(0),
@@ -216,8 +308,14 @@ impl Node {
             datagrams_queue_full: AtomicU64::new(0),
             datagrams_sent: AtomicU64::new(0),
             datagrams_not_sent: AtomicU64::new(0),
+            tcp_streams_opened: AtomicU64::new(0),
+            tcp_streams_closed: AtomicU64::new(0),
+            tcp_streams_refused: AtomicU64::new(0),
         });
-        io_runtime().spawn(receive(socket, 0, Arc::downgrade(&inner), shutdown));
+        io_runtime().spawn(receive(socket, 0, Arc::downgrade(&inner), shutdown.clone()));
+        if let Some(tcp_listener) = tcp_listener {
+            io_runtime().spawn(accept(tcp_listener, Arc::downgrade(&inner), shutdown));
+        }
         Ok(Node { inner })
     }
 
@@ -226,7 +324,12 @@ impl Node {
         self.inner.listeners[0].local_addr
     }
 
-    /// The host candidates of this node: what a client is told to send to.
+    /// The address the TCP listener is bound to, if the node has one.
+    pub fn tcp_local_addr(&self) -> Option<SocketAddr> {
+        self.inner.tcp.as_ref().map(|tcp| tcp.local_addr)
+    }
+
+    /// The host candidates of this node: what a client is told to send to over UDP.
     pub fn candidates(&self) -> Vec<SocketAddr> {
         self.inner
             .listeners
@@ -235,20 +338,32 @@ impl Node {
             .collect()
     }
 
+    /// The passive TCP candidates of this node: what a client is told to connect to over
+    /// TCP. Empty without a TCP listener.
+    pub fn tcp_candidates(&self) -> Vec<SocketAddr> {
+        self.inner
+            .tcp
+            .as_ref()
+            .map(|tcp| tcp.candidates.clone())
+            .unwrap_or_default()
+    }
+
     /// What a connection that advertises these addresses in the place of the node's own
     /// tells a client to send to: each address with the port of the socket that can be
     /// reached at it. An address of a family the node has no socket for is left out.
     pub(crate) fn candidates_for(&self, ips: &[IpAddr]) -> Vec<SocketAddr> {
         let mut candidates = Vec::new();
         for listener in &self.inner.listeners {
-            for ip in ips {
-                let candidate = SocketAddr::new(ip.to_canonical(), listener.local_addr.port());
-                if candidate.is_ipv4() == listener.local_addr.is_ipv4()
-                    && !candidates.contains(&candidate)
-                {
-                    candidates.push(candidate);
-                }
-            }
+            candidates_at(ips, listener.local_addr, &mut candidates);
+        }
+        candidates
+    }
+
+    /// The same for the TCP listener: the passive candidates of such a connection.
+    pub(crate) fn tcp_candidates_for(&self, ips: &[IpAddr]) -> Vec<SocketAddr> {
+        let mut candidates = Vec::new();
+        if let Some(tcp) = &self.inner.tcp {
+            candidates_at(ips, tcp.local_addr, &mut candidates);
         }
         candidates
     }
@@ -266,21 +381,32 @@ impl Node {
             datagrams_queue_full: i.datagrams_queue_full.load(Ordering::Relaxed),
             datagrams_sent: i.datagrams_sent.load(Ordering::Relaxed),
             datagrams_not_sent: i.datagrams_not_sent.load(Ordering::Relaxed),
+            tcp_streams_opened: i.tcp_streams_opened.load(Ordering::Relaxed),
+            tcp_streams_closed: i.tcp_streams_closed.load(Ordering::Relaxed),
+            tcp_streams_refused: i.tcp_streams_refused.load(Ordering::Relaxed),
         }
     }
 
-    /// Stops reading the socket and lets go of the connections: each of them that is still
-    /// open finds its queue closed and closes itself.
+    /// Stops reading the socket and the TCP listener, closes the TCP streams and lets go of
+    /// the connections: each of them that is still open finds its queue closed and closes
+    /// itself.
     pub fn close(&self) {
-        self.inner.shutdown.notify_one();
+        self.inner.shutdown.cancel();
         let mut routes = self.inner.routes.write();
         routes.by_addr.clear();
         routes.by_ufrag.clear();
         routes.connections.clear();
+        let streams = std::mem::take(&mut routes.streams);
+        drop(routes);
+        drop(streams);
     }
 
     /// Makes room for a connection: its number, and the queue its datagrams are put in.
-    pub(crate) fn register(&self) -> (u64, mpsc::Receiver<Datagram>, ConnectionGuard) {
+    /// `active_tcp`: the connection dials the passive TCP candidates it sends to.
+    pub(crate) fn register(
+        &self,
+        active_tcp: bool,
+    ) -> (u64, mpsc::Receiver<Datagram>, ConnectionGuard) {
         let id = self.inner.next_id.fetch_add(1, Ordering::SeqCst);
         let (tx, rx) = mpsc::channel(CONNECTION_QUEUE);
         self.inner.routes.write().connections.insert(
@@ -289,6 +415,8 @@ impl Node {
                 route: Route { id, tx },
                 ufrags: Vec::new(),
                 addrs: Vec::new(),
+                streams: Vec::new(),
+                active_tcp,
             },
         );
         self.inner.connections.fetch_add(1, Ordering::SeqCst);
@@ -346,7 +474,7 @@ impl Node {
         );
     }
 
-    /// Forgets a connection. Its queue is closed by this.
+    /// Forgets a connection. Its queue is closed by this, and its TCP streams.
     pub(crate) fn unregister(&self, id: u64) {
         let mut routes = self.inner.routes.write();
         let Some(connection) = routes.connections.remove(&id) else {
@@ -362,11 +490,23 @@ impl Node {
                 routes.by_addr.remove(&addr);
             }
         }
+        let streams: Vec<StreamRoute> = connection
+            .streams
+            .iter()
+            .filter_map(|peer| routes.streams.remove(&(id, *peer)))
+            .collect();
+        drop(routes);
+        // Ending a stream takes no lock of the node, but it is let go of outside anyway.
+        drop(streams);
     }
 
     /// Pushes a datagram of a connection into the socket it is for, now. One the socket does
     /// not take is lost, as UDP allows.
     pub(crate) fn send(&self, id: u64, transport: &TransportContext, data: &[u8]) {
+        if transport.transport_protocol == TransportProtocol::TCP {
+            self.send_tcp(id, transport, data);
+            return;
+        }
         // STUN, as against DTLS and RTP (RFC 7983): the first octet is below 4.
         if data.first().is_some_and(|first| *first < 4) {
             self.learn_addr(id, transport.peer_addr);
@@ -382,6 +522,280 @@ impl Node {
                     .fetch_add(1, Ordering::Relaxed);
             }
         }
+    }
+
+    /// Puts a packet of a connection into the buffer of its TCP stream to that address. When
+    /// there is none and the packet is from the connection's active candidate (a check on a
+    /// pair with a passive candidate of the other side), the connection dials that address
+    /// first, if it may; the packet waits in the stream's buffer meanwhile.
+    fn send_tcp(&self, id: u64, transport: &TransportContext, data: &[u8]) {
+        let inner = &self.inner;
+        let not_sent = || {
+            inner.datagrams_not_sent.fetch_add(1, Ordering::Relaxed);
+        };
+        let Some(frame) = tcp::frame(data) else {
+            return not_sent();
+        };
+        let peer = transport.peer_addr;
+        let written = |stream: &StreamRoute, frame| {
+            if stream.writer.write(frame) {
+                inner.datagrams_sent.fetch_add(1, Ordering::Relaxed);
+            } else {
+                not_sent();
+            }
+        };
+        {
+            let routes = inner.routes.read();
+            if let Some(stream) = routes.streams.get(&(id, peer)) {
+                return written(stream, frame);
+            }
+            let may_dial = transport.local_addr.port() == ACTIVE_TCP_PORT
+                && routes.connections.get(&id).is_some_and(|c| c.active_tcp);
+            if !may_dial {
+                return not_sent();
+            }
+        }
+
+        let mut routes = inner.routes.write();
+        // Another thread of the connection may have dialled in between.
+        if let Some(stream) = routes.streams.get(&(id, peer)) {
+            return written(stream, frame);
+        }
+        let Some(connection) = routes.connections.get_mut(&id) else {
+            return not_sent();
+        };
+        connection.streams.push(peer);
+        let to_connection = connection.route.tx.downgrade();
+        let (writer, queue) = Writer::new();
+        let closed = inner.shutdown.child_token();
+        let stream = StreamRoute {
+            serial: inner.next_stream.fetch_add(1, Ordering::Relaxed),
+            writer,
+            _close: closed.clone().drop_guard(),
+        };
+        written(&stream, frame);
+        routes.streams.insert((id, peer), stream);
+        drop(routes);
+        debugw!(inner.logger, "dialling a passive TCP candidate", "connection" => id, "address" => peer);
+        let end = StreamEnd {
+            node: Arc::downgrade(inner),
+            to_connection,
+            connection: id,
+            serial: None,
+            peer,
+            local: transport.local_addr,
+        };
+        io_runtime().spawn(dial(end, queue, closed));
+    }
+}
+
+/// Where the packets of a TCP stream go, and what is forgotten when it ends.
+struct StreamEnd {
+    node: Weak<NodeInner>,
+    to_connection: mpsc::WeakSender<Datagram>,
+    connection: u64,
+    // The stream's number for a stream that was accepted, which is forgotten when it ends.
+    // A dialled one stays in the routes, ended, until its connection is forgotten: it is
+    // dialled once, as pion's agent dials a passive candidate once.
+    serial: Option<u64>,
+    peer: SocketAddr,
+    // The address `rtc` is told the packets arrived at.
+    local: SocketAddr,
+}
+
+impl StreamEnd {
+    /// Gives a packet to the connection, waiting while its queue is full (as pion's TCP mux
+    /// waits: TCP slows the other side down). False when the connection is gone.
+    async fn deliver(&self, data: BytesMut, closed: &CancellationToken) -> bool {
+        let Some(node) = self.node.upgrade() else {
+            return false;
+        };
+        node.datagrams_received.fetch_add(1, Ordering::Relaxed);
+        drop(node);
+        let Some(tx) = self.to_connection.upgrade() else {
+            return false;
+        };
+        let datagram = Datagram {
+            data,
+            from: self.peer,
+            local: self.local,
+            protocol: TransportProtocol::TCP,
+            at: Time::now(),
+        };
+        tokio::select! {
+            _ = closed.cancelled() => false,
+            res = tx.send(datagram) => res.is_ok(),
+        }
+    }
+
+    /// Reads the stream until it ends, or until its route is dropped or the node closed.
+    async fn read(
+        &self,
+        stream: OwnedReadHalf,
+        mut reader: FrameReader,
+        closed: CancellationToken,
+    ) {
+        loop {
+            let res = tokio::select! {
+                _ = closed.cancelled() => break,
+                res = reader.next(&stream, tcp::FRAME_LIMIT) => res,
+            };
+            match res {
+                Ok(Some(data)) => {
+                    if !data.is_empty() && !self.deliver(data, &closed).await {
+                        break;
+                    }
+                }
+                Ok(None) => break,
+                Err(err) => {
+                    if let Some(node) = self.node.upgrade() {
+                        debugw!(node.logger, "TCP stream failed", "error" => err.to_string(), "connection" => self.connection, "address" => self.peer);
+                    }
+                    break;
+                }
+            }
+        }
+        // The writer of a dialled stream, which stays in the routes, stops too.
+        closed.cancel();
+        self.ended();
+    }
+
+    /// Counts the stream as ended, and forgets an accepted one: dropping its route lets its
+    /// writer finish.
+    fn ended(&self) {
+        let Some(node) = self.node.upgrade() else {
+            return;
+        };
+        node.tcp_streams_closed.fetch_add(1, Ordering::Relaxed);
+        if let Some(serial) = self.serial {
+            let mut routes = node.routes.write();
+            let key = (self.connection, self.peer);
+            if routes.streams.get(&key).is_some_and(|s| s.serial == serial) {
+                let stream = routes.streams.remove(&key);
+                if let Some(connection) = routes.connections.get_mut(&self.connection) {
+                    connection.streams.retain(|p| *p != self.peer);
+                }
+                drop(routes);
+                drop(stream);
+            }
+        }
+    }
+}
+
+/// Dials a passive candidate for a connection, then writes and reads the stream.
+async fn dial(end: StreamEnd, queue: tcp::WriterQueue, closed: CancellationToken) {
+    let res = tokio::select! {
+        _ = closed.cancelled() => return,
+        res = tokio::time::timeout(tcp::DIAL_TIMEOUT, TcpStream::connect(end.peer)) => res,
+    };
+    let Some(node) = end.node.upgrade() else {
+        return;
+    };
+    let stream = match res {
+        Ok(Ok(stream)) => stream,
+        // The queue is dropped: what is written to the stream from now on is lost.
+        Ok(Err(err)) => {
+            debugw!(node.logger, "could not dial a passive TCP candidate", "error" => err.to_string(), "address" => end.peer);
+            return;
+        }
+        Err(_) => {
+            debugw!(node.logger, "could not dial a passive TCP candidate in time", "address" => end.peer);
+            return;
+        }
+    };
+    node.tcp_streams_opened.fetch_add(1, Ordering::Relaxed);
+    drop(node);
+    let _ = stream.set_nodelay(true);
+    let (read, write) = stream.into_split();
+    tokio::spawn(tcp::write_loop(write, queue, closed.clone()));
+    end.read(read, FrameReader::default(), closed).await;
+}
+
+/// Accepts TCP streams until the node is closed or dropped.
+async fn accept(listener: TcpListener, node: Weak<NodeInner>, shutdown: CancellationToken) {
+    loop {
+        let res = tokio::select! {
+            _ = shutdown.cancelled() => return,
+            res = listener.accept() => res,
+        };
+        match res {
+            Ok((stream, peer)) => {
+                tokio::spawn(serve(stream, peer, node.clone(), shutdown.child_token()));
+            }
+            Err(err) => {
+                // Out of descriptors, mostly: said, and tried again a little later.
+                let Some(node) = node.upgrade() else { return };
+                warnw!(node.logger, "could not accept a TCP stream", err);
+                drop(node);
+                tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            }
+        }
+    }
+}
+
+/// Gives an accepted stream to the connection its first binding request names, then writes
+/// and reads it. pion's `TCPMuxDefault.handleConn`.
+async fn serve(
+    stream: TcpStream,
+    peer: SocketAddr,
+    node: Weak<NodeInner>,
+    closed: CancellationToken,
+) {
+    let _ = stream.set_nodelay(true);
+    let local_addr = stream.local_addr().ok();
+    let (read, write) = stream.into_split();
+    let mut reader = FrameReader::default();
+    let first = tokio::select! {
+        _ = closed.cancelled() => return,
+        res = tokio::time::timeout(
+            tcp::FIRST_STUN_BIND_TIMEOUT,
+            reader.next(&read, tcp::FIRST_FRAME_LIMIT),
+        ) => res,
+    };
+    let Some(inner) = node.upgrade() else {
+        return;
+    };
+    let refuse = |reason: &str| {
+        inner.tcp_streams_refused.fetch_add(1, Ordering::Relaxed);
+        debugw!(inner.logger, "TCP stream refused", "reason" => reason, "address" => peer, "local" => local_addr);
+        // Dropping both halves closes the stream.
+    };
+    let first = match first {
+        Ok(Ok(Some(first))) => first,
+        Ok(Ok(None)) => return refuse("closed before its first binding request"),
+        Ok(Err(err)) => return refuse(&err.to_string()),
+        Err(_) => return refuse("no binding request in time"),
+    };
+    let Some(ufrag) = stun_binding_request_username(&first) else {
+        return refuse("the first packet is not a binding request with a user name");
+    };
+
+    let (id, to_connection, serial, queue) = match inner.adopt(ufrag, peer, &closed) {
+        Ok(adopted) => adopted,
+        Err(reason) => return refuse(reason),
+    };
+    inner.tcp_streams_opened.fetch_add(1, Ordering::Relaxed);
+    let local = inner
+        .tcp
+        .as_ref()
+        .map(|tcp| tcp.candidates[0])
+        .unwrap_or(peer);
+    debugw!(inner.logger, "TCP stream accepted", "connection" => id, "address" => peer);
+    drop(inner);
+
+    tokio::spawn(tcp::write_loop(write, queue, closed.clone()));
+    let end = StreamEnd {
+        node,
+        to_connection,
+        connection: id,
+        serial: Some(serial),
+        peer,
+        local,
+    };
+    if end.deliver(first, &closed).await {
+        end.read(read, reader, closed).await;
+    } else {
+        end.ended();
     }
 }
 
@@ -440,6 +854,44 @@ impl NodeInner {
             self.datagrams_queue_full.fetch_add(1, Ordering::Relaxed);
         }
     }
+
+    /// Gives an accepted TCP stream to the connection with this ICE user name: the
+    /// connection's number and queue, the stream's number, and the buffer its writer
+    /// empties. Or why not.
+    #[allow(clippy::type_complexity)]
+    fn adopt(
+        &self,
+        ufrag: &str,
+        peer: SocketAddr,
+        closed: &CancellationToken,
+    ) -> Result<(u64, mpsc::WeakSender<Datagram>, u64, tcp::WriterQueue), &'static str> {
+        let mut routes = self.routes.write();
+        let id = routes
+            .by_ufrag
+            .get(ufrag)
+            .map(|r| r.id)
+            .ok_or("no connection has that user name")?;
+        if routes.streams.contains_key(&(id, peer)) {
+            return Err("the connection has a stream from that address");
+        }
+        let connection = routes
+            .connections
+            .get_mut(&id)
+            .ok_or("the connection is gone")?;
+        connection.streams.push(peer);
+        let to_connection = connection.route.tx.downgrade();
+        let serial = self.next_stream.fetch_add(1, Ordering::Relaxed);
+        let (writer, queue) = Writer::new();
+        routes.streams.insert(
+            (id, peer),
+            StreamRoute {
+                serial,
+                writer,
+                _close: closed.clone().drop_guard(),
+            },
+        );
+        Ok((id, to_connection, serial, queue))
+    }
 }
 
 /// Reads one socket until the node is closed or dropped.
@@ -447,12 +899,12 @@ async fn receive(
     socket: Arc<UdpSocket>,
     listener: usize,
     node: Weak<NodeInner>,
-    shutdown: Arc<Notify>,
+    shutdown: CancellationToken,
 ) {
     let mut buf = vec![0u8; MAX_DATAGRAM];
     loop {
         let res = tokio::select! {
-            _ = shutdown.notified() => return,
+            _ = shutdown.cancelled() => return,
             res = socket.recv_from(&mut buf) => res,
         };
         let Some(node) = node.upgrade() else { return };
@@ -478,6 +930,17 @@ async fn receive(
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                 }
             }
+        }
+    }
+}
+
+/// Each address with the port of a socket bound at `local`, if it is of the socket's family,
+/// added to `candidates` unless it is there.
+fn candidates_at(ips: &[IpAddr], local: SocketAddr, candidates: &mut Vec<SocketAddr>) {
+    for ip in ips {
+        let candidate = SocketAddr::new(ip.to_canonical(), local.port());
+        if candidate.is_ipv4() == local.is_ipv4() && !candidates.contains(&candidate) {
+            candidates.push(candidate);
         }
     }
 }
@@ -593,8 +1056,8 @@ mod tests {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_datagram_finds_its_connection() {
         let node = Node::new(NodeConfig::default()).unwrap();
-        let (first, mut first_queue, first_guard) = node.register();
-        let (second, mut second_queue, second_guard) = node.register();
+        let (first, mut first_queue, first_guard) = node.register(false);
+        let (second, mut second_queue, second_guard) = node.register(false);
         node.add_ufrag(first, "one1");
         node.add_ufrag(second, "two2");
         assert_eq!(node.connection_count(), 2);

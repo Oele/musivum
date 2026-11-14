@@ -10,7 +10,9 @@
 //! # How it runs
 //!
 //! - A [`Node`] has one UDP socket for all its connections. One task reads it and gives each
-//!   datagram to the connection it belongs to, through a queue per connection.
+//!   datagram to the connection it belongs to, through a queue per connection. A node may
+//!   also have a TCP listener ([`Node::new_with_tcp`]): a stream is given to the connection
+//!   its first binding request names, and its packets go through the same queue.
 //! - Every [`PeerConnection`] has a task of its own on `crate::go::time::runtime()`. It
 //!   takes the datagrams from the queue, drives the timers of `rtc`, and makes all the calls
 //!   out of the connection: the callbacks set with `on_...`, the sink, `bind` and `unbind` of
@@ -28,7 +30,9 @@
 //! - A connection has to be closed ([`PeerConnection::close`]); dropping the last handle
 //!   closes it too, unless a callback holds a handle.
 //! - Gathering is over at once: the candidates are the node's addresses, or the addresses
-//!   the connection was given in their place ([`SettingEngine::host_candidate_ips`]). ICE
+//!   the connection was given in their place ([`SettingEngine::host_candidate_ips`]), over
+//!   UDP and, on a node with a TCP listener, as passive TCP candidates; active TCP
+//!   candidates only where the settings ask for them ([`SettingEngine::active_tcp`]). ICE
 //!   servers are taken ([`Configuration::ice_servers`]) and nothing is asked of them: a
 //!   connection has no server reflexive and no relayed candidates of its own.
 //! - `on_track` comes when the first packet of a stream has arrived (and after that packet
@@ -70,9 +74,10 @@ mod media;
 mod node;
 mod settings;
 mod tap;
+mod tcp;
 
 use std::collections::{HashMap, VecDeque};
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
 use std::sync::{Arc, Weak};
 use std::time::Instant;
 
@@ -88,7 +93,7 @@ use rtc::peer_connection::{RTCPeerConnection, RTCPeerConnectionBuilder};
 use rtc::rtp_transceiver::rtp_sender::RTCRtpHeaderExtensionCapability;
 use rtc::rtp_transceiver::{RTCRtpReceiverId, RTCRtpSenderId, RTCRtpTransceiverInit};
 use rtc::sansio::Protocol;
-use rtc::shared::{TaggedBytesMut, TransportContext};
+use rtc::shared::{TaggedBytesMut, TransportContext, TransportProtocol};
 use rtc::statistics::StatsSelector;
 use tokio::sync::{Notify, mpsc};
 
@@ -162,6 +167,8 @@ pub use crate::webrtc::ice::MulticastDnsMode;
 /// pion's `NetworkType`. It is the ICE library's, which pion's `webrtc` package has a copy
 /// of.
 pub use crate::webrtc::ice::NetworkType;
+
+use crate::webrtc::ice::TcpType;
 
 /// What a connection is made from: pion's `webrtc.NewAPI(WithMediaEngine, WithSettingEngine)`
 /// and `Configuration` in one. A certificate is made for each connection.
@@ -324,6 +331,11 @@ pub(crate) struct Inner {
     pub(crate) this: Weak<Inner>,
     // The addresses this connection advertises: the node's, or its own.
     host_candidates: Vec<SocketAddr>,
+    // The same with the port of the node's TCP listener: its passive TCP candidates. Empty
+    // when the node has no TCP listener or the settings leave TCP out.
+    tcp_host_candidates: Vec<SocketAddr>,
+    // Whether the connection has active TCP candidates, and dials.
+    active_tcp: bool,
     core: Mutex<Core>,
     // Filled with the connection's mutex held, emptied by the connection's task.
     pending: Mutex<VecDeque<Delivery>>,
@@ -382,14 +394,23 @@ impl PeerConnection {
             }
             None => node.candidates(),
         };
+        let tcp = tcp_allowed(&config.setting_engine.network_types);
+        let tcp_host_candidates = match &config.setting_engine.host_candidate_ips {
+            _ if !tcp => Vec::new(),
+            Some(ips) => node.tcp_candidates_for(ips),
+            None => node.tcp_candidates(),
+        };
+        let active_tcp = tcp && config.setting_engine.active_tcp;
 
-        let (id, datagrams, guard) = node.register();
+        let (id, datagrams, guard) = node.register(active_tcp);
         let inner = Arc::new_cyclic(|this| Inner {
             id,
             node: node.clone(),
             logger: config.logger,
             this: this.clone(),
             host_candidates,
+            tcp_host_candidates,
+            active_tcp,
             core: Mutex::new(Core {
                 rtc,
                 inbox,
@@ -1234,19 +1255,27 @@ impl Inner {
             core.out
                 .push(Delivery::IceGatheringState(IceGatheringState::Gathering));
             for addr in &self.host_candidates {
-                let candidate = CandidateHostConfig {
-                    base_config: CandidateConfig {
-                        network: "udp".to_owned(),
-                        address: addr.ip().to_string(),
-                        port: addr.port(),
-                        component: 1,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                }
-                .new_candidate_host()?;
                 core.rtc
-                    .add_local_candidate(IceCandidate::from(&candidate).to_json()?)?;
+                    .add_local_candidate(host_candidate(*addr, TcpType::Unspecified)?)?;
+            }
+            for addr in &self.tcp_host_candidates {
+                core.rtc
+                    .add_local_candidate(host_candidate(*addr, TcpType::Passive)?)?;
+            }
+            if self.active_tcp {
+                // One for each address of the connection, with the port that says it has
+                // none (RFC 6544): it dials from one of the system's choosing.
+                let mut ips: Vec<IpAddr> = Vec::new();
+                for addr in &self.host_candidates {
+                    if !ips.contains(&addr.ip()) {
+                        ips.push(addr.ip());
+                    }
+                }
+                for ip in ips {
+                    let addr = SocketAddr::new(ip, tcp::ACTIVE_TCP_PORT);
+                    core.rtc
+                        .add_local_candidate(host_candidate(addr, TcpType::Active)?)?;
+                }
             }
         } else if restarted {
             // The candidates are the same after a restart, and the other side needs them
@@ -1373,11 +1402,21 @@ impl Inner {
     /// The address `rtc` is told a datagram arrived at. Its ICE agent takes a datagram only
     /// at an address that is a candidate of the connection, so for a connection with
     /// addresses of its own it is the first of those on the socket the datagram came in on.
+    ///
+    /// A packet on a TCP stream the connection dialled arrived at its active candidate (the
+    /// node keeps that address with the stream), which the agent knows by its IP address.
     fn local_addr_of(&self, datagram: &Datagram) -> SocketAddr {
-        if self.host_candidates.contains(&datagram.local) {
+        let candidates = match datagram.protocol {
+            TransportProtocol::TCP if datagram.local.port() == tcp::ACTIVE_TCP_PORT => {
+                return datagram.local;
+            }
+            TransportProtocol::TCP => &self.tcp_host_candidates,
+            _ => &self.host_candidates,
+        };
+        if candidates.contains(&datagram.local) {
             return datagram.local;
         }
-        self.host_candidates
+        candidates
             .iter()
             .find(|c| c.port() == datagram.local.port() && c.is_ipv4() == datagram.local.is_ipv4())
             .copied()
@@ -1606,6 +1645,33 @@ fn selected_candidate_pair(core: &mut Core) -> Option<Option<IceCandidatePair>> 
         }
     }
     None
+}
+
+/// A host candidate at this address, over UDP or, with a TCP type, over TCP.
+fn host_candidate(addr: SocketAddr, tcp_type: TcpType) -> Result<IceCandidateInit, Error> {
+    let network = if tcp_type == TcpType::Unspecified {
+        "udp"
+    } else {
+        "tcp"
+    };
+    let candidate = CandidateHostConfig {
+        base_config: CandidateConfig {
+            network: network.to_owned(),
+            address: addr.ip().to_string(),
+            port: addr.port(),
+            component: 1,
+            ..Default::default()
+        },
+        tcp_type,
+    }
+    .new_candidate_host()?;
+    Ok(IceCandidate::from(&candidate).to_json()?)
+}
+
+/// Whether the agent takes TCP candidates with these network types: all of them, or the TCP
+/// ones among them.
+fn tcp_allowed(network_types: &[NetworkType]) -> bool {
+    network_types.is_empty() || network_types.iter().any(|t| t.is_tcp())
 }
 
 /// The ICE user name of a description (the first, which with BUNDLE is the only one).

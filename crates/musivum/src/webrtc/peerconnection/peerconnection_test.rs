@@ -2502,3 +2502,6 @@ async fn test_codec_of_a_payload_type() {
     client.pc.close().unwrap();
     server.pc.close().unwrap();
 }
+
+#[path = "tcp_test.rs"]
+mod tcp_test;
