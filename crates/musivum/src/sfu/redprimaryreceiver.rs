@@ -24,7 +24,7 @@ use crate::protocol::codecs::mime;
 use crate::protocol::livekit;
 use crate::protocol::logger::Logger;
 use crate::sfu::buffer;
-use crate::sfu::redreceiver::close_track_senders;
+use crate::sfu::receiver_base::close_track_senders;
 use crate::sfu::utils as sfuutils;
 use crate::sfu::{
     Bitrates, DebugInfo, Error, ReceiverCodecState, RedTransformer, TrackReceiver, TrackSender,

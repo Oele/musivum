@@ -14,8 +14,6 @@
 // into a buffer on the stack and copied into a `Bytes` for each packet, and the forwarded
 // packet is a local, where the original reuses `redPayloadBuf`, `redExtPkt` and `redRtpPkt`.
 // The error that `fmt.Errorf` makes is a variant of the package's `Error`.
-// `close_track_senders` is here until the receiver is ported: upstream it is in
-// `receiver_base.go`.
 
 use std::sync::{Arc, Weak};
 
@@ -29,6 +27,7 @@ use crate::protocol::codecs::mime;
 use crate::protocol::livekit;
 use crate::protocol::logger::Logger;
 use crate::sfu::buffer;
+use crate::sfu::receiver_base::close_track_senders;
 use crate::sfu::utils as sfuutils;
 use crate::sfu::{
     Bitrates, DebugInfo, Error, ReceiverCodecState, RedTransformer, TrackReceiver, TrackSender,
@@ -437,23 +436,6 @@ fn encode_red_for_primary(
         index += p.payload.len();
     }
     Ok(index)
-}
-
-// -----------------------------------------------------------
-
-// From `receiver_base.go`, where it is the last function: it moves to `receiver_base.rs` when
-// the receiver is ported. A goroutine per sender is a scoped thread per sender, and the end
-// of the scope is the wait that the `sync.WaitGroup` is.
-
-// closes all track senders in parallel, returns when all are closed
-pub(super) fn close_track_senders(senders: &[Arc<dyn TrackSender>]) {
-    std::thread::scope(|s| {
-        for dt in senders {
-            s.spawn(move || {
-                dt.close();
-            });
-        }
-    });
 }
 
 #[cfg(test)]

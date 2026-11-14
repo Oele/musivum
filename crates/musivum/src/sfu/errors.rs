@@ -45,6 +45,12 @@ pub enum Error {
     // receiver_base.go
     #[error("receiver closed")]
     ReceiverClosed,
+    #[error("DownTrack already exist")]
+    DownTrackAlreadyExist,
+    #[error("duplicate layer")]
+    DuplicateLayer,
+    #[error("invalid layer")]
+    InvalidLayer,
 
     // redreceiver.go: a `fmt.Errorf` there, with the size of the payload that does not fit
     #[error("red payload don't have enough space, needsize {0}")]
@@ -53,6 +59,12 @@ pub enum Error {
     // an error of the codec munger, which forwarder.go passes on
     #[error(transparent)]
     CodecMunger(#[from] crate::sfu::codecmunger::Error),
+
+    // an error of the buffer, which receiver_base.go passes on from `ReadRTP`: whatever is
+    // neither the end of a buffer that is closed (that one is `Eof`) nor the bucket's (that
+    // one is `Bucket`). Not made with `From`, which would take those two along.
+    #[error(transparent)]
+    Buffer(crate::sfu::buffer::Error),
 
     // an error of the playout delay extension, which downtrack.go passes on when it makes
     // its playout delay controller

@@ -3,17 +3,20 @@
 // Changes: translated from Go to Rust; the subtests are blocks that carry their names in the
 // assertion messages. `dummyDowntrack` is a `FakeTrackSender` whose `write_rtp` returns 1: the
 // fake records the packets it is given, and `last_received_pkt` and `received_pkts` read
-// them back. The receiver (`WebRTCReceiver`, `ReceiverBase`) is not ported yet: a
-// `FakeTrackReceiver` stands for it, `get_red_receiver` and `get_primary_receiver_for_red`
-// here make the RED receivers as the receiver's methods of those names make them, and the
-// assertions on what those methods return for a receiver that is or is not RED are left out,
-// with a comment at the place of each. The buffer is not ported yet either, see
-// `test_red_receiver_reused_read_buffer`.
+// them back. The original makes a `&WebRTCReceiver{ReceiverBase: &ReceiverBase{...}}` by
+// hand and sets `isRED` on it, before and after it asks for the RED receiver. A receiver
+// cannot be made by hand here, and `ReceiverBase::new` takes `is_red` from the codec: so
+// `new_receiver(is_red)` makes the base of a receiver that is RED or is not, the assertion on
+// what a receiver returns that needs no RED receiver is made on one of the first kind, and
+// `w.isRED = ...` after it is a second receiver of the other kind. `get_red_receiver` and
+// `get_primary_receiver_for_red` here are the type assertions `.(*RedReceiver)` and
+// `.(*RedPrimaryReceiver)` of the original: they give the receiver's transformer, as the
+// trait it is held as, and check that it is the receiver that the method returned.
 
 use super::*;
 use crate::mediatransportutil::red;
 use crate::protocol::logger;
-use crate::sfu::{FakeTrackReceiver, FakeTrackSender, RedPrimaryReceiver};
+use crate::sfu::{FakeTrackSender, ReceiverBase, ReceiverBaseParams};
 
 const TS_STEP: u32 = 48000 / 1000 * 10;
 
@@ -38,26 +41,74 @@ fn received_pkts(dt: &FakeTrackSender) -> Vec<rtp::Packet> {
         .collect()
 }
 
-// What `w.GetRedReceiver().(*RedReceiver)` gives for a receiver that is not RED.
-fn get_red_receiver(w: &Arc<FakeTrackReceiver>) -> Arc<RedReceiver> {
-    RedReceiver::new(
-        w.clone(),
-        sfuutils::DownTrackSpreaderParams {
-            threshold: 0,
+// `&WebRTCReceiver{ReceiverBase: &ReceiverBase{params: ..., isRED: is_red}}` of the original:
+// see the header. A receiver that is RED has the codec that `testRedRedPrimaryReceiver`
+// gives it.
+fn new_receiver(is_red: bool) -> Arc<ReceiverBase> {
+    let codec = if is_red {
+        webrtc::RtpCodecParameters {
+            payload_type: OPUS_RED_PT,
+            rtp_codec_capability: webrtc::RtpCodecCapability {
+                mime_type: "audio/red".to_owned(),
+                ..Default::default()
+            },
+        }
+    } else {
+        webrtc::RtpCodecParameters::default()
+    };
+    ReceiverBase::new(
+        ReceiverBaseParams {
+            kind: webrtc::RtpCodecType::Audio,
             logger: logger::get_logger(),
+            codec,
+            ..Default::default()
         },
+        &livekit::TrackInfo::default(),
+        ReceiverCodecState::Normal,
     )
 }
 
-// What `w.GetPrimaryReceiverForRed().(*RedPrimaryReceiver)` gives for a receiver that is RED.
-fn get_primary_receiver_for_red(w: &Arc<FakeTrackReceiver>) -> Arc<RedPrimaryReceiver> {
-    RedPrimaryReceiver::new(
-        w.clone(),
-        sfuutils::DownTrackSpreaderParams {
-            threshold: 0,
-            logger: logger::get_logger(),
-        },
-    )
+// require.Equal(t, receiver, w.ReceiverBase)
+#[track_caller]
+fn require_is_receiver_base(receiver: &Arc<dyn TrackReceiver>, w: &Arc<ReceiverBase>) {
+    assert!(
+        std::ptr::eq(
+            Arc::as_ptr(receiver) as *const (),
+            Arc::as_ptr(w) as *const ()
+        ),
+        "the receiver returned is not the receiver itself"
+    );
+}
+
+// The transformer of the receiver, which is what `receiver` has to be.
+#[track_caller]
+fn transformer_of(
+    w: &Arc<ReceiverBase>,
+    receiver: Arc<dyn TrackReceiver>,
+) -> Arc<dyn RedTransformer> {
+    let rt = w.load_red_transformer();
+    assert!(rt.is_some());
+    let rt = rt.unwrap();
+    assert!(
+        std::ptr::eq(
+            Arc::as_ptr(&receiver) as *const (),
+            Arc::as_ptr(&rt) as *const ()
+        ),
+        "the receiver returned is not the RED receiver of the receiver"
+    );
+    rt
+}
+
+// w.GetRedReceiver().(*RedReceiver)
+#[track_caller]
+fn get_red_receiver(w: &Arc<ReceiverBase>) -> Arc<dyn RedTransformer> {
+    transformer_of(w, w.get_red_receiver())
+}
+
+// w.GetPrimaryReceiverForRed().(*RedPrimaryReceiver)
+#[track_caller]
+fn get_primary_receiver_for_red(w: &Arc<ReceiverBase>) -> Arc<dyn RedTransformer> {
+    transformer_of(w, w.get_primary_receiver_for_red())
 }
 
 fn ext_packet(pkt: &rtp::Packet) -> buffer::ExtPacket {
@@ -73,9 +124,10 @@ fn test_red_receiver() {
 
     {
         let name = "normal";
-        let w = Arc::new(FakeTrackReceiver::default());
-        // Not here, see the header: with `isRED` set,
-        // require.Equal(t, w.GetRedReceiver(), w.ReceiverBase)
+        let w = new_receiver(true);
+        require_is_receiver_base(&w.get_red_receiver(), &w);
+        // w.isRED = false
+        let w = new_receiver(false);
         let red = get_red_receiver(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -98,7 +150,7 @@ fn test_red_receiver() {
 
     {
         let name = "packet lost and jump";
-        let w = Arc::new(FakeTrackReceiver::default());
+        let w = new_receiver(false);
         let red = get_red_receiver(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -149,7 +201,7 @@ fn test_red_receiver() {
 
     {
         let name = "unorder and repeat";
-        let w = Arc::new(FakeTrackReceiver::default());
+        let w = new_receiver(false);
         let red = get_red_receiver(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -178,9 +230,10 @@ fn test_red_receiver() {
 
     {
         let name = "encoding exceed space";
-        let w = Arc::new(FakeTrackReceiver::default());
-        // Not here, see the header: with `isRED` set,
-        // require.Equal(t, w.GetRedReceiver(), w.ReceiverBase)
+        let w = new_receiver(true);
+        require_is_receiver_base(&w.get_red_receiver(), &w);
+        // w.isRED = false
+        let w = new_receiver(false);
         let red = get_red_receiver(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -203,9 +256,10 @@ fn test_red_receiver() {
 
     {
         let name = "large timestamp gap";
-        let w = Arc::new(FakeTrackReceiver::default());
-        // Not here, see the header: with `isRED` set,
-        // require.Equal(t, w.GetRedReceiver(), w.ReceiverBase)
+        let w = new_receiver(true);
+        require_is_receiver_base(&w.get_red_receiver(), &w);
+        // w.isRED = false
+        let w = new_receiver(false);
         let red = get_red_receiver(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -237,13 +291,32 @@ fn test_red_receiver() {
 // reads every packet into one reused buffer, the way ReceiverBase.forwardRTP does
 #[test]
 fn test_red_receiver_reused_read_buffer() {
-    // The original writes every packet to a `buffer.Buffer` that is bound to Opus, and reads
-    // it back into the one `pktBuf` with `ReadExtended`. The buffer is not ported yet. And
-    // what the original guards against, a history that points into a read buffer which the
-    // next packet is written over, cannot be made here, where a payload is a `Bytes`. So the
-    // packet goes through the one buffer in its wire form and is parsed from a copy of that;
-    // the rest, and what is asserted, is the original's.
-    let w = Arc::new(FakeTrackReceiver::default());
+    // What the original guards against, a history that points into a read buffer which the
+    // next packet is written over, cannot happen here, where a payload is a `Bytes` of the
+    // packet's own copy of what was read. The test is the original's all the same.
+    let opus = webrtc::RtpCodecParameters {
+        rtp_codec_capability: webrtc::RtpCodecCapability {
+            mime_type: webrtc::MIME_TYPE_OPUS.to_owned(),
+            clock_rate: 48000,
+            channels: 2,
+            ..Default::default()
+        },
+        payload_type: 111,
+    };
+    let buff = buffer::Buffer::new(0x5678, 500, 200);
+    assert!(
+        buff.bind(
+            webrtc::RtpParameters {
+                codecs: vec![opus.clone()],
+                ..Default::default()
+            },
+            &opus.rtp_codec_capability,
+            0
+        )
+        .is_ok()
+    );
+
+    let w = new_receiver(false);
     let rr = get_red_receiver(&w);
     let dt = new_dummy_downtrack();
     assert!(rr.add_down_track(dt.clone()).is_ok());
@@ -267,17 +340,12 @@ fn test_red_receiver_reused_read_buffer() {
         };
         let raw = pkt.marshal();
         assert!(raw.is_ok());
-        let raw = raw.unwrap();
-        pkt_buf[..raw.len()].copy_from_slice(&raw);
-        let raw_packet = Bytes::copy_from_slice(&pkt_buf[..raw.len()]);
-        let mut packet = rtp::Packet::default();
-        assert!(packet.unmarshal(&raw_packet).is_ok());
-        let ext_pkt = buffer::ExtPacket {
-            packet,
-            raw_packet,
-            ..Default::default()
-        };
-        rr.forward_rtp(&ext_pkt, 0);
+        assert!(buff.write(Bytes::from(raw.unwrap())).is_ok());
+        let ext_pkt = buff.read_extended(&mut pkt_buf);
+        assert!(ext_pkt.is_ok());
+        let ext_pkt = ext_pkt.unwrap();
+        assert!(ext_pkt.is_some());
+        rr.forward_rtp(&ext_pkt.unwrap(), 0);
     }
 
     // the last RED packet carries the two packets before it as redundant blocks
@@ -371,16 +439,10 @@ fn test_red_red_primary_receiver(
     expect_pkt_idx: &[usize],
 ) {
     let dt = new_dummy_downtrack();
-    let w = Arc::new(FakeTrackReceiver::default());
-    w.codec_returns(webrtc::RtpCodecParameters {
-        payload_type: OPUS_RED_PT,
-        rtp_codec_capability: webrtc::RtpCodecCapability {
-            mime_type: "audio/red".to_owned(),
-            ..Default::default()
-        },
-    });
-    // Not here, see the header: before `isRED` is set,
-    // require.Equal(t, w.GetPrimaryReceiverForRed(), w.ReceiverBase)
+    let w = new_receiver(false);
+    require_is_receiver_base(&w.get_primary_receiver_for_red(), &w);
+    // w.isRED = true
+    let w = new_receiver(true);
     let red = get_primary_receiver_for_red(&w);
     assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
@@ -407,9 +469,10 @@ fn test_red_red_primary_receiver(
 
 #[test]
 fn test_red_primary_receiver() {
-    let w = Arc::new(FakeTrackReceiver::default());
-    // Not here, see the header: before `isRED` is set,
-    // require.Equal(t, w.GetPrimaryReceiverForRed(), w.ReceiverBase)
+    let w = new_receiver(false);
+    require_is_receiver_base(&w.get_primary_receiver_for_red(), &w);
+    // w.isRED = true
+    let w = new_receiver(true);
     let _red = get_primary_receiver_for_red(&w);
 
     {
@@ -511,16 +574,10 @@ fn test_red_primary_receiver() {
     {
         let name = "mixed primary codec";
         let dt = new_dummy_downtrack();
-        let w = Arc::new(FakeTrackReceiver::default());
-        w.codec_returns(webrtc::RtpCodecParameters {
-            payload_type: OPUS_RED_PT,
-            rtp_codec_capability: webrtc::RtpCodecCapability {
-                mime_type: "audio/red".to_owned(),
-                ..Default::default()
-            },
-        });
-        // Not here, see the header: before `isRED` is set,
-        // require.Equal(t, w.GetPrimaryReceiverForRed(), w.ReceiverBase)
+        let w = new_receiver(false);
+        require_is_receiver_base(&w.get_primary_receiver_for_red(), &w);
+        // w.isRED = true
+        let w = new_receiver(true);
         let red = get_primary_receiver_for_red(&w);
         assert!(red.add_down_track(dt.clone()).is_ok(), "{name}");
 
