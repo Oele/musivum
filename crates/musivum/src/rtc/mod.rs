@@ -20,6 +20,7 @@ mod participant_data_blob;
 mod roomtrackmanager;
 mod signalanddatastats;
 mod subscribepacer;
+mod subscriptionmanager;
 #[cfg(test)]
 pub mod testutils;
 mod updatatrackmanager;
@@ -36,6 +37,7 @@ pub use participant_data_blob::*;
 pub use roomtrackmanager::*;
 pub use signalanddatastats::*;
 pub use subscribepacer::*;
+pub use subscriptionmanager::*;
 pub use updatatrackmanager::*;
 pub use uptrackmanager::*;
 pub use user_packet_deduper::*;

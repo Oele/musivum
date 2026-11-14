@@ -62,6 +62,16 @@ pub enum Error {
     #[error("datatrack is closed")]
     ReceiverClosed,
 
+    // subscriptionmanager.go: it defines no errors of its own. It tells these two apart, which
+    // are ErrNotOpen and ErrNoReceiver of mediatrackreceiver.go,
+    #[error("track is not open")]
+    NotOpen,
+    #[error("cannot subscribe without a receiver in place")]
+    NoReceiver,
+    // and WaitUntilSubscribed returns Go's context.DeadlineExceeded when its time is up
+    #[error("context deadline exceeded")]
+    DeadlineExceeded,
+
     // errors of other packages that the methods of `types/interfaces.go` pass on: of the
     // sink a participant's messages are written to, of the signal handler and the limits on
     // a participant's metadata, of the down track a subscription makes, of the peer
