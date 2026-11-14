@@ -91,6 +91,15 @@ was checked:
   its exported API at the pin and watched what it did against test servers.
 - **livekit/psrpc v0.8.2** (Apache-2.0), LiveKit's RPC between nodes: read for what its
   local bus does for a single node; `routing/bus.rs` stands in its place, written new.
+- **urfave/cli v3.11.0** (MIT), the command line library of LiveKit's `cmd/server`: its source
+  was not read; what `crates/musivum-server` does with flags and the environment was
+  observed by running LiveKit's `getConfig` at the pin.
+- **uber-go/zap v1.28.0** (MIT): `zapcore/level.go` read for the level names the server's
+  logger accepts (`musivum-server/src/logger.rs`, written new), with the protocol logger's
+  `InitFromConfig` and `ResolveComponentLevel`.
+- **gorilla/websocket v1.5.3**, further: the read limit (`ErrReadLimit`, close 1009) and
+  `handleProtocolError` (close 1002) are followed in `musivum-server/src/service/axumws.rs`.
+- **Howard Hinnant's `civil_from_days`** (public domain), for the date in the health check.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
