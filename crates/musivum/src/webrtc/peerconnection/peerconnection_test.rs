@@ -2503,5 +2503,271 @@ async fn test_codec_of_a_payload_type() {
     server.pc.close().unwrap();
 }
 
+fn feedback(r#type: &str, parameter: &str) -> RtcpFeedback {
+    RtcpFeedback {
+        r#type: r#type.to_string(),
+        parameter: parameter.to_string(),
+    }
+}
+
+fn opus(payload_type: u8, fmtp: &str, rtcp_feedback: Vec<RtcpFeedback>) -> RtpCodecParameters {
+    RtpCodecParameters {
+        rtp_codec_capability: RtpCodecCapability {
+            mime_type: MIME_TYPE_OPUS.to_string(),
+            clock_rate: 48000,
+            channels: 2,
+            sdp_fmtp_line: fmtp.to_string(),
+            rtcp_feedback,
+        },
+        payload_type,
+    }
+}
+
+/// A connection with nothing but Opus, as the codec is given, on a node of its own. It is
+/// never connected: it makes descriptions.
+fn opus_connection(codec: &RtpCodecParameters) -> PeerConnection {
+    let mut media_engine = MediaEngine::default();
+    register_codec(&mut media_engine, codec, RtpCodecType::Audio).unwrap();
+    PeerConnection::new(
+        &Node::new(NodeConfig::default()).unwrap(),
+        Configuration {
+            media_engine,
+            ..Default::default()
+        },
+    )
+    .unwrap()
+}
+
+/// The lines of the audio section of a description that say which codecs it has, and its
+/// direction: what the Go test the expected lines come from printed.
+fn audio_codec_lines(sdp: &str) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut audio = false;
+    for line in sdp.lines().map(str::trim_end) {
+        if line.starts_with("m=") {
+            audio = line.starts_with("m=audio");
+        }
+        let wanted = line.starts_with("m=audio")
+            || line.starts_with("a=rtpmap:")
+            || line.starts_with("a=fmtp:")
+            || line.starts_with("a=rtcp-fb:")
+            || matches!(
+                line,
+                "a=sendonly" | "a=recvonly" | "a=sendrecv" | "a=inactive"
+            );
+        if audio && wanted {
+            lines.push(line.to_string());
+        }
+    }
+    lines
+}
+
+/// New for musivum. A sender's codecs, as pion's `RTPSender.GetParameters` gives them: the
+/// transceiver's codecs, which are the media engine's of its kind until codec preferences are
+/// set (`rtc` gives none until then), also for a transceiver that only sends and so has no
+/// receiver to ask. Once preferences are set, the preferred codecs, with the media engine's
+/// payload type where the preference has none and of the preference's feedback what the
+/// media engine has for the codec (pion's `RTPTransceiver.getCodecs`).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_sender_codecs_before_preferences() {
+    let server = Peer::server();
+    let video = server
+        .pc
+        .add_transceiver_from_track(
+            TestTrack::new("video", RtpCodecType::Video),
+            Some(RtpTransceiverInit {
+                direction: RtpTransceiverDirection::Sendonly,
+            }),
+        )
+        .unwrap();
+    let audio = server
+        .pc
+        .add_track(TestTrack::new("audio", RtpCodecType::Audio))
+        .unwrap();
+
+    let payload_types = |sender: &RtpSender| -> Vec<u8> {
+        sender
+            .get_parameters()
+            .codecs
+            .iter()
+            .map(|c| c.payload_type)
+            .collect()
+    };
+    let video_sender = video.sender().unwrap();
+    assert_eq!(
+        payload_types(&video_sender),
+        vec![VP8, VP8_RTX, VP9, VP9_RTX]
+    );
+    let codecs = video_sender.get_parameters().rtp_parameters.codecs;
+    assert_eq!(codecs[1].sdp_fmtp_line, "apt=96");
+    assert_eq!(codecs[0].rtcp_feedback.len(), 3);
+    assert_eq!(payload_types(&audio), vec![OPUS]);
+    assert_eq!(
+        audio.get_parameters().codecs[0].sdp_fmtp_line,
+        "minptime=10;useinbandfec=1"
+    );
+    // What the receiver of a transceiver that sends and receives has, the sender has too.
+    let receiver = server.pc.get_transceivers()[1].receiver().unwrap();
+    assert_eq!(
+        audio.get_parameters().codecs,
+        receiver.get_parameters().codecs
+    );
+
+    // A preference without a payload type, with feedback of which the media engine has one.
+    let mut vp8 = video_sender.get_parameters().codecs[0].clone();
+    vp8.payload_type = 0;
+    vp8.rtp_codec_capability.rtcp_feedback =
+        vec![feedback("goog-remb", ""), feedback("nack", "pli")];
+    video.set_codec_preferences(vec![vp8]).unwrap();
+    let codecs = video_sender.get_parameters().rtp_parameters.codecs;
+    assert_eq!(codecs[0].payload_type, VP8);
+    assert!(codecs[0].mime_type.eq_ignore_ascii_case(MIME_TYPE_VP8));
+    assert_eq!(codecs[0].rtcp_feedback, vec![feedback("nack", "pli")]);
+    assert!(
+        !codecs
+            .iter()
+            .any(|c| c.mime_type.eq_ignore_ascii_case(MIME_TYPE_VP9))
+    );
+
+    server.pc.close().unwrap();
+}
+
+/// New for musivum. A transceiver made from a kind to send has a sender, as pion's has.
+/// pion gives it a track of its own that writes nothing; here it has none, as LiveKit leaves
+/// it after `SetSender(sender, nil)`, and nothing is bound until it is given one. Its codecs
+/// can be asked, and a track can take the place of none without a negotiation of its own:
+/// it is bound when the transceiver has been negotiated, with the transceiver's stream.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_sender_of_a_transceiver_from_kind() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let transceiver = server
+        .pc
+        .add_transceiver_from_kind(
+            RtpCodecType::Audio,
+            Some(RtpTransceiverInit {
+                direction: RtpTransceiverDirection::Sendonly,
+            }),
+        )
+        .unwrap();
+    let sender = transceiver
+        .sender()
+        .expect("a transceiver that sends has a sender");
+    assert!(sender.track().is_none());
+    let seam: Arc<dyn crate::webrtc::RtpTransceiver> = transceiver.clone();
+    assert!(seam.sender().is_some());
+    assert_eq!(server.pc.get_senders().len(), 1);
+    let codecs = sender.get_parameters().rtp_parameters.codecs;
+    assert_eq!(codecs.len(), 1);
+    assert_eq!(codecs[0].payload_type, OPUS);
+
+    let track = TestTrack::new("audio", RtpCodecType::Audio);
+    sender.replace_track(Some(track.clone())).unwrap();
+    assert!(sender.track().is_some_and(|t| t.id() == "audio"));
+    negotiate(&server.pc, &client.pc);
+    let offer = server.pc.current_local_description().unwrap().sdp;
+    assert!(offer.contains("a=msid:stream audio"), "{offer}");
+    connected(&server, &client).await;
+    eventually_async(|| track.is_bound(), WAIT, TICK).await;
+    assert_eq!(track.bound_and_unbound(), (1, 0));
+    assert_eq!(track.payload_type(), OPUS);
+    let ssrc = track.context().ssrc();
+    assert_ne!(ssrc, 0);
+    assert_eq!(sender.get_parameters().encodings[0].ssrc, ssrc);
+    assert!(offer.contains(&format!("a=ssrc:{ssrc} ")), "{offer}");
+
+    track
+        .writer()
+        .write_rtp(&header(ssrc, OPUS, 1), &[1; 20])
+        .unwrap();
+    eventually_async(|| client.sink.rtp_of(ssrc).len() == 1, WAIT, TICK).await;
+
+    server.pc.close().unwrap();
+    client.pc.close().unwrap();
+}
+
+/// New for musivum. What codec preferences say reaches the description, as with pion: the
+/// fmtp line of the preferred codec (LiveKit adds `sprop-stereo=1` to Opus's), its feedback
+/// (LiveKit takes NACK away) and its payload type (LiveKit's answer echoes the one the offer
+/// gave). The expected lines are what pion at the pin writes for the same, in an offer and
+/// in an answer (a Go test laid over `pkg/rtc` of the reference).
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_codec_preferences_reach_the_description() {
+    let fmtp = "minptime=10;useinbandfec=1";
+    let stereo = "minptime=10;useinbandfec=1;sprop-stereo=1";
+    // As LiveKit registers Opus, with NACK on.
+    let server_opus = opus(
+        OPUS,
+        fmtp,
+        vec![feedback("nack", ""), feedback("transport-cc", "")],
+    );
+    let send_only = Some(RtpTransceiverInit {
+        direction: RtpTransceiverDirection::Sendonly,
+    });
+
+    // The offer: stereo on, NACK off.
+    let server = opus_connection(&server_opus);
+    let transceiver = server
+        .add_transceiver_from_track(TestTrack::new("audio", RtpCodecType::Audio), send_only)
+        .unwrap();
+    transceiver
+        .set_codec_preferences(vec![opus(OPUS, stereo, vec![feedback("transport-cc", "")])])
+        .unwrap();
+    let offer = server.create_offer(None).unwrap();
+    assert_eq!(
+        audio_codec_lines(&offer.sdp),
+        vec![
+            "m=audio 9 UDP/TLS/RTP/SAVPF 111",
+            "a=rtpmap:111 opus/48000/2",
+            "a=fmtp:111 minptime=10;useinbandfec=1;sprop-stereo=1",
+            "a=rtcp-fb:111 transport-cc",
+            "a=sendonly",
+        ],
+        "{}",
+        offer.sdp
+    );
+    server.close().unwrap();
+
+    // The answer to a client that offers Opus on 109: the payload type echoed, stereo on,
+    // NACK off.
+    let client = opus_connection(&opus(
+        109,
+        fmtp,
+        vec![feedback("transport-cc", ""), feedback("nack", "")],
+    ));
+    client
+        .add_transceiver_from_kind(
+            RtpCodecType::Audio,
+            Some(RtpTransceiverInit {
+                direction: RtpTransceiverDirection::Recvonly,
+            }),
+        )
+        .unwrap();
+    let client_offer = client.create_offer(None).unwrap();
+    let server = opus_connection(&server_opus);
+    let transceiver = server
+        .add_transceiver_from_track(TestTrack::new("audio", RtpCodecType::Audio), send_only)
+        .unwrap();
+    server.set_remote_description(client_offer).unwrap();
+    transceiver
+        .set_codec_preferences(vec![opus(109, stereo, vec![feedback("transport-cc", "")])])
+        .unwrap();
+    let answer = server.create_answer().unwrap();
+    assert_eq!(
+        audio_codec_lines(&answer.sdp),
+        vec![
+            "m=audio 9 UDP/TLS/RTP/SAVPF 109",
+            "a=rtpmap:109 opus/48000/2",
+            "a=fmtp:109 minptime=10;useinbandfec=1;sprop-stereo=1",
+            "a=rtcp-fb:109 transport-cc",
+            "a=sendonly",
+        ],
+        "{}",
+        answer.sdp
+    );
+    server.close().unwrap();
+    client.close().unwrap();
+}
+
 #[path = "tcp_test.rs"]
 mod tcp_test;

@@ -1,0 +1,47 @@
+diff -ru a/src/rtp_transceiver/rtp_receiver/internal.rs b/src/rtp_transceiver/rtp_receiver/internal.rs
+--- a/src/rtp_transceiver/rtp_receiver/internal.rs
++++ b/src/rtp_transceiver/rtp_receiver/internal.rs
+@@ -145,7 +145,18 @@
+             let (c, match_type) =
+                 codec_parameters_fuzzy_search(&codec.rtp_codec, &media_engine_codecs);
+             if match_type != CodecMatch::None {
+-                filtered_codecs.push(c);
++                // musivum's patch: the preferred codec, as pion's `RTPTransceiver.getCodecs`
++                // keeps it (its fmtp line, its payload type, of its feedback what the media
++                // engine has for the codec), where this crate took the media engine's.
++                let mut codec = codec.clone();
++                if codec.payload_type == 0 {
++                    codec.payload_type = c.payload_type;
++                }
++                codec
++                    .rtp_codec
++                    .rtcp_feedback
++                    .retain(|feedback| c.rtp_codec.rtcp_feedback.contains(feedback));
++                filtered_codecs.push(codec);
+             }
+         }
+ 
+diff -ru a/src/rtp_transceiver/rtp_sender/internal.rs b/src/rtp_transceiver/rtp_sender/internal.rs
+--- a/src/rtp_transceiver/rtp_sender/internal.rs
++++ b/src/rtp_transceiver/rtp_sender/internal.rs
+@@ -3,6 +3,7 @@
+ use crate::peer_connection::configuration::interceptor_registry::create_stream_info;
+ use crate::peer_connection::configuration::media_engine::MediaEngine;
+ use crate::rtp_transceiver::direction::RTCRtpTransceiverDirection;
++use crate::rtp_transceiver::rtp_receiver::internal::RTCRtpReceiverInternal;
+ use crate::rtp_transceiver::rtp_sender::rtp_capabilities::RTCRtpCapabilities;
+ use crate::rtp_transceiver::rtp_sender::rtp_codec::{
+     CodecMatch, RtpCodecKind, codec_parameters_fuzzy_search, find_fec_payload_type,
+@@ -229,7 +230,11 @@
+             let mut rtp_parameters = media_engine
+                 .get_rtp_parameters_by_kind(self.kind(), RTCRtpTransceiverDirection::Sendonly);
+ 
+-            rtp_parameters.codecs = self.send_codecs.clone();
++            // musivum's patch: the transceiver's codecs, as pion's `RTPSender.GetParameters`
++            // gives them (the media engine's of this kind until preferences are set), where
++            // this crate gave the preferences only.
++            rtp_parameters.codecs =
++                RTCRtpReceiverInternal::get_codecs(&self.send_codecs, self.kind(), media_engine);
+ 
+             self.last_returned_parameters = Some(RTCRtpSendParameters {
+                 rtp_parameters,

@@ -231,12 +231,17 @@ pub struct RtpSender {
 }
 
 impl RtpSender {
-    pub(crate) fn new(pc: Weak<Inner>, index: usize, track: Arc<dyn TrackLocal>) -> RtpSender {
+    /// A sender with this track, or with none (of a transceiver made from a kind).
+    pub(crate) fn new(
+        pc: Weak<Inner>,
+        index: usize,
+        track: Option<Arc<dyn TrackLocal>>,
+    ) -> RtpSender {
         RtpSender {
             pc,
             index,
             state: Mutex::new(SenderState {
-                track: Some(track),
+                track,
                 context: None,
                 stopped: false,
             }),
@@ -358,8 +363,10 @@ impl RtpSender {
     /// GetParameters describes the current configuration for the encoding and
     /// transmission of media on the sender's track.
     ///
-    /// The codecs are those negotiated for the sender's media section, the header extensions
-    /// those negotiated for its kind; the one encoding has the SSRC and that of the
+    /// The codecs are the transceiver's, as pion's: its codec preferences, or the media
+    /// engine's codecs of its kind where none are set (`rtc` sets them from the other side's
+    /// description at each negotiation, so after one they are what was negotiated). The
+    /// header extensions are those of its kind; the one encoding has the SSRC and that of the
     /// retransmission stream.
     pub fn get_parameters(&self) -> RtpSendParameters {
         let Some(pc) = self.pc.upgrade() else {

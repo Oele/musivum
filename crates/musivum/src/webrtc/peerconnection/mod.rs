@@ -774,8 +774,10 @@ impl PeerConnection {
 
     /// AddTransceiverFromKind Create a new RtpTransceiver and adds it to the set of transceivers.
     ///
-    /// Without `init` the transceiver receives only. One that is to send has no track:
-    /// nothing is bound and nothing can be written on it.
+    /// Without `init` the transceiver receives only. One that is to send has a sender
+    /// without a track (pion's has a track of its own that writes nothing): nothing is bound
+    /// and nothing can be written on it until the sender is given a track
+    /// ([`RtpSender::replace_track`]), which then takes the stream `rtc` made for it.
     pub fn add_transceiver_from_kind(
         &self,
         kind: RtpCodecType,
@@ -783,6 +785,7 @@ impl PeerConnection {
     ) -> Result<Arc<RtpTransceiver>, Error> {
         self.inner().act(|inner, core, _| {
             core.check_open()?;
+            let sends = init.is_some_and(|init| init.direction.has_send());
             let init = init.map(|init| RTCRtpTransceiverInit {
                 direction: init.direction,
                 streams: Vec::new(),
@@ -798,6 +801,14 @@ impl PeerConnection {
             inner.sync_transceivers(core);
             let transceiver = core.transceivers[index].clone();
             transceiver.set_kind(kind);
+            if sends {
+                // `rtc` has made a sender, with a stream for the track it is given later.
+                transceiver.set_sender(Some(Arc::new(RtpSender::new(
+                    inner.this.clone(),
+                    index,
+                    None,
+                ))));
+            }
             Ok(transceiver)
         })
     }
@@ -852,10 +863,10 @@ impl PeerConnection {
     /// `codecs`, with the header extensions that were negotiated for media of its kind.
     ///
     /// `rtc` keeps its media engine to itself. What it shows of it is what a receiver or a
-    /// sender has: the codecs of its media section as the media engine has them after the
-    /// negotiation, and the header extensions of its kind. So the media sections are asked,
-    /// video before audio as the media engine looks, each where it receives if it does and
-    /// where it sends otherwise. That differs from pion's in three ways:
+    /// sender has: the codecs of its media section as they were negotiated (`rtc` sets them
+    /// from the other side's description), and the header extensions of its kind. So the
+    /// media sections are asked, video before audio as the media engine looks, each where it
+    /// receives if it does and where it sends otherwise. That differs from pion's in three ways:
     /// [`Error::CodecNotFound`] until a remote description was set (pion's falls back on
     /// what was registered) and for a payload type that no media section of the connection
     /// has; the header extensions are those of the direction that was asked (pion's gives
@@ -1189,7 +1200,7 @@ impl Inner {
         self.sync_transceivers(core);
         let transceiver = core.transceivers[index].clone();
         transceiver.set_kind(kind);
-        let sender = Arc::new(RtpSender::new(self.this.clone(), index, track));
+        let sender = Arc::new(RtpSender::new(self.this.clone(), index, Some(track)));
         transceiver.set_sender(Some(sender.clone()));
         sender
     }

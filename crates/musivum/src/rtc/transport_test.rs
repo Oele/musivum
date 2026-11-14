@@ -11,11 +11,9 @@
 // test's thread, where the original calls `require` inside the stub. `untilTransportsConnected`
 // waits at most `CONNECT_TIMEOUT` where the original's wait group waits for ever.
 // `TestDTLSHandshakeSkipsHelloVerify` is ignored: the layer has no hook on the DTLS
-// ClientHello and `rtc` no setting to skip HelloVerify. The two tests of
-// `configureSenderAudio` are ignored: a transceiver the layer makes from a kind has no sender,
-// and one that only sends would have no codecs before preferences are set (see the header of
-// transport_impl.rs); the first has an assertion more than the original, that an Opus codec
-// was looked at, without which it would pass without testing anything.
+// ClientHello and `rtc` no setting to skip HelloVerify. `TestConfigureAudioTransceiver` has
+// an assertion more than the original, that an Opus codec was looked at, without which it
+// would pass without testing anything.
 
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, AtomicUsize, Ordering};
@@ -1057,10 +1055,6 @@ async fn until_transports_connected(transports: &[&Arc<FakeHandler>]) {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "a transceiver the connection layer makes from a kind has no sender (pion's has \
-            one without a track), and a sender of a transceiver that only sends has no codecs \
-            before preferences are set (rtc keeps the list empty, pion gives the media \
-            engine's): configureSenderAudio has nothing to configure"]
 async fn test_configure_audio_transceiver() {
     for (nack, stereo) in [(false, false), (true, false), (false, true), (true, true)] {
         let name = format!("nack={nack},stereo={stereo}");
@@ -1118,10 +1112,6 @@ async fn test_configure_audio_transceiver() {
 // the payload type the offer assigned (RFC 3264), otherwise Firefox decodes no
 // audio. See https://github.com/livekit/livekit/issues/4599.
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "a transceiver the connection layer makes from a kind has no sender (pion's has \
-            one without a track), and a sender of a transceiver that only sends has no codecs \
-            before preferences are set (rtc keeps the list empty, pion gives the media \
-            engine's): configureSenderAudio has nothing to configure"]
 async fn test_configure_audio_transceiver_echoes_offer_payload_type() {
     let me = register_codecs(
         &[codec(MIME_TYPE_OPUS)],

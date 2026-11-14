@@ -42,12 +42,6 @@
 //   channel, and the reading goroutine is the channel's `on_message`, set when it opens. A
 //   message longer than the original's read buffer ends the reading with the warning and
 //   the closing of the channel that a failed read has.
-// - Sender codecs. pion's `RTPSender.GetParameters().Codecs` are the transceiver's codecs:
-//   its preferences as the media engine has them, or the media engine's of its kind. `rtc`
-//   keeps a sender's list empty until preferences are set (by this file, or from a remote
-//   offer). `sender_codecs` takes the receiver's parameters in that case, which are the
-//   transceiver's codecs as pion's are; a transceiver that only sends has no receiver in
-//   `rtc`, and then there are none (the report lists it as a gap of the layer).
 // - Migration between nodes. `SetMid` and `SetSender` are not in the layer, and a single
 //   node never takes a participant's connection over from another. `SetPreviousSdp` is
 //   kept; `initPCWithPreviousAnswer` stops where it would set the mid of a media section
@@ -123,7 +117,10 @@ use crate::webrtc::peerconnection::{
 };
 use crate::webrtc::rtcp;
 use crate::webrtc::sdp;
-use crate::webrtc::{PacketSink, PayloadType, RtpCodecParameters, RtpCodecType, StreamInfo};
+use crate::webrtc::{PacketSink, PayloadType, RtpCodecType, StreamInfo};
+// For the tests, which take it from here.
+#[cfg(test)]
+use crate::webrtc::RtpCodecParameters;
 use crate::{debugw, errorw, infow, warnw};
 
 pub const LOSSY_DATA_CHANNEL: &str = "_lossy";
@@ -3796,17 +3793,6 @@ fn configure_sender(
     }
 }
 
-// pion's `sender.GetParameters().Codecs` (see the header).
-fn sender_codecs(tr: &RtpTransceiver, sender: &RtpSender) -> Vec<RtpCodecParameters> {
-    let codecs = sender.get_parameters().rtp_parameters.codecs;
-    if !codecs.is_empty() {
-        return codecs;
-    }
-    tr.receiver()
-        .map(|receiver| receiver.get_parameters().codecs)
-        .unwrap_or_default()
-}
-
 // configure subscriber transceiver for audio stereo and nack
 // pion doesn't support per transciver codec configuration, so the nack of this session will be disabled
 // forever once it is first disabled by a transceiver.
@@ -3821,7 +3807,7 @@ fn configure_sender_audio(
     };
 
     // enable stereo
-    let codecs = sender_codecs(tr, &sender);
+    let codecs = sender.get_parameters().rtp_parameters.codecs;
     let mut config_codecs = Vec::with_capacity(codecs.len());
     for mut c in codecs {
         if mime::is_mime_type_string_opus(&c.rtp_codec_capability.mime_type) {
@@ -3944,7 +3930,7 @@ fn configure_sender_codecs(
     };
 
     let filtered_codecs = filter_codecs(
-        &sender_codecs(tr, &sender),
+        &sender.get_parameters().rtp_parameters.codecs,
         enabled_codecs,
         rtcp_feedback_config,
         filter_out_h264_high_profile,
