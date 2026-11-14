@@ -11,3 +11,8 @@ authors = ["The musivum authors"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
+
+# rtc's RTP packet with one field more, the padding size that pion's has: see
+# docs/webrtc-library.md and third_party/rtc-rtp/MUSIVUM.md.
+[patch.crates-io]
+rtc-rtp = { path = "third_party/rtc-rtp" }
