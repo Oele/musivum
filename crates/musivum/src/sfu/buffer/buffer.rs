@@ -9,7 +9,10 @@
 //   it), and implements `BufferProvider` at the end of this file.
 // - pion's seams. `Write` takes the packet as `Bytes` and a packet that waits for the bind
 //   keeps those bytes where the original copies them. Like the original it reports 0 bytes
-//   written. `Read`, with `lastPacketRead`, has no counterpart: it is the `io.Reader` side
+//   written. `write_at` is new: `Write` with the arrival time given, where the original has
+//   only its own clock because pion hands it no time; the body of the original's `Write` is
+//   `write_at_or_now`, which both call (the clock is read where the original reads it).
+//   `Read`, with `lastPacketRead`, has no counterpart: it is the `io.Reader` side
 //   that pion reads a stream through (and the pending packets with it, to find out what the
 //   stream is), and nothing of LiveKit's calls it.
 // - `sendPLI` is `send_pli_packet` (`send_pli` is the base's `SendPLI`), and
@@ -260,6 +263,18 @@ impl Buffer {
 
     // Write adds an RTP Packet, ordering is not guaranteed, newer packets may arrive later
     pub fn write(&self, pkt: Bytes) -> Result<usize, Error> {
+        self.write_at_or_now(pkt, None)
+    }
+
+    // (not in the original) Write with the time the packet arrived at, in the unit and of the
+    // clock `write` stamps it with (`mono::unix_nano`), for a caller that has it from the
+    // socket.
+    pub fn write_at(&self, pkt: Bytes, arrival_time: i64) -> Result<usize, Error> {
+        self.write_at_or_now(pkt, Some(arrival_time))
+    }
+
+    // (the body of the original's Write)
+    fn write_at_or_now(&self, pkt: Bytes, arrival_time: Option<i64>) -> Result<usize, Error> {
         let mut rtp_packet = rtp::Packet::default();
         rtp_packet.unmarshal(&pkt)?;
 
@@ -269,7 +284,7 @@ impl Buffer {
             return Err(Error::Eof);
         }
 
-        let now = mono::unix_nano();
+        let now = arrival_time.unwrap_or_else(mono::unix_nano);
         if let Some(twcc) = &b.twcc
             && b.twcc_ext_id != 0
             && let Some(ext) = rtp_packet.get_extension(b.twcc_ext_id)

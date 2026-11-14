@@ -7,12 +7,15 @@
 // Changes: translated from Go to Rust. Only the declarations are here, and of them only what
 // LiveKit's `pkg/sfu` calls: pion's structs `TrackRemote`, `RTPSender`, `RTPReceiver` and
 // `RTPTransceiver` are traits with those methods, so that a test can stand in for the peer
-// connection (`webrtc::peerconnection` has the real ones). Left out because nothing calls
+// connection (`webrtc::peerconnection` has the real ones). `RTPSender.ReplaceTrack` and
+// `RTPTransceiver.Stop`, which `pkg/rtc` calls to use a transceiver again, have a body here
+// that refuses, so that a stand-in need not have them. Left out because nothing calls
 // them: `TrackLocalWriter.Write`, `TrackLocalContext.ID`, `.RTCPReader` and
 // `.SSRCForwardErrorCorrection`, `StreamInfo.ID` and `.Attributes`. Of the errors only those
 // that LiveKit's code names are here (one of them, `ErrStreamClosed`, is pion/sctp's, from
 // stream.go at v1.12.0), and `Other` for what the library underneath says.
-// `PacketSink` is new: it stands where pion has its buffer factory.
+// `PacketSink` is new: it stands where pion has its buffer factory, and is told what pion
+// tells its interceptors about streams.
 
 //! The seam between the ported media code and the peer connection: what `pkg/sfu` takes from
 //! pion's `webrtc` package as behaviour. A down track is a [`TrackLocal`] that the connection
@@ -210,6 +213,18 @@ pub trait RtpSender: Send + Sync {
     /// GetParameters describes the current configuration for the encoding and
     /// transmission of media on the sender's track.
     fn get_parameters(&self) -> RtpSendParameters;
+
+    /// ReplaceTrack replaces the track currently being used as the sender's source with a new TrackLocal.
+    /// The new track must be of the same media kind (audio, video, etc) and switching the track should not
+    /// require negotiation.
+    ///
+    /// `None` takes the track away and leaves the sender without one. An implementation that
+    /// cannot do this says so with an error, which is what this body does.
+    fn replace_track(&self, _track: Option<Arc<dyn TrackLocal>>) -> Result<(), Error> {
+        Err(Error::Other(
+            "ReplaceTrack is not supported by this RTPSender".to_string(),
+        ))
+    }
 }
 
 /// An RTPReceiver allows an application to inspect the receipt of a TrackRemote.
@@ -226,6 +241,16 @@ pub trait RtpTransceiver: Send + Sync {
 
     /// Mid gets the Transceiver's Mid value. When not already set, this value will be set in CreateOffer or CreateAnswer.
     fn mid(&self) -> String;
+
+    /// Stop irreversibly stops the RTPTransceiver.
+    ///
+    /// An implementation that cannot do this says so with an error, which is what this body
+    /// does.
+    fn stop(&self) -> Result<(), Error> {
+        Err(Error::Other(
+            "Stop is not supported by this RTPTransceiver".to_string(),
+        ))
+    }
 }
 
 /// StreamInfo is the Context passed when a StreamLocal or StreamRemote has been Binded or Unbinded.
@@ -247,8 +272,8 @@ pub struct StreamInfo {
 
 /// Where a connection hands over what it receives: the counterpart of pion's buffer factory
 /// (`SettingEngine.BufferFactory`, through which LiveKit gets every packet per SSRC right
-/// after decryption) and of `BindRemoteStream` of pion's interceptors, which is how LiveKit
-/// learns what a stream is.
+/// after decryption) and of what pion tells its interceptors about streams (`BindRemoteStream`,
+/// which is how LiveKit learns what a stream is, and `BindLocalStream`).
 ///
 /// A connection calls its sink from one place at a time and in the order things happened; it
 /// holds no lock of its own while it does, so a sink may call back into the connection.
@@ -269,4 +294,17 @@ pub trait PacketSink: Send + Sync {
 
     /// UnbindRemoteStream of pion's interceptors: the stream was removed.
     fn unbind_remote_stream(&self, _info: &StreamInfo) {}
+
+    /// BindLocalStream of pion's interceptors: a stream the connection sends. It comes when
+    /// the track of a sender was bound (after its `bind` has returned), with the codec the
+    /// track chose.
+    fn bind_local_stream(&self, _info: &StreamInfo) {}
+
+    /// UnbindLocalStream of pion's interceptors: the track of that stream was unbound (after
+    /// its `unbind` has returned). `info` is what the stream was bound with.
+    fn unbind_local_stream(&self, _info: &StreamInfo) {}
+
+    /// The connection has closed. It comes once, after the last packet and the last other
+    /// call, and nothing comes after it: the connection lets go of its sink then.
+    fn closed(&self) {}
 }

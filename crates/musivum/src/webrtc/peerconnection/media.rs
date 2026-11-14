@@ -17,11 +17,13 @@ use rtc::rtp_transceiver::rtp_sender::{
 use rtc::rtp_transceiver::{RTCRtpReceiverId, RTCRtpSenderId};
 
 use super::{Delivery, Inner, RtpTransceiverDirection, convert};
+use crate::webrtc::interceptor::RtpHeaderExtension;
 use crate::webrtc::rtp;
 use crate::webrtc::track;
 use crate::webrtc::{
-    Error, RtpCodecParameters, RtpCodecType, RtpHeaderExtensionParameter, RtpParameters,
-    RtpSendParameters, Ssrc, TrackLocal, TrackLocalContext, TrackLocalWriter,
+    Error, MIME_TYPE_FLEX_FEC, RtpCodecParameters, RtpCodecType, RtpHeaderExtensionParameter,
+    RtpParameters, RtpSendParameters, Ssrc, StreamInfo, TrackLocal, TrackLocalContext,
+    TrackLocalWriter,
 };
 
 /// pion's `RTPTransceiverInit`.
@@ -177,6 +179,10 @@ impl RtpTransceiver {
     }
 
     /// Stop irreversibly stops the RTPTransceiver.
+    ///
+    /// The track of its sender is unbound and what it receives is unbound at the sink, both
+    /// from the connection's task; its direction is inactive from here on, which the next
+    /// negotiation tells the other side. Stopping it again is nothing.
     pub fn stop(&self) -> Result<(), Error> {
         let pc = self.pc.upgrade().ok_or(Error::ConnectionClosed)?;
         pc.act(|_, core, _| {
@@ -202,6 +208,10 @@ impl track::RtpTransceiver for RtpTransceiver {
 
     fn mid(&self) -> String {
         RtpTransceiver::mid(self)
+    }
+
+    fn stop(&self) -> Result<(), Error> {
+        RtpTransceiver::stop(self)
     }
 }
 
@@ -270,9 +280,79 @@ impl RtpSender {
         })
     }
 
+    /// Takes another track, or none. The track it had is given back as `stop` gives it: to
+    /// be unbound, or let go of, outside of the connection's mutex.
+    fn replace(&self, track: Option<Arc<dyn TrackLocal>>) -> Option<Delivery> {
+        let mut state = self.state.lock();
+        let replaced = std::mem::replace(&mut state.track, track)?;
+        Some(match state.context.take() {
+            Some(context) => {
+                context.close();
+                Delivery::Unbind {
+                    track: replaced,
+                    context,
+                }
+            }
+            None => Delivery::Release(replaced),
+        })
+    }
+
     /// Track returns the RTCRtpTransceiver track, or nil.
     pub fn track(&self) -> Option<Arc<dyn TrackLocal>> {
         self.state.lock().track.clone()
+    }
+
+    /// ReplaceTrack replaces the track currently being used as the sender's source with a new TrackLocal.
+    /// The new track must be of the same media kind (audio, video, etc) and switching the track should not
+    /// require negotiation.
+    ///
+    /// The track the sender had is unbound as when it is removed (its writer writes no more),
+    /// and the new one is bound when tracks are bound: at once if the sender's media section
+    /// was negotiated, the connection is up and no negotiation is under way, otherwise when
+    /// that has come about. It is bound with what the media section has: the codecs that
+    /// were negotiated for it, its SSRC and that of its retransmission stream. `None` leaves
+    /// the sender without a track, to be given one later.
+    ///
+    /// Both calls come from the connection's task, after this has returned or while it
+    /// does. So, unlike pion's, this does not say whether the new track could be bound: an
+    /// error of its `bind` is logged, and the track the sender had is not put back. What is
+    /// refused here: a track of another kind, a sender that was stopped (its track removed,
+    /// its transceiver stopped), a connection that was closed.
+    pub fn replace_track(&self, track: Option<Arc<dyn TrackLocal>>) -> Result<(), Error> {
+        let pc = self.pc.upgrade().ok_or(Error::ConnectionClosed)?;
+        // What the track says about itself is asked before the mutex is taken: it is the
+        // application's code.
+        let described = track
+            .as_ref()
+            .map(|track| (track.stream_id(), track.id(), track.kind()));
+        pc.act(|inner, core, _| {
+            core.check_open()?;
+            let stopped = || Error::Other("Sender has already been stopped".to_string());
+            if self.state.lock().stopped {
+                return Err(stopped());
+            }
+            if let Some((stream_id, id, kind)) = described {
+                let mut rtc_sender = core
+                    .rtc
+                    .rtp_sender(RTCRtpSenderId::from(self.index))
+                    .ok_or_else(stopped)?;
+                // `rtc` has the SSRCs of the stream with the track it was given, and writes
+                // the track's names into the next description. The new track takes the
+                // place of the old one with the same encodings. A track of another kind is
+                // refused here.
+                let codings = rtc_sender.track().codings().to_vec();
+                rtc_sender.replace_track(MediaStreamTrack::new(
+                    stream_id,
+                    id.clone(),
+                    id,
+                    convert::codec_type_to_rtc(kind),
+                    codings,
+                ))?;
+            }
+            core.out.extend(self.replace(track));
+            inner.bind_sender(core, self);
+            Ok(())
+        })
     }
 
     /// GetParameters describes the current configuration for the encoding and
@@ -297,6 +377,10 @@ impl RtpSender {
 impl track::RtpSender for RtpSender {
     fn get_parameters(&self) -> RtpSendParameters {
         RtpSender::get_parameters(self)
+    }
+
+    fn replace_track(&self, track: Option<Arc<dyn TrackLocal>>) -> Result<(), Error> {
+        RtpSender::replace_track(self, track)
     }
 }
 
@@ -517,7 +601,10 @@ pub(crate) struct SenderContext {
     header_extensions: Vec<RtpHeaderExtensionParameter>,
     ssrc: Ssrc,
     ssrc_retransmission: Ssrc,
+    ssrc_forward_error_correction: Ssrc,
     writer: Arc<Writer>,
+    // The stream as the sink was told of it when the track was bound, until it is unbound.
+    stream_info: Mutex<Option<StreamInfo>>,
 }
 
 impl SenderContext {
@@ -526,17 +613,66 @@ impl SenderContext {
         SenderContext {
             ssrc: encoding.map_or(0, |e| e.ssrc),
             ssrc_retransmission: encoding.map_or(0, |e| e.rtx.ssrc),
+            ssrc_forward_error_correction: encoding.map_or(0, |e| e.fec.ssrc),
             codecs: Mutex::new(parameters.rtp_parameters.codecs),
             header_extensions: parameters.rtp_parameters.header_extensions,
             writer: Arc::new(Writer {
                 pc,
                 closed: AtomicBool::new(false),
             }),
+            stream_info: Mutex::new(None),
         }
     }
 
-    pub(crate) fn set_codec(&self, codec: RtpCodecParameters) {
-        *self.codecs.lock() = vec![codec];
+    /// The track was bound and chose this codec. Gives the stream as pion's `RTPSender.Send`
+    /// describes it to the interceptors (`createStreamInfo`): with the payload types of the
+    /// retransmission and of the forward error correction that go with the codec, among the
+    /// codecs the track was offered. After that the context has the codec the track chose,
+    /// as pion's; a track that named none leaves the context as it was.
+    pub(crate) fn bound_as(&self, codec: RtpCodecParameters) -> StreamInfo {
+        let mut codecs = self.codecs.lock();
+        // pion's `findRTXPayloadType` and `findFECPayloadType`
+        let apt = format!("apt={}", codec.payload_type);
+        let payload_type_retransmission = codecs
+            .iter()
+            .find(|c| c.sdp_fmtp_line == apt)
+            .map_or(0, |c| c.payload_type);
+        let payload_type_forward_error_correction = codecs
+            .iter()
+            .find(|c| c.mime_type.contains(MIME_TYPE_FLEX_FEC))
+            .map_or(0, |c| c.payload_type);
+        let info = StreamInfo {
+            ssrc: self.ssrc,
+            ssrc_retransmission: self.ssrc_retransmission,
+            ssrc_forward_error_correction: self.ssrc_forward_error_correction,
+            payload_type: codec.payload_type,
+            payload_type_retransmission,
+            payload_type_forward_error_correction,
+            rtp_header_extensions: self
+                .header_extensions
+                .iter()
+                .map(|e| RtpHeaderExtension {
+                    uri: e.uri.clone(),
+                    id: e.id,
+                })
+                .collect(),
+            mime_type: codec.mime_type.clone(),
+            clock_rate: codec.clock_rate,
+            channels: codec.channels,
+            sdp_fmtp_line: codec.sdp_fmtp_line.clone(),
+            rtcp_feedback: codec.rtcp_feedback.clone(),
+        };
+        if !codec.mime_type.is_empty() {
+            *codecs = vec![codec];
+        }
+        *self.stream_info.lock() = Some(info.clone());
+        info
+    }
+
+    /// The stream the sink was told of when the track was bound, once: for telling it that
+    /// the track was unbound.
+    pub(crate) fn take_stream_info(&self) -> Option<StreamInfo> {
+        self.stream_info.lock().take()
     }
 
     /// The writer writes nothing from here on.

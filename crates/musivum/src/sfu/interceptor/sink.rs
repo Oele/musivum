@@ -26,8 +26,9 @@
 //! retransmission stream's buffer keeps them until it is paired, and then hands them to the
 //! buffer it repairs, which drops them unless it is bound. A buffer its receiver has closed
 //! stays here as it is (packets for it are dropped, as with pion) until the stream is
-//! unbound. The arrival time the connection gives is not used: a buffer takes its own when a
-//! packet is written, as upstream.
+//! unbound. A packet is written with the arrival time the connection gives, which is when its
+//! datagram was read from the socket (`Buffer::write_at`); upstream's buffer has only its own
+//! clock at the moment of the write, because pion hands it no time.
 //!
 //! # RTCP
 //!
@@ -65,10 +66,19 @@
 //!   retransmission stream that was paired with it, as pion's `RTPReceiver.Stop` closes
 //!   them.
 //! - [`BufferFactorySink::close`]: everything the sink has a handle of, as closing pion's
-//!   SRTP sessions does. The connection does not tell its sink that it was closed, so whoever
-//!   closes the connection calls this. Dropping the sink closes it too; that is for the case
-//!   that nobody did, and not to be relied on: a connection lets go of its sink with a lock of
-//!   its own held, and what closing a buffer calls back would run under it.
+//!   SRTP sessions does. The connection calls it when it has closed (`closed`, from its own
+//!   task, after everything else it had to hand over); whoever closes the connection may call
+//!   it too, sooner, and what the connection still hands over then goes nowhere. Closing
+//!   twice is nothing. Dropping the sink closes it as well, for a sink that never was a
+//!   connection's.
+//!
+//! # The streams the connection sends
+//!
+//! The connection tells its sink when the track of a sender is bound and when it is unbound
+//! (`bind_local_stream`, `unbind_local_stream`). That goes to the connection's [`RttFromXr`],
+//! which answers a receiver's reference time report in the name of every such stream. pion
+//! told its interceptors when a sender started and when it stopped; a track that takes the
+//! place of another on a sender is, here, the end of one stream and the beginning of the next.
 //!
 //! # Where it runs
 //!
@@ -205,9 +215,8 @@ impl BufferFactorySink {
         &self.extractor().0
     }
 
-    /// The connection's [`RttFromXr`], if it has one. The connection does not tell its sink
-    /// about the streams it sends, so whoever wants extended reports answered tells it
-    /// (`bind_local_stream`).
+    /// The connection's [`RttFromXr`], if it has one. It is told about the streams the
+    /// connection sends by the sink, which the connection tells.
     pub fn rtt_from_xr(&self) -> Option<&Arc<RttFromXr>> {
         self.rtt_from_xr.as_ref()
     }
@@ -221,8 +230,9 @@ impl BufferFactorySink {
         }
     }
 
-    /// Closes the buffers and RTCP readers of the connection, and ends what runs for it. To
-    /// be called when the connection is closed.
+    /// Closes the buffers and RTCP readers of the connection, and ends what runs for it. The
+    /// connection does this when it has closed (`closed`); whoever closes the connection may
+    /// do it as well, before or after. Only the first call does anything.
     pub fn close(&self) {
         let (streams, rtcp_readers) = {
             let mut inner = self.lock.lock();
@@ -450,7 +460,7 @@ impl BufferFactorySink {
 }
 
 impl PacketSink for BufferFactorySink {
-    fn on_rtp(&self, ssrc: Ssrc, packet: Bytes, _arrival: Time) {
+    fn on_rtp(&self, ssrc: Ssrc, packet: Bytes, arrival: Time) {
         let buffer = {
             let inner = self.lock.lock();
             if inner.closed {
@@ -471,7 +481,8 @@ impl PacketSink for BufferFactorySink {
             }
         };
         // What cannot be read as RTP, and what comes for a buffer that was closed, is dropped.
-        let _ = buffer.write(packet);
+        // The buffer's clock is the one the connection's times are of (`mono::unix_nano`).
+        let _ = buffer.write_at(packet, arrival.unix_nano());
     }
 
     fn on_rtcp(&self, packets: &[Box<dyn rtcp::Packet>], _arrival: Time) {
@@ -568,6 +579,22 @@ impl PacketSink for BufferFactorySink {
         for buffer in buffers {
             let _ = buffer.close();
         }
+    }
+
+    fn bind_local_stream(&self, info: &StreamInfo) {
+        if let Some(rtt_from_xr) = &self.rtt_from_xr {
+            rtt_from_xr.bind_local_stream(info);
+        }
+    }
+
+    fn unbind_local_stream(&self, info: &StreamInfo) {
+        if let Some(rtt_from_xr) = &self.rtt_from_xr {
+            rtt_from_xr.unbind_local_stream(info);
+        }
+    }
+
+    fn closed(&self) {
+        self.close();
     }
 }
 

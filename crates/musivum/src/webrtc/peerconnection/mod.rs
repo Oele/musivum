@@ -36,6 +36,12 @@
 //! - Received media is not read from a track: it comes out at the sink, as it does for
 //!   LiveKit through pion's buffer factory.
 //! - A local description has to be set as it was created: `rtc` compares the text.
+//! - A track is bound and unbound from the connection's task, also when it takes the place
+//!   of another ([`RtpSender::replace_track`]): the call that caused it does not wait for
+//!   it, and an error of `bind` is logged and not returned.
+//! - The sink is told of a stream the connection sends when its track is bound and when it
+//!   is unbound ([`PacketSink::bind_local_stream`]); pion tells its interceptors when a
+//!   sender starts and when it stops, and nothing when a track is replaced.
 //!
 //! # What `rtc` 0.21.1 does not do
 //!
@@ -91,7 +97,8 @@ use crate::protocol::logger::Logger;
 use crate::webrtc::rtcp;
 use crate::webrtc::rtp;
 use crate::webrtc::{
-    Error, PacketSink, RtpCodecParameters, RtpCodecType, StreamInfo, TrackLocal, TrackLocalContext,
+    Error, PacketSink, RtpCodecParameters, RtpCodecType, RtpParameters, StreamInfo, TrackLocal,
+    TrackLocalContext,
 };
 use crate::{debugw, warnw};
 
@@ -697,6 +704,10 @@ impl PeerConnection {
     }
 
     /// Where received packets go from now on: pion's `SettingEngine.BufferFactory`.
+    ///
+    /// The sink the connection has when it ends is told so ([`PacketSink::closed`]); one that
+    /// was replaced before is not, and one that is set later is told of the tracks that are
+    /// unbound from then on, also of those it was not told were bound.
     pub fn set_packet_sink(&self, sink: Option<Arc<dyn PacketSink>>) {
         *self.inner().sink.write() = sink;
     }
@@ -812,6 +823,71 @@ impl PeerConnection {
                 .iter()
                 .filter_map(|t| t.receiver())
                 .collect()
+        })
+    }
+
+    /// pion's `MediaEngine.getRTPParametersByPayloadType`, which its connection asks for a
+    /// stream nobody announced: the codec that was negotiated for a payload type, alone in
+    /// `codecs`, with the header extensions that were negotiated for media of its kind.
+    ///
+    /// `rtc` keeps its media engine to itself. What it shows of it is what a receiver or a
+    /// sender has: the codecs of its media section as the media engine has them after the
+    /// negotiation, and the header extensions of its kind. So the media sections are asked,
+    /// video before audio as the media engine looks, each where it receives if it does and
+    /// where it sends otherwise. That differs from pion's in three ways:
+    /// [`Error::CodecNotFound`] until a remote description was set (pion's falls back on
+    /// what was registered) and for a payload type that no media section of the connection
+    /// has; the header extensions are those of the direction that was asked (pion's gives
+    /// them for both; they differ only where an extension was registered for one direction);
+    /// and a media section whose transceiver was stopped does not answer.
+    pub fn get_rtp_parameters_by_payload_type(
+        &self,
+        payload_type: u8,
+    ) -> Result<RtpParameters, Error> {
+        self.inner().read(|core| {
+            if core.rtc.remote_description().is_none() {
+                return Err(Error::CodecNotFound);
+            }
+            let indexes = |video: bool| {
+                core.transceivers
+                    .iter()
+                    .filter(|t| (t.kind_hint() == RtpCodecType::Video) == video)
+                    .map(|t| t.index())
+                    .collect::<Vec<usize>>()
+            };
+            for index in indexes(true).into_iter().chain(indexes(false)) {
+                let negotiated = core
+                    .rtc
+                    .rtp_transceiver(index)
+                    .is_some_and(|t| t.mid().is_some());
+                if !negotiated {
+                    continue;
+                }
+                let parameters = if let Some(mut receiver) =
+                    core.rtc.rtp_receiver(RTCRtpReceiverId::from(index))
+                {
+                    receiver.get_parameters().rtp_parameters.clone()
+                } else if let Some(mut sender) = core.rtc.rtp_sender(RTCRtpSenderId::from(index)) {
+                    sender.get_parameters().rtp_parameters.clone()
+                } else {
+                    continue;
+                };
+                if let Some(codec) = parameters
+                    .codecs
+                    .iter()
+                    .find(|codec| codec.payload_type == payload_type)
+                {
+                    return Ok(RtpParameters {
+                        header_extensions: parameters
+                            .header_extensions
+                            .iter()
+                            .map(convert::header_extension_from_rtc)
+                            .collect(),
+                        codecs: vec![convert::codec_parameters_from_rtc(codec)],
+                    });
+                }
+            }
+            Err(Error::CodecNotFound)
         })
     }
 
@@ -1101,32 +1177,39 @@ impl Inner {
     /// bound once, when its media section has been negotiated and DTLS is up, so that what
     /// it writes right away can go out.
     fn bind_senders(&self, core: &mut Core) {
+        for transceiver in core.transceivers.clone() {
+            if let Some(sender) = transceiver.sender() {
+                self.bind_sender(core, &sender);
+            }
+        }
+    }
+
+    /// Binds the track of one sender if it can be bound now and is not: when the connection
+    /// is up and no negotiation is under way, and the sender's media section has been
+    /// negotiated. A sender that is given a track when that holds already
+    /// (`RtpSender::replace_track`) has it bound here; any other waits for `bind_senders`.
+    pub(crate) fn bind_sender(&self, core: &mut Core, sender: &RtpSender) {
         if !core.media_open || core.closed || core.signaling_state != SignalingState::Stable {
             return;
         }
-        for transceiver in core.transceivers.clone() {
-            let Some(sender) = transceiver.sender() else {
-                continue;
-            };
-            if !sender.wants_binding() {
-                continue;
-            }
-            let index = transceiver.index();
-            let negotiated = core
-                .rtc
-                .rtp_transceiver(index)
-                .is_some_and(|t| t.mid().is_some());
-            if !negotiated {
-                continue;
-            }
-            let Some(mut rtc_sender) = core.rtc.rtp_sender(RTCRtpSenderId::from(index)) else {
-                continue;
-            };
-            let parameters = convert::send_parameters_from_rtc(rtc_sender.get_parameters());
-            let context = Arc::new(SenderContext::new(self.this.clone(), parameters));
-            if let Some(track) = sender.bound(context.clone()) {
-                core.out.push(Delivery::Bind { track, context });
-            }
+        if !sender.wants_binding() {
+            return;
+        }
+        let index = sender.index();
+        let negotiated = core
+            .rtc
+            .rtp_transceiver(index)
+            .is_some_and(|t| t.mid().is_some());
+        if !negotiated {
+            return;
+        }
+        let Some(mut rtc_sender) = core.rtc.rtp_sender(RTCRtpSenderId::from(index)) else {
+            return;
+        };
+        let parameters = convert::send_parameters_from_rtc(rtc_sender.get_parameters());
+        let context = Arc::new(SenderContext::new(self.this.clone(), parameters));
+        if let Some(track) = sender.bound(context.clone()) {
+            core.out.push(Delivery::Bind { track, context });
         }
     }
 
@@ -1399,18 +1482,29 @@ impl Inner {
             Delivery::Bind { track, context } => {
                 let t: Arc<dyn TrackLocalContext> = context.clone();
                 match track.bind(t) {
-                    // After the bind the context has the codec the track chose, as pion's.
-                    Ok(codec) if !codec.mime_type.is_empty() => context.set_codec(codec),
-                    Ok(_) => {}
+                    Ok(codec) => {
+                        // After the bind the context has the codec the track chose, and the
+                        // interceptors are told of the stream, as pion's `RTPSender.Send`
+                        // does both.
+                        let info = context.bound_as(codec);
+                        if let Some(sink) = sink {
+                            sink.bind_local_stream(&info);
+                        }
+                    }
                     Err(err) => {
                         warnw!(self.logger, "could not bind track", err, "trackID" => track.id());
                     }
                 }
             }
             Delivery::Unbind { track, context } => {
+                // None for a track whose `bind` failed: the sink was not told of a stream.
+                let info = context.take_stream_info();
                 let t: Arc<dyn TrackLocalContext> = context;
                 if let Err(err) = track.unbind(t) {
                     warnw!(self.logger, "could not unbind track", err, "trackID" => track.id());
+                }
+                if let (Some(sink), Some(info)) = (sink, info) {
+                    sink.unbind_local_stream(&info);
                 }
             }
             Delivery::Release(track) => drop(track),
@@ -1425,10 +1519,17 @@ impl Inner {
     }
 
     /// Lets go of what the application gave the connection, when it is over: callbacks hold
-    /// what they captured, often the connection itself.
+    /// what they captured, often the connection itself. The sink is told that this is the
+    /// end. Only the connection's task calls this, as the last thing it does, so the sink has
+    /// had everything else by then.
     fn forget(&self) {
         *self.handlers.lock() = Handlers::default();
-        *self.sink.write() = None;
+        // Taken out first: neither the sink's `closed` nor what dropping the sink sets off
+        // runs with a lock of the connection held.
+        let sink = self.sink.write().take();
+        if let Some(sink) = sink {
+            sink.closed();
+        }
     }
 }
 
