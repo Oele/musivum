@@ -312,3 +312,103 @@ async fn the_room_api_is_routed_to_the_room_manager() {
     s.stop(false).await;
     started.await.unwrap().unwrap();
 }
+
+// New for musivum: the server as `main` makes it, its state made on a thread that is on no
+// runtime, sends the webhook of a room made through the room API (found by asaroton's lab:
+// the webhook senders ran on a runtime without the network, and none ever left).
+#[test]
+fn webhooks_leave_when_the_server_is_made_before_its_runtime() {
+    use std::io::{Read, Write};
+
+    let hooks = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    hooks.set_nonblocking(true).unwrap();
+    let conf = Config::new(
+        &format!(
+            "{CONF}webhook:\n  api_key: key1\n  urls:\n    - http://{}/hook\n",
+            hooks.local_addr().unwrap()
+        ),
+        true,
+    )
+    .unwrap();
+    // here, on no runtime, as main.rs makes it
+    assert!(tokio::runtime::Handle::try_current().is_err());
+    let current_node: Arc<dyn LocalNode> = routing::LocalNodeImpl::new(Some(&conf)).unwrap();
+    let webrtc_config = Arc::new(rtc::WebRtcConfig::new(&conf).unwrap());
+    let rtc_node = Node::new(NodeConfig::default()).unwrap();
+    let state = new_server_state(conf, current_node, webrtc_config, rtc_node).unwrap();
+    let s = LivekitServer::new(state.clone(), new_mux(state)).unwrap();
+
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    rt.block_on(async {
+        let (addr, started) = start(&s).await;
+        let token = musivum::protocol::auth::AccessToken::new(
+            "key1",
+            "a-secret-of-at-least-thirty-two-characters",
+        )
+        .set_video_grant(musivum::protocol::auth::VideoGrant {
+            room_create: true,
+            ..Default::default()
+        })
+        .to_jwt()
+        .unwrap();
+        let (status, body) = post_json(
+            addr,
+            "/twirp/livekit.RoomService/CreateRoom",
+            &token,
+            r#"{"name":"a-room"}"#,
+        )
+        .await;
+        assert_eq!(200, status, "{body}");
+
+        // the webhook: a plain HTTP server, off the runtime
+        let event = tokio::task::spawn_blocking(move || {
+            let deadline = Instant::now() + StdDuration::from_secs(10);
+            let mut conn = loop {
+                match hooks.accept() {
+                    Ok((conn, _)) => break conn,
+                    Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(Instant::now() < deadline, "no webhook within 10 s");
+                        std::thread::sleep(StdDuration::from_millis(20));
+                    }
+                    Err(err) => panic!("{err}"),
+                }
+            };
+            conn.set_nonblocking(false).unwrap();
+            conn.set_read_timeout(Some(StdDuration::from_secs(5)))
+                .unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0u8; 4096];
+            // the head and the body (the server writes both before it waits for an answer)
+            loop {
+                let n = conn.read(&mut buf).unwrap();
+                assert!(n > 0, "the connection closed before the request");
+                request.extend_from_slice(&buf[..n]);
+                if let Some(at) = request.windows(4).position(|w| w == b"\r\n\r\n") {
+                    let head = String::from_utf8_lossy(&request[..at]).to_ascii_lowercase();
+                    let length: usize = head
+                        .lines()
+                        .find_map(|l| l.strip_prefix("content-length:"))
+                        .map(|v| v.trim().parse().unwrap())
+                        .unwrap_or(0);
+                    if request.len() >= at + 4 + length {
+                        break;
+                    }
+                }
+            }
+            conn.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .unwrap();
+            String::from_utf8_lossy(&request).into_owned()
+        })
+        .await
+        .unwrap();
+        assert!(event.starts_with("POST /hook HTTP/1.1\r\n"), "{event}");
+        assert!(event.contains(r#""event":"room_started""#), "{event}");
+        assert!(event.contains(r#""name":"a-room""#), "{event}");
+
+        s.stop(true).await;
+        started.await.unwrap().unwrap();
+    });
+}

@@ -373,13 +373,15 @@ pub async fn sleep(d: Duration) {
 }
 
 /// The runtime that timers and workers started from ported code run on: the one the caller is
-/// on, or, for a caller on a plain thread, a small one of the library's own.
+/// on, or, for a caller on a plain thread, a small one of the library's own. Its tasks have
+/// timers and the network, as every goroutine has (a webhook is sent from such a task when
+/// the service was made before the caller's runtime ran).
 pub fn runtime() -> tokio::runtime::Handle {
     static OWN: LazyLock<tokio::runtime::Runtime> = LazyLock::new(|| {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
             .thread_name("musivum-timer")
-            .enable_time()
+            .enable_all()
             .build()
             .expect("the timer runtime starts")
     });
@@ -475,6 +477,37 @@ impl fmt::Debug for Timer {
 mod tests {
     use super::*;
     use std::sync::atomic::AtomicU32;
+
+    // New for musivum: what runs on the library's own runtime (a caller on no runtime) can
+    // use the network, as every goroutine can.
+    #[test]
+    fn the_own_runtime_has_the_network() {
+        use std::io::Read;
+        use tokio::io::AsyncWriteExt;
+
+        assert!(tokio::runtime::Handle::try_current().is_err());
+        let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = listener.local_addr().unwrap();
+        spawn(async move {
+            let mut conn = tokio::net::TcpStream::connect(addr).await.unwrap();
+            conn.write_all(b"x").await.unwrap();
+        });
+        listener.set_nonblocking(true).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        let mut conn = loop {
+            match listener.accept() {
+                Ok((conn, _)) => break conn,
+                Err(_) => {
+                    assert!(std::time::Instant::now() < deadline, "no connection");
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+            }
+        };
+        conn.set_nonblocking(false).unwrap();
+        let mut b = [0u8; 1];
+        conn.read_exact(&mut b).unwrap();
+        assert_eq!(b"x", &b);
+    }
 
     #[test]
     fn durations_are_signed_and_read_like_go() {

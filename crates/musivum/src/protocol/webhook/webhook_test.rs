@@ -1051,3 +1051,66 @@ async fn read_request(conn: &mut TcpStream, buf: &mut Vec<u8>) -> Option<http::R
     buf.drain(..body_start + content_length);
     builder.body(body).ok()
 }
+
+// New for musivum: a notifier made on a thread that is on no runtime (as the server makes its
+// telemetry service before its runtime runs) sends from the library's own runtime. That
+// runtime had no IO once, and the first connect of the HTTP client panicked: no webhook
+// ever left.
+#[test]
+fn a_notifier_made_off_any_runtime_sends() {
+    use std::io::{Read, Write};
+
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}/webhook", listener.local_addr().unwrap());
+    let notifier = new_default_notifier(
+        &WebHookConfig {
+            urls: vec![url],
+            api_key: "mykey".to_string(),
+            ..DEFAULT_WEB_HOOK_CONFIG
+        },
+        Arc::new(crate::protocol::auth::SimpleKeyProvider::new(
+            "mykey", "mysecret",
+        )),
+    )
+    .unwrap();
+    notifier
+        .queue_notify(&room_ev("room_started", "a-room"), &[])
+        .unwrap();
+
+    // a plain HTTP server on this thread: the first request, answered with 200
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+    let mut conn = loop {
+        match listener.accept() {
+            Ok((conn, _)) => break conn,
+            Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                assert!(
+                    std::time::Instant::now() < deadline,
+                    "no webhook came within 10 s"
+                );
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            Err(err) => panic!("{err}"),
+        }
+    };
+    conn.set_nonblocking(false).unwrap();
+    conn.set_read_timeout(Some(std::time::Duration::from_secs(5)))
+        .unwrap();
+    let mut request = Vec::new();
+    let mut buf = [0u8; 4096];
+    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+        let n = conn.read(&mut buf).unwrap();
+        assert!(n > 0, "the connection closed before the request's head");
+        request.extend_from_slice(&buf[..n]);
+    }
+    conn.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+        .unwrap();
+    let head = String::from_utf8_lossy(&request);
+    assert!(head.starts_with("POST /webhook HTTP/1.1\r\n"), "{head}");
+    assert!(
+        head.to_ascii_lowercase()
+            .contains("content-type: application/webhook+json"),
+        "{head}"
+    );
+    notifier.stop(true);
+}
