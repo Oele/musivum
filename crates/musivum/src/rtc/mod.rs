@@ -4,6 +4,8 @@
 //! the deduper of user packets, the shadow pacer of subscribes and the data blobs of a
 //! participant.
 
+pub mod dynacast;
+pub mod signalling;
 pub mod transport;
 pub mod types;
 

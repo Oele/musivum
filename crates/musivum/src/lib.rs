@@ -15,9 +15,11 @@
 // The original uses fields of the protocol that are deprecated there, and so does the port.
 #![allow(deprecated)]
 
+pub mod clientconfiguration;
 pub mod go;
 pub mod mediatransportutil;
 pub mod protocol;
+pub mod routing;
 pub mod rtc;
 pub mod sfu;
 pub mod telemetry;
