@@ -586,8 +586,11 @@ impl Server {
             *self.counters.rtp_in_extensions.entry(format!("id {}", e.id)).or_default() += 1;
         }
 
-        let is_audio = h.payload_type == 111;
-        let is_video = h.payload_type == 96;
+        // By the track, not by the payload type: browsers number their codecs differently
+        // (Chrome offers VP8 as 96 and Opus as 111, Firefox as 120 and 109). Only the video
+        // is published with rids.
+        let is_video = rid.is_some();
+        let is_audio = !is_video;
         if is_video {
             if rid.as_deref() != Some(self.rid.as_str()) {
                 return;
@@ -1182,7 +1185,10 @@ async fn control(State(app): State<App>, Json(body): Json<Control>) -> HttpResul
 async fn main() -> Result<()> {
     let http_port: u16 = std::env::var("HTTP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(39400);
     let udp_port: u16 = std::env::var("UDP_PORT").ok().and_then(|p| p.parse().ok()).unwrap_or(39401);
-    let socket = Arc::new(UdpSocket::bind(("127.0.0.1", udp_port)).await?);
+    // Media on the loopback interface unless told otherwise (Firefox does not pair its own
+    // addresses with a loopback one).
+    let bind_ip = std::env::var("BIND_IP").unwrap_or_else(|_| "127.0.0.1".to_owned());
+    let socket = Arc::new(UdpSocket::bind((bind_ip.as_str(), udp_port)).await?);
     let local_addr = socket.local_addr()?;
     let (tx, rx) = mpsc::channel(64);
     let server = Server {

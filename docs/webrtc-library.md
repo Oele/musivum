@@ -81,6 +81,15 @@ exists for, and nothing the library does.
 | Padding-only packets of 255 bytes on the RTX stream | sent at that size (with the patch below); the subscriber keeps decoding |
 | Data channel opened by the browser (unordered, no retransmissions) and one opened by the server | both echo |
 
+Firefox 158 was put through a shorter run of the same (`driver/firefox-check.js`): it
+connects in both directions, its three simulcast layers arrive with their rid, video
+forwarded to it decodes, and its RTCP, transport-wide feedback included, is handed over. Two
+things about the test and not about the library showed there: Firefox does not pair its own
+addresses with a loopback address, so for it the forwarder's media socket has to be on
+another interface (`BIND_IP`); and browsers number their codecs differently (Chrome offers
+VP8 as payload type 96, Firefox as 120), which the first version of the forwarder had
+hard-coded.
+
 ## What `rtc` lacks, and what is done about it
 
 1. **Its RTP packet cannot carry a padding size.** `rtc-rtp` pads to a multiple of four
@@ -103,8 +112,8 @@ None of these changes the structure of the port.
 
 ## Not tested
 
-- Other clients: Firefox, Safari, LiveKit's native SDKs (which Element X uses). First with
-  the real signalling in place (step 5).
+- Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
+  signalling in place (step 5).
 - A network that is not the loopback interface: address translation, loss and delay, ICE
   restarts when the address changes, TCP candidates, TURN. `rtc` has examples for ICE
   restart and for ICE over TCP; a TURN server that LiveKit embeds is a separate matter and
