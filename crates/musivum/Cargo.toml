@@ -41,5 +41,8 @@ nix = { version = "0.31.3", default-features = false, features = ["net", "socket
 
 [dev-dependencies]
 musivum-fakes = { version = "0.0.0", path = "../musivum-fakes" }
+# AES-GCM for a test of the buffer that upstream writes with Go's crypto/aes. Already in the
+# build through rtc.
+ring = "0.17.14"
 tokio = { version = "1.54.1", features = ["test-util", "rt-multi-thread", "macros"] }
 tracing-subscriber = "0.3.23"

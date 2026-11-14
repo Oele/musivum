@@ -5,12 +5,31 @@
 // description) and are statics, so there is no `initPacketStats` to call first; the constant
 // labels `node_id` and `node_type` are left to whoever serves the metrics.
 
-use super::{Gauge, Histogram, MetricFamily};
+use super::{Counter, Gauge, Histogram, MetricFamily, MetricVec};
 use crate::go::atomic;
+
+/// `type Direction string` of the original, with its two values.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Direction {
+    Incoming,
+    Outgoing,
+}
+
+impl Direction {
+    /// `string(direction)`
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Direction::Incoming => "incoming",
+            Direction::Outgoing => "outgoing",
+        }
+    }
+}
 
 // read by the node's statistics upstream (`node.go`)
 pub(super) static FORWARD_LATENCY: atomic::Uint32 = atomic::Uint32::new(0);
 
+pub static PROM_KEY_FRAME_TOTAL: MetricVec<Counter, 1> =
+    MetricVec::new(["direction"], Counter::new);
 pub static PROM_FORWARD_LATENCY: Gauge = Gauge::new();
 pub static PROM_FORWARD_LATENCY_HIST: Histogram<10> = Histogram::new(
     // 50us, 100us, 250us, 500us, 1ms, 2ms, 3ms, 5ms, 10ms, 20ms
@@ -30,6 +49,11 @@ pub static PROM_FORWARD_LATENCY_HIST: Histogram<10> = Histogram::new(
 
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
+    families.push(MetricFamily::of_vec(
+        "livekit_keyframe_total",
+        "Key frames received from publishers (incoming) and forwarded to subscribers (outgoing, once per subscriber).",
+        &PROM_KEY_FRAME_TOTAL,
+    ));
     families.push(MetricFamily::of(
         "livekit_forward_latency",
         "",
@@ -49,6 +73,12 @@ pub fn record_forward_latency_sample(forward_latency: i64) {
 pub fn record_forward_latency(p90: u32) {
     FORWARD_LATENCY.store(p90);
     PROM_FORWARD_LATENCY.set(p90 as f64);
+}
+
+pub fn increment_key_frames(direction: Direction) {
+    PROM_KEY_FRAME_TOTAL
+        .with_label_values([direction.as_str()])
+        .inc();
 }
 
 // The original has tests of its own (`packets_test.go`) for functions that are not here yet.
@@ -89,5 +119,20 @@ mod tests {
             std::thread::yield_now();
         }
         panic!("the recorded forward latency was never read back");
+    }
+
+    #[test]
+    fn a_key_frame_counts_under_its_direction() {
+        let count = |direction: Direction| {
+            PROM_KEY_FRAME_TOTAL
+                .with_label_values([direction.as_str()])
+                .get()
+        };
+        let (incoming, outgoing) = (count(Direction::Incoming), count(Direction::Outgoing));
+        increment_key_frames(Direction::Outgoing);
+        increment_key_frames(Direction::Outgoing);
+        increment_key_frames(Direction::Incoming);
+        assert!(count(Direction::Outgoing) >= outgoing + 2);
+        assert!(count(Direction::Incoming) > incoming);
     }
 }

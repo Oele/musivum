@@ -70,10 +70,15 @@ mod tests {
         let names: Vec<&str> = families.iter().map(|family| family.name).collect();
         assert_eq!(
             names,
-            ["livekit_forward_latency", "livekit_forward_latency_ns"]
+            [
+                "livekit_keyframe_total",
+                "livekit_forward_latency",
+                "livekit_forward_latency_ns"
+            ]
         );
+        assert_eq!(families[0].label_names, ["direction"]);
 
-        let histogram = &families[1];
+        let histogram = &families[2];
         assert!(histogram.label_names.is_empty());
         assert_eq!(histogram.samples.len(), 1);
         let Value::Histogram(snapshot) = &histogram.samples[0].value else {

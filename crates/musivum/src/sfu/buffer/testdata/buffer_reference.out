@@ -1,0 +1,355 @@
+v new
+v bind err=false capacity=300
+v ep esn=65500 ets=4294904760 sn=65500 ts=4294904760 m=false pt=96 s=-1 t=0 kf=true ooo=false buf=true plen=35 ph=0b969e1772292009 rawlen=63 rh=71430480f07072cb ext1=- vp8=1,1,0,0,6,true act=true
+v ep esn=65501 ets=4294904760 sn=65501 ts=4294904760 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=true plen=54 ph=6d8cb442a95a8def rawlen=66 rh=26ecfba1f66bb259 ext1=- vp8=1,1,0,0,6,false act=false
+v ep esn=65502 ets=4294904760 sn=65502 ts=4294904760 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=true plen=21 ph=a67db10649bb5543 rawlen=33 rh=db1b0d710a86b526 ext1=- vp8=1,1,0,0,6,false act=false
+v phase bound nackq=[]
+v stats packets=3 bytes=162 hdr=52 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=1 kf=1 fec=0 gaps=[]
+v delta packets=3 bytes=162 hdr=52 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=1 layers=1 same=true
+v rr ssrc=4097 frac=0 total=0 last=65503 lsr=0
+v gp esn=65502 n=33 h=db1b0d710a86b526
+v gp esn=65501 n=66 h=26ecfba1f66bb259
+v gp esn=65500 n=63 h=71430480f07072cb
+v gp esn=65495 err
+v gp esn=65462 err
+v gp esn=65172 err
+v gp esn=64802 err
+v gp esn=65503 err
+v ep esn=65503 ets=4294907760 sn=65503 ts=4294907760 m=false pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=57 ph=cef4fd60e1dc41ea rawlen=69 rh=35fee22c5899584e ext1=- vp8=2,1,1,0,6,false act=false
+v ep esn=65504 ets=4294907760 sn=65504 ts=4294907760 m=false pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=46 ph=87c51a7225e5817a rawlen=58 rh=7d695e9cc6147b67 ext1=- vp8=2,1,1,0,6,false act=false
+v ep esn=65505 ets=4294907760 sn=65505 ts=4294907760 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=34 ph=be7fd16d69095ee3 rawlen=46 rh=e7cd3de648cf70ed ext1=- vp8=2,1,1,0,6,false act=false
+v sr rtp=4294907760 rtpext=4294907760 ntp=16788979064041252096 at=1700000001829000000 adj=1700000001829000000 pkts=100 octets=100000
+v ep esn=65506 ets=4294910760 sn=65506 ts=4294910760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=49 ph=41e059226751cde6 rawlen=61 rh=493aefe540fd2597 ext1=- vp8=3,1,2,0,6,false act=false
+v phase in-order nackq=[]
+v stats packets=7 bytes=396 hdr=100 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=3 kf=1 fec=0 gaps=[]
+v delta packets=4 bytes=234 hdr=48 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=2 layers=1 same=true
+v rr ssrc=4097 frac=0 total=0 last=65507 lsr=1870775718
+v gp esn=65506 n=61 h=493aefe540fd2597
+v gp esn=65505 n=46 h=e7cd3de648cf70ed
+v gp esn=65504 n=58 h=7d695e9cc6147b67
+v gp esn=65499 err
+v gp esn=65466 err
+v gp esn=65176 err
+v gp esn=64806 err
+v gp esn=65507 err
+v ep esn=65508 ets=4294916760 sn=65508 ts=4294916760 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=27 ph=d92f4531d916aee4 rawlen=39 rh=bd4d94c7b4717f98 ext1=- vp8=5,2,2,0,6,false act=false
+v ep esn=65509 ets=4294916760 sn=65509 ts=4294916760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=55 ph=c1bddb3e922be2b7 rawlen=67 rh=9ad0b6b85875275e ext1=- vp8=5,2,2,0,6,false act=false
+v ep esn=65511 ets=4294919760 sn=65511 ts=4294919760 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=18 ph=06db96cbe778e4c8 rawlen=30 rh=9862a3604574d831 ext1=- vp8=6,2,1,0,6,false act=false
+v ep esn=65513 ets=4294925760 sn=65513 ts=4294925760 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=31 ph=32cd9506821d5160 rawlen=43 rh=d483a99f06c6667c ext1=- vp8=8,3,0,0,6,false act=false
+v ep esn=65514 ets=4294925760 sn=65514 ts=4294925760 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=61 ph=adbf327e8efacce4 rawlen=73 rh=f558f3a5e5392c5f ext1=- vp8=8,3,0,0,6,false act=false
+v ep esn=65512 ets=4294922760 sn=65512 ts=4294922760 m=true pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=42 ph=3d803bcaf1acaca6 rawlen=54 rh=43a7030a464462de ext1=- vp8=7,2,2,0,6,false act=false
+v sr rtp=4294925760 rtpext=4294925760 ntp=16788979068816219392 at=1700000002949000000 adj=1700000002941582838 pkts=200 octets=200000
+v phase lost nackq=[65507 65510]
+v stats packets=13 bytes=702 hdr=172 lost=2 loss=13.3333 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=1 frames=6 kf=1 fec=0 gaps=[1:3]
+v delta packets=8 bytes=306 hdr=72 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=2 missing=0 ooo=1 frames=3 layers=1 same=true
+v rr ssrc=4097 frac=64 total=2 last=65515 lsr=1870848578
+v gp esn=65512 n=54 h=43a7030a464462de
+v gp esn=65511 n=30 h=9862a3604574d831
+v gp esn=65510 err
+v gp esn=65505 n=46 h=e7cd3de648cf70ed
+v gp esn=65472 err
+v gp esn=65182 err
+v gp esn=64812 err
+v gp esn=65513 n=43 h=d483a99f06c6667c
+v ep esn=65518 ets=4294931760 sn=65518 ts=4294931760 m=false pt=96 s=-1 t=0 kf=true ooo=false buf=false plen=44 ph=6711820d2a3c0412 rawlen=72 rh=1183b289cfdfef75 ext1=- vp8=10,4,0,1,6,true act=true
+v ep esn=65515 ets=4294925760 sn=65515 ts=4294925760 m=true pt=96 s=-1 t=0 kf=false ooo=true buf=false plen=38 ph=7eb98a2c31e111c0 rawlen=50 rh=ac4aec3beaf10082 ext1=- vp8=8,3,0,0,6,false act=false
+v ep esn=65516 ets=4294928760 sn=65516 ts=4294928760 m=false pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=58 ph=1ba8a2227070fa10 rawlen=70 rh=2363b55cf6243a77 ext1=- vp8=9,3,2,1,6,false act=false
+v ep esn=65517 ets=4294928760 sn=65517 ts=4294928760 m=true pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=38 ph=f442f16180078993 rawlen=50 rh=082f67c02dac1377 ext1=- vp8=9,3,2,1,6,false act=false
+v ep esn=65519 ets=4294931760 sn=65519 ts=4294931760 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=61 ph=28899005897cd711 rawlen=73 rh=a852a13c98ea04c3 ext1=- vp8=10,4,0,1,6,false act=false
+v ep esn=65522 ets=4294937760 sn=65522 ts=4294937760 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=25 ph=f365c8bf0d3ee251 rawlen=37 rh=38a1d815b56db465 ext1=- vp8=12,5,0,1,6,false act=false
+v ep esn=65520 ets=4294934760 sn=65520 ts=4294934760 m=false pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=22 ph=9eea3927f0d96d5e rawlen=34 rh=687637276aab7238 ext1=- vp8=11,4,2,1,6,false act=false
+v ep esn=65521 ets=4294934760 sn=65521 ts=4294934760 m=true pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=21 ph=4044cc21468cfec0 rawlen=33 rh=28c528e6d0492e9f ext1=- vp8=11,4,2,1,6,false act=false
+v phase reordered nackq=[65507 65510]
+v stats packets=21 bytes=1121 hdr=284 lost=2 loss=8.6957 dup=2 dupbytes=120 duphdr=24 pad=0 padbytes=0 padhdr=0 ooo=8 frames=10 kf=2 fec=0 gaps=[1:3 2:1 3:1]
+v delta packets=8 bytes=419 hdr=112 dup=2 dupbytes=120 duphdr=24 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=7 frames=4 layers=1 same=true
+v rr ssrc=4097 frac=0 total=2 last=65523 lsr=1870848578
+v gp esn=65521 n=33 h=28c528e6d0492e9f
+v gp esn=65520 n=34 h=687637276aab7238
+v gp esn=65519 n=73 h=a852a13c98ea04c3
+v gp esn=65514 n=73 h=f558f3a5e5392c5f
+v gp esn=65481 err
+v gp esn=65191 err
+v gp esn=64821 err
+v gp esn=65522 n=37 h=38a1d815b56db465
+v ep esn=65523 ets=4294937760 sn=65523 ts=4294937760 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=31 ph=4d09fe8259c4696e rawlen=43 rh=78f7884218c0a1bf ext1=- vp8=12,5,0,1,6,false act=false
+v ep esn=65524 ets=4294940760 sn=65524 ts=4294940760 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=39 ph=93b533fda5f1b761 rawlen=51 rh=529b3b51bfc19d07 ext1=- vp8=13,5,2,1,6,false act=false
+v ep esn=65525 ets=4294940760 sn=65525 ts=4294940760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=20 ph=1008c84c17e77217 rawlen=32 rh=80c87677ef02d862 ext1=- vp8=13,5,2,1,6,false act=false
+v ep esn=65526 ets=4294943760 sn=65526 ts=4294943760 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=58 ph=1df865d5b53b295a rawlen=70 rh=04824ac82ef3812a ext1=- vp8=14,5,1,1,6,false act=false
+v ep esn=65527 ets=4294946760 sn=65527 ts=4294946760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=29 ph=a3a98f361fd84936 rawlen=41 rh=0f915e89edb9f592 ext1=- vp8=15,5,2,1,6,false act=false
+v ep esn=65528 ets=4294949760 sn=65528 ts=4294949760 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=29 ph=310d4fd80a182b8b rawlen=41 rh=099e8ff093b0b26c ext1=- vp8=16,6,0,1,6,false act=false
+v ep esn=65529 ets=4294952760 sn=65529 ts=4294952760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=62 ph=28f68c5cf9d3252c rawlen=74 rh=1cee5f2139d6fc0a ext1=- vp8=17,6,2,1,6,false act=false
+v sr rtp=4294952760 rtpext=4294952760 ntp=16788979073734153984 at=1700000004031000000 adj=1700000004036562872 pkts=300 octets=300000
+v phase padding nackq=[65507 65510]
+v stats packets=28 bytes=1473 hdr=368 lost=2 loss=6.4516 dup=2 dupbytes=120 duphdr=24 pad=1 padbytes=75 padhdr=12 ooo=8 frames=16 kf=2 fec=0 gaps=[1:3 2:1 3:1]
+v delta packets=7 bytes=352 hdr=84 dup=0 dupbytes=0 duphdr=0 pad=1 padbytes=75 padhdr=12 lost=0 missing=0 ooo=0 frames=6 layers=1 same=true
+v rr ssrc=4097 frac=0 total=2 last=65531 lsr=1870923620
+v gp esn=65529 n=74 h=1cee5f2139d6fc0a
+v gp esn=65528 n=41 h=099e8ff093b0b26c
+v gp esn=65527 n=41 h=0f915e89edb9f592
+v gp esn=65522 n=37 h=38a1d815b56db465
+v gp esn=65489 err
+v gp esn=65199 err
+v gp esn=64829 err
+v gp esn=65530 err
+v restart
+v ep esn=65535 ets=4244964760 sn=65535 ts=4244964760 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=32 ph=255dda272f8b94cf rawlen=44 rh=b0ee7c8c00170ca5 ext1=- vp8=21,8,2,2,6,false act=false
+v ep esn=65536 ets=4244964760 sn=0 ts=4244964760 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=55 ph=a6b4c04fd59bcac0 rawlen=67 rh=6c2e40c3cbb6a798 ext1=- vp8=21,8,2,2,6,false act=false
+v ep esn=65537 ets=4244964760 sn=1 ts=4244964760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=52 ph=720baa4f1dc30732 rawlen=64 rh=e0c013cd02380dd1 ext1=- vp8=21,8,2,2,6,false act=false
+v ep esn=65538 ets=4244967760 sn=2 ts=4244967760 m=false pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=57 ph=ab549a3ce64667cc rawlen=69 rh=5b72554bb1d5848a ext1=- vp8=22,8,1,2,6,false act=false
+v ep esn=65539 ets=4244967760 sn=3 ts=4244967760 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=40 ph=c74d971e02786259 rawlen=52 rh=3ee749ab60a9cccc ext1=- vp8=22,8,1,2,6,false act=false
+v ep esn=65540 ets=4244970760 sn=4 ts=4244970760 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=25 ph=b41db47f3c64182d rawlen=37 rh=247fd07597153931 ext1=- vp8=23,8,2,2,6,false act=false
+v ep esn=65541 ets=4244970760 sn=5 ts=4244970760 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=34 ph=2f928828add26c78 rawlen=46 rh=2349a7296c8fc5cf ext1=- vp8=23,8,2,2,6,false act=false
+v ep esn=65542 ets=4244973760 sn=6 ts=4244973760 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=22 ph=58a5e214d5025344 rawlen=34 rh=7aa6c2aebe43365b ext1=- vp8=24,9,0,2,6,false act=false
+v gp esn=65529 err
+v sr rtp=4244973760 rtpext=4244973760 ntp=16788979080465121280 at=1700000005640000000 adj=1700000005640000000 pkts=400 octets=400000
+v phase restarted nackq=[]
+v stats packets=8 bytes=413 hdr=96 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=4 kf=0 fec=0 gaps=[]
+v delta packets=8 bytes=413 hdr=96 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=4 layers=1 same=true
+v rr ssrc=4097 frac=0 total=0 last=65543 lsr=1871026326
+v gp esn=65542 n=34 h=7aa6c2aebe43365b
+v gp esn=65541 n=46 h=2349a7296c8fc5cf
+v gp esn=65540 n=37 h=247fd07597153931
+v gp esn=65535 n=44 h=b0ee7c8c00170ca5
+v gp esn=65502 err
+v gp esn=65212 err
+v gp esn=64842 err
+v gp esn=65543 err
+v w err=other
+v close err=false
+v w err=eof
+v read err=eof
+v close err=false
+o new
+o bind err=false capacity=70
+o ep esn=100 ets=1960 sn=100 ts=1960 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=true plen=20 ph=6208c77f6ec9e31d rawlen=40 rh=6f39fea7b64ab195 ext1=1d vp8=- act=false
+o ep esn=101 ets=2920 sn=101 ts=2920 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=true plen=51 ph=c1034866679a5225 rawlen=71 rh=1f0dbd00530374e2 ext1=8b vp8=- act=false
+o ep esn=102 ets=3880 sn=102 ts=3880 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=true plen=37 ph=113910158730a205 rawlen=57 rh=58556247c6d6fe79 ext1=bf vp8=- act=false
+o phase bound nackq=[]
+o stats packets=3 bytes=168 hdr=60 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=0 kf=0 fec=0 gaps=[]
+o delta packets=3 bytes=168 hdr=60 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=0 layers=1 same=true
+o rr ssrc=4098 frac=0 total=0 last=103 lsr=0
+o gp esn=102 n=57 h=58556247c6d6fe79
+o gp esn=101 n=71 h=1f0dbd00530374e2
+o gp esn=100 n=40 h=6f39fea7b64ab195
+o gp esn=95 err
+o gp esn=62 err
+o gp esn=18446744073709551388 err
+o gp esn=18446744073709551018 err
+o gp esn=103 err
+o ep esn=103 ets=4840 sn=103 ts=4840 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=50 ph=0123f4a9de523d01 rawlen=70 rh=012aae6bc38b85e4 ext1=ae vp8=- act=false
+o ep esn=104 ets=5800 sn=104 ts=5800 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=42 ph=c34283100aff9f61 rawlen=62 rh=853dc5c537492e53 ext1=50 vp8=- act=false
+o ep esn=105 ets=6760 sn=105 ts=6760 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=23 ph=8eecca3df0f3f6ce rawlen=43 rh=b6083d412c4044d5 ext1=24 vp8=- act=false
+o sr rtp=6760 rtpext=6760 ntp=16788979061721252096 at=1700000001249000000 adj=1700000001249000000 pkts=100 octets=100000
+o ep esn=106 ets=7720 sn=106 ts=7720 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=33 ph=7a6f91a0fdecc5f5 rawlen=53 rh=5000291cbc1749b3 ext1=3a vp8=- act=false
+o phase in-order nackq=[]
+o stats packets=7 bytes=396 hdr=140 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=0 kf=0 fec=0 gaps=[]
+o delta packets=4 bytes=228 hdr=80 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=0 layers=1 same=true
+o rr ssrc=4098 frac=0 total=0 last=107 lsr=1870740317
+o gp esn=106 n=53 h=5000291cbc1749b3
+o gp esn=105 n=43 h=b6083d412c4044d5
+o gp esn=104 n=62 h=853dc5c537492e53
+o gp esn=99 err
+o gp esn=66 err
+o gp esn=18446744073709551392 err
+o gp esn=18446744073709551022 err
+o gp esn=107 err
+o ep esn=107 ets=8680 sn=107 ts=8680 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=42 ph=6d6bf7d8ef08b513 rawlen=62 rh=71da48723b41d531 ext1=ba vp8=- act=false
+o ep esn=108 ets=9640 sn=108 ts=9640 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=38 ph=062eb6ff510c5779 rawlen=58 rh=eea8496dc21c6396 ext1=b6 vp8=- act=false
+o ep esn=109 ets=10600 sn=109 ts=10600 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=53 ph=480de56db922b295 rawlen=73 rh=fbc18a0eb5e48286 ext1=45 vp8=- act=false
+o ep esn=110 ets=11560 sn=110 ts=11560 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=41 ph=6be39604cc76ae68 rawlen=61 rh=d62fb4f979b4d444 ext1=2d vp8=- act=false
+o ep esn=111 ets=12520 sn=111 ts=12520 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=16 ph=3cd3692f1eee567c rawlen=36 rh=885ec04ea54a5b47 ext1=56 vp8=- act=false
+o ep esn=112 ets=13480 sn=112 ts=13480 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=53 ph=44078d2ff7bab62e rawlen=73 rh=580762a059f0a4c2 ext1=48 vp8=- act=false
+o ep esn=113 ets=14440 sn=113 ts=14440 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=49 ph=b20a6d031ffed3e5 rawlen=69 rh=9c92df801654b87e ext1=5a vp8=- act=false
+o ep esn=114 ets=15400 sn=114 ts=15400 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=51 ph=feca0a5fefd5055c rawlen=71 rh=43bbd8158bd01c14 ext1=b6 vp8=- act=false
+o sr rtp=15400 rtpext=15400 ntp=16788979067284219392 at=1700000002566000000 adj=1700000002544229256 pkts=200 octets=200000
+o phase lost nackq=[]
+o stats packets=15 bytes=899 hdr=300 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=0 kf=0 fec=0 gaps=[]
+o delta packets=8 bytes=503 hdr=160 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=0 layers=1 same=true
+o rr ssrc=4098 frac=0 total=0 last=115 lsr=1870825201
+o gp esn=114 n=71 h=43bbd8158bd01c14
+o gp esn=113 n=69 h=9c92df801654b87e
+o gp esn=112 n=73 h=580762a059f0a4c2
+o gp esn=107 n=62 h=71da48723b41d531
+o gp esn=74 err
+o gp esn=18446744073709551400 err
+o gp esn=18446744073709551030 err
+o gp esn=115 err
+o ep esn=115 ets=16360 sn=115 ts=16360 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=24 ph=bcc8df7437dee912 rawlen=44 rh=78e720fc40c92cb6 ext1=26 vp8=- act=false
+o ep esn=116 ets=17320 sn=116 ts=17320 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=20 ph=92059a3be7160f98 rawlen=40 rh=debb2c001fd1985f ext1=cc vp8=- act=false
+o ep esn=117 ets=18280 sn=117 ts=18280 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=41 ph=8887f0c1359d9cf4 rawlen=61 rh=0bc969ddbbec1f39 ext1=ed vp8=- act=false
+o ep esn=118 ets=19240 sn=118 ts=19240 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=44 ph=9d20786227a4aeb6 rawlen=64 rh=7130b8c60f03386e ext1=87 vp8=- act=false
+o ep esn=120 ets=21160 sn=120 ts=21160 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=13 ph=76a76fbdf1108d34 rawlen=33 rh=9cd2ad92fabf1507 ext1=19 vp8=- act=false
+o ep esn=122 ets=23080 sn=122 ts=23080 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=33 ph=9d70af68e3a00f05 rawlen=53 rh=4c514180d200ae2c ext1=ed vp8=- act=false
+o ep esn=121 ets=22120 sn=121 ts=22120 m=false pt=111 s=-1 t=-1 kf=false ooo=true buf=false plen=33 ph=dc0e8d76ee75fa43 rawlen=53 rh=8edd4ca82958f012 ext1=0e vp8=- act=false
+o ep esn=119 ets=20200 sn=119 ts=20200 m=false pt=111 s=-1 t=-1 kf=false ooo=true buf=false plen=30 ph=a481b1c133f75942 rawlen=50 rh=ff45b6ecf5819baa ext1=95 vp8=- act=false
+o phase reordered nackq=[]
+o stats packets=23 bytes=1297 hdr=460 lost=0 loss=0.0000 dup=2 dupbytes=77 duphdr=40 pad=0 padbytes=0 padhdr=0 ooo=2 frames=0 kf=0 fec=0 gaps=[1:2]
+o delta packets=8 bytes=398 hdr=160 dup=2 dupbytes=77 duphdr=40 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=2 frames=0 layers=1 same=true
+o rr ssrc=4098 frac=0 total=0 last=123 lsr=1870825201
+o gp esn=119 n=50 h=ff45b6ecf5819baa
+o gp esn=118 n=64 h=7130b8c60f03386e
+o gp esn=117 n=61 h=0bc969ddbbec1f39
+o gp esn=112 n=73 h=580762a059f0a4c2
+o gp esn=79 err
+o gp esn=18446744073709551405 err
+o gp esn=18446744073709551035 err
+o gp esn=120 n=33 h=9cd2ad92fabf1507
+o ep esn=123 ets=24040 sn=123 ts=24040 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=41 ph=1af2d2a727ced271 rawlen=61 rh=66bd7c42e09df3c4 ext1=6d vp8=- act=false
+o ep esn=125 ets=25000 sn=125 ts=25000 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=31 ph=e537d50117d4ef73 rawlen=51 rh=091a26ae6c981715 ext1=f0 vp8=- act=false
+o ep esn=126 ets=25960 sn=126 ts=25960 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=10 ph=b08ce0797cbfdd25 rawlen=30 rh=e698688f2e1ce997 ext1=a7 vp8=- act=false
+o ep esn=124 ets=24040 sn=124 ts=24040 m=false pt=111 s=-1 t=-1 kf=false ooo=true buf=false plen=0 ph=cbf29ce484222325 rawlen=193 rh=253b189a17cf1072 ext1=- vp8=- act=false
+o ep esn=127 ets=26920 sn=127 ts=26920 m=false pt=111 s=-1 t=-1 kf=false ooo=false buf=false plen=21 ph=d606386b1f8fe5fa rawlen=41 rh=6ba84be2eaea97f9 ext1=87 vp8=- act=false
+o sr rtp=26920 rtpext=26920 ntp=16788979071615186688 at=1700000003575000000 adj=1700000003552611159 pkts=300 octets=300000
+o phase padding nackq=[]
+o stats packets=27 bytes=1480 hdr=540 lost=0 loss=0.0000 dup=4 dupbytes=354 duphdr=64 pad=4 padbytes=609 padhdr=48 ooo=3 frames=0 kf=0 fec=0 gaps=[1:3]
+o delta packets=4 bytes=183 hdr=80 dup=2 dupbytes=277 duphdr=24 pad=4 padbytes=609 padhdr=48 lost=0 missing=0 ooo=1 frames=0 layers=1 same=true
+o rr ssrc=4098 frac=0 total=0 last=131 lsr=1870891287
+o gp esn=127 n=41 h=6ba84be2eaea97f9
+o gp esn=126 n=30 h=e698688f2e1ce997
+o gp esn=125 n=51 h=091a26ae6c981715
+o gp esn=120 n=33 h=9cd2ad92fabf1507
+o gp esn=87 err
+o gp esn=18446744073709551413 err
+o gp esn=18446744073709551043 err
+o gp esn=128 err
+o gp esn=127 n=41 h=6ba84be2eaea97f9
+o sr rtp=4245005736 rtpext=4245005736 ntp=16788979077446153984 at=1700000004959000000 adj=1700000004910239028 pkts=400 octets=400000
+o phase restarted nackq=[]
+o stats packets=27 bytes=1480 hdr=540 lost=0 loss=0.0000 dup=4 dupbytes=354 duphdr=64 pad=4 padbytes=609 padhdr=48 ooo=3 frames=0 kf=0 fec=0 gaps=[1:3]
+o delta packets=0 bytes=0 hdr=0 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=0 layers=1 same=true
+o rr nil
+o gp esn=127 n=41 h=6ba84be2eaea97f9
+o gp esn=126 n=30 h=e698688f2e1ce997
+o gp esn=125 n=51 h=091a26ae6c981715
+o gp esn=120 n=33 h=9cd2ad92fabf1507
+o gp esn=87 err
+o gp esn=18446744073709551413 err
+o gp esn=18446744073709551043 err
+o gp esn=128 err
+o w err=other
+o close err=false
+o w err=eof
+o read err=eof
+o close err=false
+r new
+r bind err=false capacity=600
+r ep esn=65530 ets=503000 sn=65530 ts=503000 m=true pt=96 s=-1 t=0 kf=true ooo=false buf=true plen=27 ph=c0f42c335f4b9451 rawlen=39 rh=4b774f1068f4e47e ext1=- vp8=1,1,0,0,6,true act=false
+r ep esn=65531 ets=506000 sn=65531 ts=506000 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=true plen=25 ph=5a698fced8ea8911 rawlen=37 rh=775b76b06a33132f ext1=- vp8=2,1,1,0,6,false act=false
+r ep esn=65532 ets=509000 sn=65532 ts=509000 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=true plen=20 ph=83b5744bcfce7236 rawlen=32 rh=f74651b1ff5a3ce1 ext1=- vp8=3,1,2,0,6,false act=false
+r phase bound nackq=[]
+r stats packets=3 bytes=108 hdr=36 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=2 kf=1 fec=0 gaps=[]
+r delta packets=3 bytes=108 hdr=36 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=2 layers=1 same=true
+r rr ssrc=4099 frac=0 total=0 last=65533 lsr=0
+r gp esn=65532 n=32 h=f74651b1ff5a3ce1
+r gp esn=65531 n=37 h=775b76b06a33132f
+r gp esn=65530 n=39 h=4b774f1068f4e47e
+r gp esn=65525 err
+r gp esn=65492 err
+r gp esn=65202 err
+r gp esn=64832 err
+r gp esn=65533 err
+r ep esn=65533 ets=509000 sn=65533 ts=509000 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=17 ph=54560333f15f87a9 rawlen=29 rh=f8a5a331b20811bd ext1=- vp8=3,1,2,0,6,false act=false
+r ep esn=65534 ets=509000 sn=65534 ts=509000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=23 ph=327a7ea2fc509e10 rawlen=35 rh=935330e6913043db ext1=- vp8=3,1,2,0,6,false act=false
+r ep esn=65535 ets=512000 sn=65535 ts=512000 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=49 ph=28c4893ec70549af rawlen=61 rh=043c020b174e9d35 ext1=- vp8=4,2,0,0,6,false act=false
+r sr rtp=512000 rtpext=512000 ntp=16788979063581252096 at=1700000001714000000 adj=1700000001714000000 pkts=100 octets=100000
+r ep esn=65536 ets=515000 sn=0 ts=515000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=59 ph=df6276a1dbd8b497 rawlen=71 rh=6f9c33d48bddbf86 ext1=- vp8=5,2,2,0,6,false act=false
+r phase in-order nackq=[]
+r stats packets=7 bytes=304 hdr=84 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=5 kf=1 fec=0 gaps=[]
+r delta packets=4 bytes=196 hdr=48 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=3 layers=1 same=true
+r rr ssrc=4099 frac=0 total=0 last=65537 lsr=1870768699
+r gp esn=65536 n=71 h=6f9c33d48bddbf86
+r gp esn=65535 n=61 h=043c020b174e9d35
+r gp esn=65534 n=35 h=935330e6913043db
+r gp esn=65529 err
+r gp esn=65496 err
+r gp esn=65206 err
+r gp esn=64836 err
+r gp esn=65537 err
+r ep esn=65537 ets=518000 sn=1 ts=518000 m=false pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=46 ph=5e99a33a234cd196 rawlen=58 rh=fde9682ea42ab87e ext1=- vp8=6,2,1,0,6,false act=false
+r ep esn=65538 ets=518000 sn=2 ts=518000 m=false pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=20 ph=03131b0bb491ef3b rawlen=32 rh=8c5f560de45448c6 ext1=- vp8=6,2,1,0,6,false act=false
+r ep esn=65540 ets=521000 sn=4 ts=521000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=55 ph=dd20fc612c636f07 rawlen=67 rh=48b920c58c1ad326 ext1=- vp8=7,2,2,0,6,false act=false
+r ep esn=65541 ets=524000 sn=5 ts=524000 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=50 ph=d90629b6eb1e81d4 rawlen=62 rh=65f43ff9b132288d ext1=- vp8=8,3,0,0,6,false act=false
+r ep esn=65542 ets=527000 sn=6 ts=527000 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=41 ph=fcc4fba6936eb79e rawlen=53 rh=57a636f0716aff0d ext1=- vp8=9,3,2,1,6,false act=false
+r ep esn=65543 ets=527000 sn=7 ts=527000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=17 ph=4948300158bd0004 rawlen=29 rh=c359147e38b97e8a ext1=- vp8=9,3,2,1,6,false act=false
+r ep esn=65544 ets=530000 sn=8 ts=530000 m=false pt=96 s=-1 t=0 kf=true ooo=false buf=false plen=41 ph=0d18fb7a430ea848 rawlen=53 rh=c5f98b71d653efcd ext1=- vp8=10,4,0,1,6,true act=false
+r sr rtp=530000 rtpext=530000 ntp=16788979070659186688 at=1700000003336000000 adj=1700000003338596007 pkts=200 octets=200000
+r phase lost nackq=[3]
+r stats packets=14 bytes=658 hdr=168 lost=1 loss=6.6667 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=8 kf=2 fec=0 gaps=[1:1]
+r delta packets=8 bytes=354 hdr=84 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=1 missing=0 ooo=0 frames=3 layers=1 same=true
+r rr ssrc=4099 frac=32 total=1 last=65545 lsr=1870876699
+r gp esn=65544 n=53 h=c5f98b71d653efcd
+r gp esn=65543 n=29 h=c359147e38b97e8a
+r gp esn=65542 n=53 h=57a636f0716aff0d
+r gp esn=65537 n=58 h=fde9682ea42ab87e
+r gp esn=65504 err
+r gp esn=65214 err
+r gp esn=64844 err
+r gp esn=65545 err
+r ep esn=65545 ets=530000 sn=9 ts=530000 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=36 ph=c2f23dce1f5435b8 rawlen=48 rh=737fe400f6661130 ext1=- vp8=10,4,0,1,6,false act=false
+r ep esn=65548 ets=533000 sn=12 ts=533000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=36 ph=b84ad5012f7bfe5c rawlen=48 rh=6c5340d2171160c3 ext1=- vp8=11,4,2,1,6,false act=false
+r ep esn=65547 ets=533000 sn=11 ts=533000 m=false pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=48 ph=2cd6993cab1fc8b8 rawlen=60 rh=98becd589b6e3906 ext1=- vp8=11,4,2,1,6,false act=false
+r ep esn=65546 ets=530000 sn=10 ts=530000 m=true pt=96 s=-1 t=0 kf=false ooo=true buf=false plen=19 ph=775205d319eb0457 rawlen=31 rh=c0d29b8ac9526568 ext1=- vp8=10,4,0,1,6,false act=false
+r ep esn=65552 ets=539000 sn=16 ts=539000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=50 ph=243649c4f06569ac rawlen=62 rh=5ed52d5436454e74 ext1=- vp8=13,5,2,1,6,false act=false
+r ep esn=65550 ets=536000 sn=14 ts=536000 m=true pt=96 s=-1 t=0 kf=false ooo=true buf=false plen=59 ph=8413afacbaaa8909 rawlen=71 rh=18be268d32842843 ext1=- vp8=12,5,0,1,6,false act=false
+r ep esn=65551 ets=539000 sn=15 ts=539000 m=false pt=96 s=-1 t=2 kf=false ooo=true buf=false plen=52 ph=1d6c2acb61759f65 rawlen=64 rh=882ce1e5d58a8fb4 ext1=- vp8=13,5,2,1,6,false act=false
+r ep esn=65549 ets=536000 sn=13 ts=536000 m=false pt=96 s=-1 t=0 kf=false ooo=true buf=false plen=37 ph=800f0ad1c69deb72 rawlen=49 rh=a76a1366d35c345b ext1=- vp8=12,5,0,1,6,false act=false
+r phase reordered nackq=[3]
+r stats packets=22 bytes=1091 hdr=264 lost=1 loss=4.3478 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=5 frames=12 kf=2 fec=0 gaps=[1:1 2:1 3:1]
+r delta packets=8 bytes=433 hdr=96 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=5 frames=4 layers=1 same=true
+r rr ssrc=4099 frac=0 total=1 last=65553 lsr=1870876699
+r gp esn=65549 n=49 h=a76a1366d35c345b
+r gp esn=65548 n=48 h=6c5340d2171160c3
+r gp esn=65547 n=60 h=98becd589b6e3906
+r gp esn=65542 n=53 h=57a636f0716aff0d
+r gp esn=65509 err
+r gp esn=65219 err
+r gp esn=64849 err
+r gp esn=65550 n=71 h=18be268d32842843
+r ep esn=65553 ets=542000 sn=17 ts=542000 m=true pt=96 s=-1 t=1 kf=false ooo=false buf=false plen=42 ph=4470f11cabfa6cef rawlen=54 rh=1a40f045b8104b08 ext1=- vp8=14,5,1,1,6,false act=false
+r ep esn=65554 ets=545000 sn=18 ts=545000 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=31 ph=f764d84d10d0bbab rawlen=43 rh=00139e6df127b6c6 ext1=- vp8=15,5,2,1,6,false act=false
+r ep esn=65555 ets=545000 sn=19 ts=545000 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=54 ph=b9f4fe6aa11f1b55 rawlen=66 rh=644b9d3b5e65de35 ext1=- vp8=15,5,2,1,6,false act=false
+r ep esn=65556 ets=548000 sn=20 ts=548000 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=21 ph=4c8bed3a90b7f396 rawlen=33 rh=4a6170b74fe82655 ext1=- vp8=16,6,0,1,6,false act=false
+r ep esn=65557 ets=548000 sn=21 ts=548000 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=17 ph=85b674fe6bb6fff1 rawlen=29 rh=2fde30150e23af4f ext1=- vp8=16,6,0,1,6,false act=false
+r ep esn=65558 ets=548000 sn=22 ts=548000 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=59 ph=50b3d40513cd2acf rawlen=71 rh=a79b4e15070a2f32 ext1=- vp8=16,6,0,1,6,false act=false
+r ep esn=65559 ets=551000 sn=23 ts=551000 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=26 ph=52e58fe0cb0a9595 rawlen=38 rh=87ca5319cae45a19 ext1=- vp8=17,6,2,1,6,false act=false
+r sr rtp=551000 rtpext=551000 ntp=16788979076090153984 at=1700000004620000000 adj=1700000004603091618 pkts=300 octets=300000
+r phase padding nackq=[3]
+r stats packets=29 bytes=1425 hdr=348 lost=1 loss=3.3333 dup=1 dupbytes=29 duphdr=12 pad=0 padbytes=0 padhdr=0 ooo=5 frames=15 kf=2 fec=0 gaps=[1:1 2:1 3:1]
+r delta packets=7 bytes=334 hdr=84 dup=1 dupbytes=29 duphdr=12 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=3 layers=1 same=true
+r rr ssrc=4099 frac=0 total=1 last=65560 lsr=1870959569
+r gp esn=65559 n=38 h=87ca5319cae45a19
+r gp esn=65558 n=71 h=a79b4e15070a2f32
+r gp esn=65557 n=29 h=2fde30150e23af4f
+r gp esn=65552 n=62 h=5ed52d5436454e74
+r gp esn=65519 err
+r gp esn=65229 err
+r gp esn=64859 err
+r gp esn=65560 err
+r restart
+r ep esn=28 ets=4245524296 sn=28 ts=4245524296 m=false pt=96 s=-1 t=0 kf=true ooo=false buf=false plen=29 ph=0eeca9730388cd61 rawlen=41 rh=c2a3204ac9a948b1 ext1=- vp8=19,7,0,2,6,true act=false
+r ep esn=29 ets=4245524296 sn=29 ts=4245524296 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=24 ph=bc8467e548bf48ac rawlen=36 rh=46f355b7a474e39f ext1=- vp8=19,7,0,2,6,false act=false
+r ep esn=30 ets=4245524296 sn=30 ts=4245524296 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=35 ph=047e184d40b2d923 rawlen=47 rh=8b66a900e71e6491 ext1=- vp8=19,7,0,2,6,false act=false
+r ep esn=31 ets=4245527296 sn=31 ts=4245527296 m=false pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=1106 ph=ae9d7ac2108a559a rawlen=1118 rh=4877b54e072785eb ext1=- vp8=20,8,0,2,6,false act=false
+r ep esn=32 ets=4245527296 sn=32 ts=4245527296 m=true pt=96 s=-1 t=0 kf=false ooo=false buf=false plen=25 ph=098c9b323d26291e rawlen=37 rh=d255842625de4566 ext1=- vp8=20,8,0,2,6,false act=false
+r ep esn=33 ets=4245530296 sn=33 ts=4245530296 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=21 ph=1e2c52211c6f7436 rawlen=33 rh=51b4457e457ac1f4 ext1=- vp8=21,8,2,2,6,false act=false
+r ep esn=34 ets=4245530296 sn=34 ts=4245530296 m=false pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=17 ph=731f414c07d0c797 rawlen=29 rh=3603f4df49b22582 ext1=- vp8=21,8,2,2,6,false act=false
+r ep esn=35 ets=4245530296 sn=35 ts=4245530296 m=true pt=96 s=-1 t=2 kf=false ooo=false buf=false plen=46 ph=bbb8a82959a3d767 rawlen=58 rh=97637a89d06cb5ff ext1=- vp8=21,8,2,2,6,false act=false
+r gp esn=65559 err
+r sr rtp=4245530296 rtpext=4245530296 ntp=16788979083096088576 at=1700000006224000000 adj=1700000006224000000 pkts=400 octets=400000
+r phase restarted nackq=[]
+r stats packets=8 bytes=1399 hdr=96 lost=0 loss=0.0000 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 ooo=0 frames=3 kf=1 fec=0 gaps=[]
+r delta packets=8 bytes=1399 hdr=96 dup=0 dupbytes=0 duphdr=0 pad=0 padbytes=0 padhdr=0 lost=0 missing=0 ooo=0 frames=3 layers=1 same=true
+r rr ssrc=4099 frac=0 total=0 last=36 lsr=1871066471
+r gp esn=35 n=58 h=97637a89d06cb5ff
+r gp esn=34 n=29 h=3603f4df49b22582
+r gp esn=33 n=33 h=51b4457e457ac1f4
+r gp esn=28 n=41 h=c2a3204ac9a948b1
+r gp esn=18446744073709551611 err
+r gp esn=18446744073709551321 err
+r gp esn=18446744073709550951 err
+r gp esn=36 err
+r w err=other
+r close err=false
+r w err=eof
+r read err=eof
+r close err=false

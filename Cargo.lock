@@ -942,6 +942,7 @@ dependencies = [
  "parking_lot",
  "pbjson-types",
  "rand",
+ "ring",
  "rtc",
  "rtc-rtcp",
  "saphyr-parser",
