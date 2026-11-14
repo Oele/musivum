@@ -1,0 +1,177 @@
+{
+ "target": "reference",
+ "scenario": "a",
+ "about": "one room, 2 publishers of simulcast video and audio, 10 subscribers",
+ "at": "2026-11-14T18:52:38Z",
+ "lk": {
+  "version": "2.19.4",
+  "durationS": 60,
+  "joinsPerS": 5,
+  "videoCodec": "h264",
+  "simulcast": true,
+  "layout": "speaker"
+ },
+ "rooms": 1,
+ "videoPublishers": 2,
+ "audioPublishers": 2,
+ "subscribersPerRoom": 10,
+ "participants": 12,
+ "memoryCap": "systemd-run --user --scope -p MemoryMax=8G",
+ "tempSource": "coretemp Package id 0 (hwmon)",
+ "cpus": 16,
+ "before": {
+  "tempC": 74.0,
+  "load1": 0.19,
+  "waitedS": 0
+ },
+ "serverUpS": 0.1,
+ "steadyFromS": 6.1,
+ "lkEndS": 66.1,
+ "stops": [],
+ "serverExit": null,
+ "server": {
+  "cpuSteady": {
+   "mean": 0.048,
+   "max": 0.06
+  },
+  "cpuRampAndSteady": {
+   "mean": 0.049,
+   "max": 0.1
+  },
+  "cpuPerParticipantMilli": 4.0,
+  "rssIdleMB": 50.2,
+  "rssPeakMB": 94.5,
+  "rssPerParticipantMB": 3.69,
+  "threadsIdle": 15,
+  "threadsPeak": 21
+ },
+ "loadGenerator": {
+  "cpuSteady": {
+   "mean": 0.093,
+   "max": 0.12
+  }
+ },
+ "machine": {
+  "load1": {
+   "mean": 0.142,
+   "max": 0.18
+  },
+  "tempC": {
+   "mean": 59.54,
+   "max": 64.0
+  },
+  "cpuBusy": {
+   "mean": 0.167,
+   "max": 0.32
+  }
+ },
+ "subscribers": {
+  "expected": 10,
+  "reported": 10,
+  "withAllMedia": 10,
+  "tracksExpected": 40,
+  "tracksReceived": 40,
+  "tracksWithoutPackets": 0,
+  "packets": 188410,
+  "dropped": 0,
+  "lossPct": 0.0,
+  "worstSubscriberLossPct": 0.0,
+  "kbpsPerSubscriber": {
+   "mean": 1790.0,
+   "max": 2300.0
+  },
+  "videoKbpsPerTrack": {
+   "median": 1300.0,
+   "min": 197.1,
+   "max": 2000.0
+  },
+  "audioKbpsPerTrack": {
+   "median": 21.3
+  },
+  "errors": 0,
+  "errorLines": []
+ },
+ "summary": "reference a: cpu 0.048 avg / 0.06 peak cores, rss 50 -> 94 MB, threads 21, subs with media 10/10, tracks 40/40, loss 0.0% (worst sub 0.0%), 1790.0 kbps/sub, errors 0, lk 0.093 cores, temp max 64.0 °C, load max 0.18, machine busy 0.167 cores",
+ "perSubscriber": [
+  {"room":0,"name":"Sub 0","trackStats":[{"kind":"audio","packets":3094,"kbps":20.5,"dropped":0},{"kind":"audio","packets":3101,"kbps":21.4,"dropped":0},{"kind":"video","packets":9690,"kbps":1300.0,"dropped":0},{"kind":"video","packets":1804,"kbps":200.1,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 1","trackStats":[{"kind":"audio","packets":3084,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3091,"kbps":21.4,"dropped":0},{"kind":"video","packets":9688,"kbps":1300.0,"dropped":0},{"kind":"video","packets":1802,"kbps":200.8,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 2","trackStats":[{"kind":"audio","packets":3074,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3081,"kbps":21.4,"dropped":0},{"kind":"video","packets":14044,"kbps":2000.0,"dropped":0},{"kind":"video","packets":1649,"kbps":197.1,"dropped":0}],"tracks":4,"expected":4,"kbps":2200.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 3","trackStats":[{"kind":"audio","packets":3071,"kbps":21.4,"dropped":0},{"kind":"audio","packets":3064,"kbps":20.4,"dropped":0},{"kind":"video","packets":1647,"kbps":197.7,"dropped":0},{"kind":"video","packets":14042,"kbps":2000.0,"dropped":0}],"tracks":4,"expected":4,"kbps":2300.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 4","trackStats":[{"kind":"audio","packets":3063,"kbps":21.4,"dropped":0},{"kind":"audio","packets":3056,"kbps":20.4,"dropped":0},{"kind":"video","packets":9683,"kbps":1400.0,"dropped":0},{"kind":"video","packets":1797,"kbps":202.8,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 5","trackStats":[{"kind":"audio","packets":3044,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3053,"kbps":21.4,"dropped":0},{"kind":"video","packets":1644,"kbps":199.0,"dropped":0},{"kind":"video","packets":13917,"kbps":2000.0,"dropped":0}],"tracks":4,"expected":4,"kbps":2200.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 6","trackStats":[{"kind":"audio","packets":3036,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3043,"kbps":21.4,"dropped":0},{"kind":"video","packets":1793,"kbps":204.1,"dropped":0},{"kind":"video","packets":9679,"kbps":1400.0,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 7","trackStats":[{"kind":"audio","packets":3026,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3033,"kbps":21.4,"dropped":0},{"kind":"video","packets":1790,"kbps":204.8,"dropped":0},{"kind":"video","packets":9677,"kbps":1400.0,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 8","trackStats":[{"kind":"audio","packets":3016,"kbps":20.3,"dropped":0},{"kind":"audio","packets":3023,"kbps":21.4,"dropped":0},{"kind":"video","packets":1797,"kbps":206.5,"dropped":0},{"kind":"video","packets":9674,"kbps":1400.0,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 9","trackStats":[{"kind":"audio","packets":3006,"kbps":20.3,"dropped":0},{"kind":"audio","packets":3013,"kbps":21.3,"dropped":0},{"kind":"video","packets":1848,"kbps":215.2,"dropped":0},{"kind":"video","packets":9673,"kbps":1400.0,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null}
+ ],
+ "samples": [
+  {"t":0.1,"phase":"idle","rssMB":50.2,"threads":15,"load1":0.19,"tempC":74.0},
+  {"t":1.1,"phase":"idle","cpu":0.0,"lkCpu":0.0,"machineCpu":0.39,"rssMB":50.2,"threads":15,"load1":0.19,"tempC":58.0},
+  {"t":2.1,"phase":"idle","cpu":0.0,"lkCpu":0.0,"machineCpu":0.06,"rssMB":50.2,"threads":15,"load1":0.17,"tempC":58.0},
+  {"t":4.1,"phase":"ramp","cpu":0.065,"lkCpu":0.08,"machineCpu":0.26,"rssMB":73.0,"threads":20,"load1":0.17,"tempC":60.0},
+  {"t":5.1,"phase":"ramp","cpu":0.1,"lkCpu":0.13,"machineCpu":0.25,"rssMB":81.5,"threads":21,"load1":0.17,"tempC":60.0},
+  {"t":6.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.14,"rssMB":84.9,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":7.1,"phase":"steady","cpu":0.05,"lkCpu":0.06,"machineCpu":0.32,"rssMB":85.5,"threads":21,"load1":0.16,"tempC":59.0},
+  {"t":8.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.18,"rssMB":86.5,"threads":21,"load1":0.16,"tempC":64.0},
+  {"t":9.1,"phase":"steady","cpu":0.06,"lkCpu":0.11,"machineCpu":0.18,"rssMB":87.7,"threads":21,"load1":0.16,"tempC":64.0},
+  {"t":10.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.13,"rssMB":88.2,"threads":21,"load1":0.16,"tempC":62.0},
+  {"t":11.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.17,"rssMB":88.6,"threads":21,"load1":0.16,"tempC":62.0},
+  {"t":12.1,"phase":"steady","cpu":0.05,"lkCpu":0.12,"machineCpu":0.15,"rssMB":88.9,"threads":21,"load1":0.15,"tempC":59.0},
+  {"t":13.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.12,"rssMB":89.1,"threads":21,"load1":0.15,"tempC":59.0},
+  {"t":14.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.22,"rssMB":89.4,"threads":21,"load1":0.15,"tempC":62.0},
+  {"t":15.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.19,"rssMB":89.7,"threads":21,"load1":0.15,"tempC":62.0},
+  {"t":16.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.29,"rssMB":89.8,"threads":21,"load1":0.15,"tempC":61.0},
+  {"t":17.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.14,"rssMB":89.9,"threads":21,"load1":0.14,"tempC":61.0},
+  {"t":18.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.2,"rssMB":90.1,"threads":21,"load1":0.14,"tempC":60.0},
+  {"t":19.1,"phase":"steady","cpu":0.04,"lkCpu":0.11,"machineCpu":0.16,"rssMB":90.4,"threads":21,"load1":0.14,"tempC":60.0},
+  {"t":20.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.14,"rssMB":90.6,"threads":21,"load1":0.14,"tempC":60.0},
+  {"t":21.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.14,"rssMB":90.6,"threads":21,"load1":0.14,"tempC":60.0},
+  {"t":22.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.15,"rssMB":90.8,"threads":21,"load1":0.12,"tempC":61.0},
+  {"t":23.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.17,"rssMB":91.1,"threads":21,"load1":0.12,"tempC":61.0},
+  {"t":24.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.21,"rssMB":91.5,"threads":21,"load1":0.12,"tempC":62.0},
+  {"t":25.1,"phase":"steady","cpu":0.06,"lkCpu":0.11,"machineCpu":0.19,"rssMB":92.1,"threads":21,"load1":0.12,"tempC":62.0},
+  {"t":26.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.29,"rssMB":92.1,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":27.1,"phase":"steady","cpu":0.04,"lkCpu":0.1,"machineCpu":0.14,"rssMB":92.1,"threads":21,"load1":0.11,"tempC":59.0},
+  {"t":28.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.18,"rssMB":92.1,"threads":21,"load1":0.11,"tempC":59.0},
+  {"t":29.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.13,"rssMB":92.4,"threads":21,"load1":0.11,"tempC":59.0},
+  {"t":30.1,"phase":"steady","cpu":0.06,"lkCpu":0.11,"machineCpu":0.16,"rssMB":92.4,"threads":21,"load1":0.11,"tempC":60.0},
+  {"t":31.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.12,"rssMB":92.4,"threads":21,"load1":0.11,"tempC":60.0},
+  {"t":32.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.31,"rssMB":92.4,"threads":21,"load1":0.18,"tempC":58.0},
+  {"t":33.1,"phase":"steady","cpu":0.03,"lkCpu":0.11,"machineCpu":0.14,"rssMB":92.5,"threads":21,"load1":0.18,"tempC":58.0},
+  {"t":34.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.16,"rssMB":93.1,"threads":21,"load1":0.18,"tempC":60.0},
+  {"t":35.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.14,"rssMB":93.1,"threads":21,"load1":0.18,"tempC":60.0},
+  {"t":36.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.17,"rssMB":93.1,"threads":21,"load1":0.18,"tempC":59.0},
+  {"t":37.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.12,"rssMB":93.1,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":38.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.13,"rssMB":93.1,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":39.1,"phase":"steady","cpu":0.05,"lkCpu":0.12,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":40.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":41.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.16,"rssMB":93.1,"threads":21,"load1":0.17,"tempC":59.0},
+  {"t":42.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.14,"rssMB":93.1,"threads":21,"load1":0.16,"tempC":60.0},
+  {"t":43.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.13,"rssMB":93.1,"threads":21,"load1":0.16,"tempC":60.0},
+  {"t":44.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.19,"rssMB":93.1,"threads":21,"load1":0.16,"tempC":58.0},
+  {"t":45.1,"phase":"steady","cpu":0.05,"lkCpu":0.07,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.16,"tempC":58.0},
+  {"t":46.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.16,"rssMB":93.1,"threads":21,"load1":0.16,"tempC":59.0},
+  {"t":47.1,"phase":"steady","cpu":0.06,"lkCpu":0.1,"machineCpu":0.14,"rssMB":93.1,"threads":21,"load1":0.14,"tempC":59.0},
+  {"t":48.1,"phase":"steady","cpu":0.04,"lkCpu":0.1,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.14,"tempC":59.0},
+  {"t":49.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.14,"tempC":59.0},
+  {"t":50.1,"phase":"steady","cpu":0.06,"lkCpu":0.11,"machineCpu":0.16,"rssMB":93.1,"threads":21,"load1":0.14,"tempC":58.0},
+  {"t":51.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.15,"rssMB":93.1,"threads":21,"load1":0.14,"tempC":58.0},
+  {"t":52.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.18,"rssMB":93.1,"threads":21,"load1":0.13,"tempC":58.0},
+  {"t":53.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.14,"rssMB":93.1,"threads":21,"load1":0.13,"tempC":58.0},
+  {"t":54.1,"phase":"steady","cpu":0.04,"lkCpu":0.1,"machineCpu":0.17,"rssMB":93.1,"threads":21,"load1":0.13,"tempC":59.0},
+  {"t":55.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.14,"rssMB":93.1,"threads":21,"load1":0.13,"tempC":59.0},
+  {"t":56.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.13,"rssMB":93.2,"threads":21,"load1":0.13,"tempC":59.0},
+  {"t":57.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.17,"rssMB":93.2,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":58.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.16,"rssMB":93.2,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":59.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.14,"rssMB":93.2,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":60.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.15,"rssMB":93.2,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":61.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.18,"rssMB":93.2,"threads":21,"load1":0.12,"tempC":59.0},
+  {"t":62.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.14,"rssMB":93.3,"threads":21,"load1":0.11,"tempC":58.0},
+  {"t":63.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.15,"rssMB":93.3,"threads":21,"load1":0.11,"tempC":58.0},
+  {"t":64.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.18,"rssMB":93.5,"threads":21,"load1":0.11,"tempC":58.0},
+  {"t":65.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.14,"rssMB":93.5,"threads":21,"load1":0.11,"tempC":58.0},
+  {"t":66.1,"phase":"steady","cpu":0.04,"lkCpu":0.0,"machineCpu":0.07,"rssMB":94.5,"threads":21,"load1":0.11,"tempC":57.0},
+  {"t":67.1,"phase":"after","cpu":0.0,"lkCpu":0.0,"machineCpu":0.05,"rssMB":94.5,"threads":21,"load1":0.1,"tempC":57.0},
+  {"t":68.1,"phase":"after","cpu":0.0,"lkCpu":0.0,"machineCpu":0.03,"rssMB":94.5,"threads":21,"load1":0.1,"tempC":57.0}
+ ]
+}

@@ -1,0 +1,177 @@
+{
+ "target": "musivum",
+ "scenario": "a",
+ "about": "one room, 2 publishers of simulcast video and audio, 10 subscribers",
+ "at": "2026-11-14T19:24:39Z",
+ "lk": {
+  "version": "2.19.4",
+  "durationS": 60,
+  "joinsPerS": 5,
+  "videoCodec": "h264",
+  "simulcast": true,
+  "layout": "speaker"
+ },
+ "rooms": 1,
+ "videoPublishers": 2,
+ "audioPublishers": 2,
+ "subscribersPerRoom": 10,
+ "participants": 12,
+ "memoryCap": "systemd-run --user --scope -p MemoryMax=8G",
+ "tempSource": "coretemp Package id 0 (hwmon)",
+ "cpus": 16,
+ "before": {
+  "tempC": 62.0,
+  "load1": 1.02,
+  "waitedS": 0
+ },
+ "serverUpS": 0.1,
+ "steadyFromS": 6.1,
+ "lkEndS": 66.1,
+ "stops": [],
+ "serverExit": null,
+ "server": {
+  "cpuSteady": {
+   "mean": 0.051,
+   "max": 0.07
+  },
+  "cpuRampAndSteady": {
+   "mean": 0.052,
+   "max": 0.09
+  },
+  "cpuPerParticipantMilli": 4.2,
+  "rssIdleMB": 13.4,
+  "rssPeakMB": 46.0,
+  "rssPerParticipantMB": 2.72,
+  "threadsIdle": 36,
+  "threadsPeak": 86
+ },
+ "loadGenerator": {
+  "cpuSteady": {
+   "mean": 0.093,
+   "max": 0.12
+  }
+ },
+ "machine": {
+  "load1": {
+   "mean": 0.692,
+   "max": 0.94
+  },
+  "tempC": {
+   "mean": 62.571,
+   "max": 64.0
+  },
+  "cpuBusy": {
+   "mean": 0.216,
+   "max": 0.46
+  }
+ },
+ "subscribers": {
+  "expected": 10,
+  "reported": 10,
+  "withAllMedia": 10,
+  "tracksExpected": 40,
+  "tracksReceived": 40,
+  "tracksWithoutPackets": 0,
+  "packets": 196613,
+  "dropped": 0,
+  "lossPct": 0.0,
+  "worstSubscriberLossPct": 0.0,
+  "kbpsPerSubscriber": {
+   "mean": 1930.0,
+   "max": 2300.0
+  },
+  "videoKbpsPerTrack": {
+   "median": 1300.0,
+   "min": 197.1,
+   "max": 2000.0
+  },
+  "audioKbpsPerTrack": {
+   "median": 21.3
+  },
+  "errors": 0,
+  "errorLines": []
+ },
+ "summary": "musivum a: cpu 0.051 avg / 0.07 peak cores, rss 13 -> 46 MB, threads 86, subs with media 10/10, tracks 40/40, loss 0.0% (worst sub 0.0%), 1930.0 kbps/sub, errors 0, lk 0.093 cores, temp max 64.0 °C, load max 0.94, machine busy 0.216 cores",
+ "perSubscriber": [
+  {"room":0,"name":"Sub 0","trackStats":[{"kind":"audio","packets":3094,"kbps":20.5,"dropped":0},{"kind":"audio","packets":3101,"kbps":21.4,"dropped":0},{"kind":"video","packets":1805,"kbps":200.2,"dropped":0},{"kind":"video","packets":9683,"kbps":1300.0,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 1","trackStats":[{"kind":"audio","packets":3091,"kbps":21.4,"dropped":0},{"kind":"audio","packets":3084,"kbps":20.4,"dropped":0},{"kind":"video","packets":9681,"kbps":1300.0,"dropped":0},{"kind":"video","packets":1803,"kbps":200.8,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 2","trackStats":[{"kind":"audio","packets":3074,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3081,"kbps":21.4,"dropped":0},{"kind":"video","packets":1649,"kbps":197.1,"dropped":0},{"kind":"video","packets":14041,"kbps":2000.0,"dropped":0}],"tracks":4,"expected":4,"kbps":2200.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 3","trackStats":[{"kind":"audio","packets":3064,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3071,"kbps":21.4,"dropped":0},{"kind":"video","packets":9677,"kbps":1400.0,"dropped":0},{"kind":"video","packets":1799,"kbps":202.1,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 4","trackStats":[{"kind":"audio","packets":3054,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3061,"kbps":21.4,"dropped":0},{"kind":"video","packets":9675,"kbps":1400.0,"dropped":0},{"kind":"video","packets":1995,"kbps":232.7,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 5","trackStats":[{"kind":"audio","packets":3044,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3051,"kbps":21.4,"dropped":0},{"kind":"video","packets":13910,"kbps":2000.0,"dropped":0},{"kind":"video","packets":1643,"kbps":199.0,"dropped":0}],"tracks":4,"expected":4,"kbps":2200.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 6","trackStats":[{"kind":"audio","packets":3034,"kbps":20.4,"dropped":0},{"kind":"audio","packets":3041,"kbps":21.4,"dropped":0},{"kind":"video","packets":13908,"kbps":2000.0,"dropped":0},{"kind":"video","packets":1641,"kbps":199.7,"dropped":0}],"tracks":4,"expected":4,"kbps":2300.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 7","trackStats":[{"kind":"audio","packets":3024,"kbps":20.3,"dropped":0},{"kind":"audio","packets":3031,"kbps":21.4,"dropped":0},{"kind":"video","packets":9669,"kbps":1400.0,"dropped":0},{"kind":"video","packets":1941,"kbps":227.5,"dropped":0}],"tracks":4,"expected":4,"kbps":1600.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 8","trackStats":[{"kind":"audio","packets":3021,"kbps":21.3,"dropped":0},{"kind":"audio","packets":3014,"kbps":20.3,"dropped":0},{"kind":"video","packets":13887,"kbps":2000.0,"dropped":0},{"kind":"video","packets":1637,"kbps":201.0,"dropped":0}],"tracks":4,"expected":4,"kbps":2300.0,"dropped":0,"error":null},
+  {"room":0,"name":"Sub 9","trackStats":[{"kind":"audio","packets":3004,"kbps":20.3,"dropped":0},{"kind":"audio","packets":3011,"kbps":21.3,"dropped":0},{"kind":"video","packets":13884,"kbps":2000.0,"dropped":0},{"kind":"video","packets":1635,"kbps":201.7,"dropped":0}],"tracks":4,"expected":4,"kbps":2300.0,"dropped":0,"error":null}
+ ],
+ "samples": [
+  {"t":0.1,"phase":"idle","rssMB":13.3,"threads":36,"load1":1.02,"tempC":62.0},
+  {"t":1.1,"phase":"idle","cpu":0.0,"lkCpu":0.0,"machineCpu":0.53,"rssMB":13.3,"threads":36,"load1":1.02,"tempC":62.0},
+  {"t":2.1,"phase":"idle","cpu":0.0,"lkCpu":0.0,"machineCpu":0.36,"rssMB":13.4,"threads":36,"load1":0.94,"tempC":61.0},
+  {"t":4.1,"phase":"ramp","cpu":0.035,"lkCpu":0.08,"machineCpu":0.26,"rssMB":30.2,"threads":62,"load1":0.94,"tempC":63.0},
+  {"t":5.1,"phase":"ramp","cpu":0.09,"lkCpu":0.14,"machineCpu":0.4,"rssMB":39.0,"threads":82,"load1":0.94,"tempC":63.0},
+  {"t":6.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.33,"rssMB":41.1,"threads":86,"load1":0.94,"tempC":63.0},
+  {"t":7.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.22,"rssMB":41.1,"threads":86,"load1":0.86,"tempC":63.0},
+  {"t":8.1,"phase":"steady","cpu":0.07,"lkCpu":0.09,"machineCpu":0.2,"rssMB":41.4,"threads":86,"load1":0.86,"tempC":63.0},
+  {"t":9.1,"phase":"steady","cpu":0.05,"lkCpu":0.12,"machineCpu":0.46,"rssMB":41.6,"threads":86,"load1":0.86,"tempC":63.0},
+  {"t":10.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.19,"rssMB":41.8,"threads":86,"load1":0.86,"tempC":64.0},
+  {"t":11.1,"phase":"steady","cpu":0.06,"lkCpu":0.11,"machineCpu":0.18,"rssMB":41.8,"threads":86,"load1":0.86,"tempC":64.0},
+  {"t":12.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.3,"rssMB":42.0,"threads":86,"load1":0.87,"tempC":64.0},
+  {"t":13.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.38,"rssMB":42.0,"threads":86,"load1":0.87,"tempC":64.0},
+  {"t":14.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.22,"rssMB":42.2,"threads":86,"load1":0.87,"tempC":62.0},
+  {"t":15.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.31,"rssMB":42.2,"threads":86,"load1":0.87,"tempC":62.0},
+  {"t":16.1,"phase":"steady","cpu":0.04,"lkCpu":0.09,"machineCpu":0.19,"rssMB":42.2,"threads":86,"load1":0.87,"tempC":64.0},
+  {"t":17.1,"phase":"steady","cpu":0.06,"lkCpu":0.08,"machineCpu":0.17,"rssMB":42.2,"threads":86,"load1":0.8,"tempC":64.0},
+  {"t":18.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.22,"rssMB":42.3,"threads":86,"load1":0.8,"tempC":63.0},
+  {"t":19.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.21,"rssMB":43.1,"threads":86,"load1":0.8,"tempC":63.0},
+  {"t":20.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.15,"rssMB":43.9,"threads":86,"load1":0.8,"tempC":62.0},
+  {"t":21.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.2,"rssMB":44.0,"threads":86,"load1":0.8,"tempC":62.0},
+  {"t":22.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.26,"rssMB":44.1,"threads":86,"load1":0.82,"tempC":62.0},
+  {"t":23.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.22,"rssMB":44.3,"threads":86,"load1":0.82,"tempC":62.0},
+  {"t":24.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.19,"rssMB":44.4,"threads":86,"load1":0.82,"tempC":64.0},
+  {"t":25.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.2,"rssMB":44.4,"threads":86,"load1":0.82,"tempC":64.0},
+  {"t":26.1,"phase":"steady","cpu":0.06,"lkCpu":0.1,"machineCpu":0.21,"rssMB":44.4,"threads":86,"load1":0.82,"tempC":62.0},
+  {"t":27.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.22,"rssMB":44.4,"threads":86,"load1":0.75,"tempC":62.0},
+  {"t":28.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.22,"rssMB":44.5,"threads":86,"load1":0.75,"tempC":62.0},
+  {"t":29.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.23,"rssMB":44.5,"threads":86,"load1":0.75,"tempC":62.0},
+  {"t":30.1,"phase":"steady","cpu":0.06,"lkCpu":0.08,"machineCpu":0.17,"rssMB":44.5,"threads":86,"load1":0.75,"tempC":64.0},
+  {"t":31.1,"phase":"steady","cpu":0.04,"lkCpu":0.11,"machineCpu":0.28,"rssMB":44.5,"threads":86,"load1":0.75,"tempC":64.0},
+  {"t":32.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.27,"rssMB":44.6,"threads":86,"load1":0.69,"tempC":63.0},
+  {"t":33.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.14,"rssMB":44.6,"threads":86,"load1":0.69,"tempC":63.0},
+  {"t":34.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.19,"rssMB":44.8,"threads":86,"load1":0.69,"tempC":63.0},
+  {"t":35.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.16,"rssMB":44.8,"threads":86,"load1":0.69,"tempC":63.0},
+  {"t":36.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.14,"rssMB":44.9,"threads":86,"load1":0.69,"tempC":62.0},
+  {"t":37.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.22,"rssMB":44.9,"threads":86,"load1":0.64,"tempC":62.0},
+  {"t":38.1,"phase":"steady","cpu":0.04,"lkCpu":0.07,"machineCpu":0.21,"rssMB":44.9,"threads":86,"load1":0.64,"tempC":64.0},
+  {"t":39.1,"phase":"steady","cpu":0.06,"lkCpu":0.12,"machineCpu":0.23,"rssMB":44.9,"threads":86,"load1":0.64,"tempC":64.0},
+  {"t":40.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.18,"rssMB":44.9,"threads":86,"load1":0.64,"tempC":63.0},
+  {"t":41.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.45,"rssMB":44.9,"threads":86,"load1":0.64,"tempC":63.0},
+  {"t":42.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.22,"rssMB":45.0,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":43.1,"phase":"steady","cpu":0.04,"lkCpu":0.08,"machineCpu":0.19,"rssMB":45.2,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":44.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.19,"rssMB":45.2,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":45.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.16,"rssMB":45.2,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":46.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.17,"rssMB":45.2,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":47.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.17,"rssMB":45.3,"threads":86,"load1":0.54,"tempC":62.0},
+  {"t":48.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.19,"rssMB":45.4,"threads":86,"load1":0.54,"tempC":63.0},
+  {"t":49.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.34,"rssMB":45.6,"threads":86,"load1":0.54,"tempC":63.0},
+  {"t":50.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.18,"rssMB":45.7,"threads":86,"load1":0.54,"tempC":62.0},
+  {"t":51.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.18,"rssMB":45.7,"threads":86,"load1":0.54,"tempC":62.0},
+  {"t":52.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.2,"rssMB":45.7,"threads":86,"load1":0.58,"tempC":61.0},
+  {"t":53.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.18,"rssMB":45.8,"threads":86,"load1":0.58,"tempC":61.0},
+  {"t":54.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.19,"rssMB":45.8,"threads":86,"load1":0.58,"tempC":61.0},
+  {"t":55.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.16,"rssMB":45.8,"threads":86,"load1":0.58,"tempC":61.0},
+  {"t":56.1,"phase":"steady","cpu":0.05,"lkCpu":0.1,"machineCpu":0.13,"rssMB":45.8,"threads":86,"load1":0.58,"tempC":62.0},
+  {"t":57.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.13,"rssMB":45.8,"threads":86,"load1":0.53,"tempC":62.0},
+  {"t":58.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.13,"rssMB":45.8,"threads":86,"load1":0.53,"tempC":61.0},
+  {"t":59.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.18,"rssMB":45.8,"threads":86,"load1":0.53,"tempC":61.0},
+  {"t":60.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.17,"rssMB":45.8,"threads":86,"load1":0.53,"tempC":62.0},
+  {"t":61.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.18,"rssMB":45.8,"threads":86,"load1":0.53,"tempC":62.0},
+  {"t":62.1,"phase":"steady","cpu":0.06,"lkCpu":0.09,"machineCpu":0.22,"rssMB":45.8,"threads":86,"load1":0.49,"tempC":62.0},
+  {"t":63.1,"phase":"steady","cpu":0.05,"lkCpu":0.08,"machineCpu":0.18,"rssMB":45.8,"threads":86,"load1":0.49,"tempC":62.0},
+  {"t":64.1,"phase":"steady","cpu":0.05,"lkCpu":0.11,"machineCpu":0.26,"rssMB":45.8,"threads":86,"load1":0.49,"tempC":64.0},
+  {"t":65.1,"phase":"steady","cpu":0.05,"lkCpu":0.09,"machineCpu":0.15,"rssMB":46.0,"threads":86,"load1":0.49,"tempC":64.0},
+  {"t":66.1,"phase":"steady","cpu":0.04,"lkCpu":0.0,"machineCpu":0.16,"rssMB":42.3,"threads":81,"load1":0.49,"tempC":60.0},
+  {"t":67.1,"phase":"after","cpu":0.0,"lkCpu":0.0,"machineCpu":0.08,"rssMB":42.3,"threads":81,"load1":0.53,"tempC":60.0},
+  {"t":68.1,"phase":"after","cpu":0.0,"lkCpu":0.0,"machineCpu":0.12,"rssMB":42.3,"threads":81,"load1":0.53,"tempC":60.0}
+ ]
+}
