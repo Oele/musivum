@@ -50,6 +50,13 @@ was checked:
   parsing and validating a token in `protocol/auth/jwt.rs` follow its `parser.go`,
   `validator.go`, `types.go`, `token.go` and `hmac.go`. Its notice is in `NOTICE`.
 
+- **jxskiss/base62 v1.1.0** (MIT), which LiveKit's protocol uses for hashed ids and
+  secrets: its encoder is ported in `protocol/utils/base62.rs`. Its notice is in `NOTICE`.
+- **Go's standard library** (BSD-3-Clause) was read for what the originals call
+  (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
+  translated its ChaCha8 generator was removed, and identifiers take their random numbers
+  from the `rand` crate.
+
 ## Order of work
 
 1. **Survey.** Read `pkg/sfu` and `pkg/rtc` and write `docs/port-map.md`: for every upstream

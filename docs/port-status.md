@@ -30,6 +30,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | protocol `codecs/mime/mimetype.go` | `protocol/codecs/mime/mimetype.rs` | none upstream | Five tests added. The conversion to `roomobs` (observability) is left out. |
 | protocol `codecs/codecs.go` | `protocol/codecs/codecs.rs` | none upstream | Three tests added. |
 | protocol `auth/accesstoken.go`, `grants.go`, `verifier.go`, `provider.go`, `interfaces.go` | `protocol/auth/` (same names, with `jwt.rs` and `json.rs`) | 13 / 13 | Seventeen tests added. `jwt.rs` is what the original takes from golang-jwt (MIT), ported in part; `json.rs` is new. Tokens signed by Go verify here and tokens signed here verify in Go (run both ways, every grant; for fixed claims and times the token is Go's byte for byte). More than 200 unusual tokens and 60 key files were put through Go, and the tests expect Go's outcome. Token times are compared with the system clock, as in Go. `authfakes` is not ported. |
+| protocol `utils/`: `timed_version.go`, `bitmap.go`, `time_size_cache.go`, `timed_aggregator.go`, `rtpstats.go`, `protoproxy.go`, `dedupedslice.go`, `guid/id.go`, `id.go`, `connectionquality.go`, `error.go`, `data_channel_rpc.go`, `secret.go`, `pointer/to.go` | `protocol/utils/` (same names) | 11 / 12 | 29 tests added, with values from the originals. `guid.Hash` and its test are not ported (it reproduces Go's ChaCha8 sequence for a seed; only request ids of the service use it). Identifiers take their random numbers from the `rand` crate. `base62.rs` is jxskiss/base62's encoder (MIT). The database methods of `TimedVersion`, `LocalNodeID` and the psrpc conversion are left out. `ProtoProxy` is generic over a value with `Default` and `PartialEq`; its `update_fn` has to hold its owner weakly. |
 | protocol `utils/mono/mono.go` | `protocol/utils/mono.rs` | 0 / 2 | The clock itself is `go::time`; upstream's two tests are about Go's `time.Time` and have nothing to test here. |
 | protocol `livekit/types.go` | `protocol/livekit/types.rs` | 0 / 4 | Only the identifier types; upstream's tests are of the YAML conversions, which are not ported. |
 | protocol `utils/rtputil/rtpconverter.go` | `protocol/utils/rtputil.rs` | 1 / 1 | |
@@ -61,6 +62,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/types/protocol_version.go`, `trafficstats.go` | `rtc/types/` (same names) | none upstream | Five tests added. `livekit.StreamType` is written out (its proto file is not compiled here). |
 | `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
 | `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
+| `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
+| (new) | `webrtc/track.rs`, `webrtc/peerconnection/` | | Written new: the traits `pkg/sfu` meets the WebRTC library through, and musivum's peer connection on `rtc`. Twelve tests. See `docs/webrtc-library.md`. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
 with the same pseudo-random inputs (34,021 lines of output, identical).
@@ -180,6 +183,13 @@ What looked wrong or fragile upstream and was ported as it is:
   image outputs; a token without `iss` is verified with the secret of the key `""`;
   `TestVerifier`'s "incorrect key" case uses an expired token and cannot notice a missing
   signature check (a test was added).
+- protocol `utils`: `rtpstats.go` compares the time of the last FIR with the last PLI;
+  a `ProtoProxy` with refresh interval 0 never updates, against its comment;
+  `TimedAggregator`'s `Get...AndRestartAt` restarts also when the read failed, so time goes
+  backwards; `NewBitmap` allocates more than asked; two assertions of
+  `timed_aggregator_test.go` have their arguments the wrong way round and cannot fail.
+  `pkg/utils/opsqueue.go`: `Stop()` on a queue that was never started never closes its
+  channel.
 - `pkg/rtc`: `CanHandleReconnectResponse` panics on a `ClientInfo` without a message.
   `UserPacketDeduper` takes a nonce of 16 zero bytes for a duplicate at first sight.
   `RTPStatsDiffToTrafficStats` clamps lost packets at zero while padding and out-of-order
@@ -196,3 +206,22 @@ What looked wrong or fragile upstream and was ported as it is:
   clearing them, so a reused packet accumulates (LiveKit resets the packet first).
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
+
+## In progress, not on `main`
+
+Stopped on 2026-11-14 when the account's usage limit was reached; each is a branch with its
+work in progress committed (not reviewed, not merged):
+
+| What | Branch | State when stopped |
+|---|---|---|
+| `sfu/buffer/fps.go`, the rest of `dependencydescriptorparser.go` | `worktree-agent-ad0a55f78e9baa649` | Both files written; the parser's test file was being written. |
+| `sfu/codecmunger` | `worktree-agent-af38123cbb04c7d54` | Partly written. |
+| `sfu/videolayerselector` with `temporallayerselector` | `worktree-agent-ac9dc30a6634ca5d6` | Written (25 files); was about to build. |
+| `sfu/rtpmunger.go`, `sequencer.go`, `rtxbudget.go`, `forwardstats.go`, `telemetry/prometheus` | `worktree-agent-af75858273bb71ed3` | The RTP munger done; the sequencer was next. |
+| `sfu/streamtrackermanager.go` | `worktree-agent-a4f0b6a686c461dee` | Just begun. |
+| `crates/musivum-fakes`: fakes of traits for tests, in the manner of counterfeiter | `worktree-agent-a7e87e6e01374d5a6` | The macro and its tests exist; a test with the port's real types was being added. |
+
+Next after these, in this order: `sfu/rtpstats` and `sfu/bwe/sendsidebwe` (what they
+waited for, the utilities, is merged); `sfu/pacer` (the seam traits are merged); then the
+buffer proper, `connectionquality`, `playoutdelay`; then the forwarder, the receivers, the
+down track, the stream allocator; then `pkg/rtc`.

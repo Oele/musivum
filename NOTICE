@@ -72,3 +72,9 @@ crates/musivum/src/protocol/auth/jwt.rs is in part a port to Rust of golang-jwt
     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
     CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR
     THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+crates/musivum/src/protocol/utils/base62.rs is a port to Rust of the encoder of
+jxskiss/base62 (https://github.com/jxskiss/base62), which is under the MIT License (the
+text above) with this notice:
+
+    Copyright (c) 2019 Shawn Wang <jxskiss@126.com>

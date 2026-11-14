@@ -110,6 +110,47 @@ hard-coded.
 
 None of these changes the structure of the port.
 
+## The connection layer, and what building it found
+
+`crates/musivum/src/webrtc/peerconnection/` is musivum's peer connection on `rtc`: a node
+with one UDP socket for all its connections, a `PeerConnection` with pion's method names
+and callbacks, and the door LiveKit's buffer factory came through (`PacketSink`: every
+incoming RTP packet as bytes and every RTCP packet, RTX, FEC and padding included).
+`crates/musivum/src/webrtc/track.rs` has the traits the ported `pkg/sfu` meets it through
+(`TrackLocal`, `TrackLocalWriter`, `TrackLocalContext`, `TrackRemote`, `RtpSender`,
+`RtpReceiver`, `RtpTransceiver`), without a dependency on `rtc`. Twelve tests run two
+connections against each other in one process (media and RTCP both ways, RTX and padding,
+two clients on one port, data channels, renegotiation, ICE restart, callbacks that call
+back in, close).
+
+How it runs: one mutex per connection around `rtc`'s connection; every callback, the sink
+and `bind`/`unbind` run on the connection's own task from an ordered queue with no lock
+held; a write takes the mutex and has its datagrams on the socket before it returns; one
+reader task for the node routes datagrams into a queue of 1,024 per connection. A callback
+that blocks stalls that connection's reading and timers; a panic in a callback ends the
+connection's task without a close event.
+
+Found in `rtc` 0.21.1 while building it (source references are in the commit's report,
+kept in the header comments of `peerconnection/mod.rs`):
+
+1. **The RTX stream of a simulcast layer is not paired with its layer** (`rtc` has a TODO
+   at that place). The RTX packets reach the sink, but no stream is announced for that
+   SSRC and `TrackRemote::rtx_ssrc()` stays 0. LiveKit learns the pairing from the first
+   RTX packets itself (`pkg/sfu/interceptor/rtx.go`), which is the part to port for it.
+2. **A data channel added by a later negotiation never opens**: the SCTP association is
+   only begun when DTLS completes. LiveKit creates its channels before the first offer.
+3. A channel the remote opened reports no retransmission limits.
+4. `rtc` has no getters for the connection's states (the layer tracks them from events)
+   and sets the gathering state back on every local description.
+5. `set_local_description` insists on the text `create_offer` or `create_answer` gave:
+   the SDP cannot be changed before it is set locally, which LiveKit does in places
+   (`pkg/rtc/transport.go`); what it changes there has to be reached another way.
+6. A rollback removes transceivers by index; passed through, untested.
+7. Not there yet in the layer: detached data channels with deadlines (LiveKit writes with a
+   deadline; here `send` never blocks and `buffered_amount` is what the writer has to go
+   by), what migration between nodes needs, the selected candidate pair other than through
+   the statistics, pion's own congestion control interceptors (not used by default).
+
 ## Not tested
 
 - Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
