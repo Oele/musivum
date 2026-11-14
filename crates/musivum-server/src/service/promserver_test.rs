@@ -196,7 +196,9 @@ async fn test_metrics_endpoint() {
         .unwrap()
         .parse()
         .unwrap();
-    assert!(scrapes >= 7, "{}", res.body);
+    // the six answered above; this one is counted once it is answered, as promhttp counts
+    // (another test that scrapes at the same time may add to it)
+    assert!(scrapes >= 6, "{}", res.body);
 
     // stopped, it takes no connections
     s.shutdown();
