@@ -4,6 +4,7 @@
 //! The WebRTC library that does the transport is not here: it meets the ported code at the
 //! traits the port has where pion's objects were.
 
+pub mod interceptor;
 pub mod rtcp;
 pub mod rtp;
 pub mod sdp;
