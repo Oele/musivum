@@ -107,6 +107,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/participant_data_blob_handler.go` | `rtc/participant_data_blob_handler.rs` | 4 / 4 | The original's methods of the participant are provided methods of a trait the participant will implement. |
 | `pkg/rtc/uptrackmanager.go` | `rtc/uptrackmanager.rs` | 2 / 2 | |
 | `pkg/rtc/wrappedreceiver.go`, `subscribedtrack.go`, `mediatracksubscriptions.go`, `mediatrackreceiver.go` | `rtc/` (same names) | none upstream | 25 tests added, most with values from the same steps run against the original (receiver chosen by negotiated codec, a dummy receiver upgraded, settings applied after the debounce, a subscriber added, refused twice, removed, a cached transceiver reused through `replace_track`, receivers ordered by priority, a codec regression). Upstream's two tests of `mediatrack.go` already pass against `MediaTrackReceiver`. |
+| `pkg/rtc/mediatrack.go` | `rtc/mediatrack.rs` | 2 / 2 | Eight tests added that run `add_receiver` with real buffers from a buffer factory, their values from the same steps against the original (three simulcast layers, a backup codec, RED both ways, mute, dynacast, close). A second announcement of the same SSRC, which `rtc` makes after every renegotiation, is harmless here, where upstream would close the track: the one place this file leaves the original, tested. Not wired: the counter of FEC recovered from the publisher (`RecordFECUpstream`), which `telemetry::prometheus` does not have yet; the place is marked. |
 | `pkg/rtc/subscriptionmanager.go` | `rtc/subscriptionmanager.rs` | 11 / 11 | The manager holds its participant weakly; the callbacks for a closed track hold it strongly until the track has closed, as upstream's closures do. The reconciler is a task; `close` waits for it as upstream does. The tests' three overridable timeouts are constants with the test values in a test build. `subscriptionTimeout` is the transport's ICE failure timeout, written out until `transport.go` is ported. |
 | `pkg/rtc/roomtrackmanager.go`, `medialossproxy.go`, `signalanddatastats.go` | `rtc/` (same names) | none upstream | Twelve tests added. Of `signalanddatastats.go` the counting and the reports to telemetry are ported; what feeds the observability reporters is left out, so `BytesTrackStats::new` takes four arguments where upstream's takes seven. |
 | `pkg/rtc/supervisor/` (two files) | `rtc/supervisor/` (same names) | 2 / 2 | One test added. |
@@ -269,6 +270,10 @@ What looked wrong or fragile upstream and was ported as it is:
   is silently ignored. `GetLocalIPAddresses` does not look at whether an interface is up.
   `port_range_start` alone suppresses the default ports in `Validate`, and then neither a
   range nor a port is used.
+- `rtc/mediatrack.go`: `NotifySubscriberNodeMediaLoss` on a video track dereferences the
+  loss proxy, which only audio tracks have. `SetMuted(false)` forces a dynacast update
+  before unmuting, and the listener reads the mute state on another thread, so the notice
+  after unmuting can be lost.
 - `rtc/mediatrackreceiver.go`, `UpdateAudioTrack`: `DedupeSlice` zeroes the tail of the
   caller's slice, and zero is `TF_STEREO`, so a feature named twice turns stereo on (run in
   the original). `subscribedtrack.go`: the loop over the RTCP feedback writes to copies of
