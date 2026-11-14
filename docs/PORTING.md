@@ -109,6 +109,11 @@ was checked:
   the room API's JSON is written and read; nothing copied (`service/protojson.rs`, new).
 - **google.golang.org/grpc v1.84.0** (Apache-2.0): `status.FromError` read for how LiveKit's
   `xtwirp` maps an error.
+- **prometheus/client_golang v1.24.1** and **prometheus/common v0.72.0** (Apache-2.0): read
+  for how metrics are served and written (`promhttp`, `expfmt`); followed in
+  `telemetry/prometheus/exposition.rs` and `musivum-server/src/service/promserver.rs`, nothing
+  copied. **munnerz/goautoneg** (BSD-3-Clause): the order in which it parses an `Accept`
+  header, followed in `exposition.rs`.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
   (`math/rand/v2`, `sort.Search`). Nothing of it is in the repository: a draft that had
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
