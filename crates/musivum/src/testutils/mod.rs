@@ -51,6 +51,67 @@ pub fn eventually_async(
     }
 }
 
+/// `ConnectTimeout` of LiveKit's `pkg/testutils`: how long [`with_timeout`] waits when it is
+/// given no timeout.
+pub const CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
+
+// How often `with_timeout` asks.
+const WITH_TIMEOUT_TICK: Duration = Duration::from_millis(10);
+
+/// `WithTimeout(t, f, timeouts...)` of LiveKit's `pkg/testutils`, for a test on a plain
+/// thread: calls `f` every 10 ms, for the first time after 10 ms, until it returns an empty
+/// string, and fails with the last string it returned once the timeout has passed. `timeout`
+/// is the original's optional last argument; `None` is [`CONNECT_TIMEOUT`].
+///
+/// The original fails only if `f` was called at least once, and waits forever if the timeout
+/// is shorter than the first 10 ms; this fails then too.
+#[track_caller]
+pub fn with_timeout(mut f: impl FnMut() -> String, timeout: Option<Duration>) {
+    let timeout = timeout.unwrap_or(CONNECT_TIMEOUT);
+    let deadline = Instant::now() + timeout;
+    let mut last_err = String::new();
+    loop {
+        let now = Instant::now();
+        if now + WITH_TIMEOUT_TICK > deadline {
+            std::thread::sleep(deadline.saturating_duration_since(now));
+            panic!("did not reach expected state after {timeout:?}: {last_err}");
+        }
+        std::thread::sleep(WITH_TIMEOUT_TICK);
+        last_err = f();
+        if last_err.is_empty() {
+            return;
+        }
+    }
+}
+
+/// [`with_timeout`] for a test on the runtime: waits without blocking a worker thread.
+#[track_caller]
+pub fn with_timeout_async(
+    mut f: impl FnMut() -> String,
+    timeout: Option<Duration>,
+) -> impl Future<Output = ()> {
+    let location = std::panic::Location::caller();
+    async move {
+        let timeout = timeout.unwrap_or(CONNECT_TIMEOUT);
+        let deadline = Instant::now() + timeout;
+        let mut last_err = String::new();
+        loop {
+            let now = Instant::now();
+            if now + WITH_TIMEOUT_TICK > deadline {
+                tokio::time::sleep(deadline.saturating_duration_since(now)).await;
+                panic!(
+                    "did not reach expected state after {timeout:?}: {last_err} (at {location})"
+                );
+            }
+            tokio::time::sleep(WITH_TIMEOUT_TICK).await;
+            last_err = f();
+            if last_err.is_empty() {
+                return;
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,5 +144,59 @@ mod tests {
             Duration::from_millis(20),
             Duration::from_millis(5),
         );
+    }
+
+    #[test]
+    fn with_timeout_asks_until_the_answer_is_empty() {
+        let mut n = 0;
+        with_timeout(
+            || {
+                n += 1;
+                if n == 3 {
+                    String::new()
+                } else {
+                    format!("asked {n} times")
+                }
+            },
+            None,
+        );
+        assert_eq!(n, 3);
+    }
+
+    #[test]
+    #[should_panic(expected = "did not reach expected state after 50ms: still waiting")]
+    fn with_timeout_gives_up_with_the_last_answer() {
+        with_timeout(
+            || "still waiting".to_string(),
+            Some(Duration::from_millis(50)),
+        );
+    }
+
+    #[tokio::test]
+    async fn with_timeout_async_asks_until_the_answer_is_empty() {
+        let mut n = 0;
+        with_timeout_async(
+            || {
+                n += 1;
+                if n == 3 {
+                    String::new()
+                } else {
+                    format!("asked {n} times")
+                }
+            },
+            None,
+        )
+        .await;
+        assert_eq!(n, 3);
+    }
+
+    #[tokio::test]
+    #[should_panic(expected = "did not reach expected state after 50ms: still waiting")]
+    async fn with_timeout_async_gives_up_with_the_last_answer() {
+        with_timeout_async(
+            || "still waiting".to_string(),
+            Some(Duration::from_millis(50)),
+        )
+        .await;
     }
 }
