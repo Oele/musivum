@@ -4,6 +4,7 @@
 //! paths of what they are ported from (`docs/port-map.md` in the repository):
 //!
 //! - [`sfu`], from LiveKit's `pkg/sfu`: receiving, buffering and forwarding media.
+//! - [`rtc`], from LiveKit's `pkg/rtc`: rooms, participants, tracks and subscriptions.
 //! - [`mediatransportutil`], from `livekit/mediatransportutil`.
 //! - [`protocol`], from `livekit/protocol`.
 //! - [`webrtc`]: the packet types and small descriptions that LiveKit takes from pion.
@@ -15,6 +16,7 @@
 pub mod go;
 pub mod mediatransportutil;
 pub mod protocol;
+pub mod rtc;
 pub mod sfu;
 pub mod webrtc;
 
