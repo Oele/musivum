@@ -91,6 +91,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
 | `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
 | `pkg/clientconfiguration/` (four files) | `clientconfiguration/` (same names, with `semver.rs`) | 4 / 4 | A rule is a closure written through `script_match!` with the upstream expression as its body, token for token; the client's fields carry the script language's comparisons. Two table cases that expect a script error are compile errors here. `NewScriptMatch` with a string at run time is left out (nothing feeds it). Also run against the original with 989 clients and 1,962 version pairs: all agreed; 93 lines pinned. |
+| `pkg/config/config.go` | `config/` (`config.rs`, with `yaml.rs`, `fields.rs`, `logger.rs`, `webhook.rs`, `metric.rs`) | 11 / 16 | LiveKit's configuration file, read as LiveKit reads it: defaults first, the file over them, strict mode, yaml.v3's rules for scalars (a decoder of musivum's own on `saphyr-parser`, following yaml.v3's; serde cannot decode onto defaults or switch strictness at run time). Compared with the original value by value: 315 values of the defaults, 320 of the sample file with every option uncommented, 353 of a file of edge cases, and the texts of 31 errors with their line numbers: all agree. Fourteen sections for what musivum leaves out (`redis`, `agents`, `sip`, `ingress`, `psrpc`, ...) are accepted and ignored with a log line each; strict mode does not look inside them. Not ported: the generated command line flags (two tests), `psrpc` (two tests), a test that reflects over struct tags. 21 tests added. |
 | `pkg/utils/opsqueue.go`, `changenotifier.go`, `incrementaldispatcher.go`, `math.go`, `slice.go`, `iceconfigcache.go`, `logging.go`, `protocol.go` | `utils/` (same names) | 8 / 8 | Fourteen tests added. The ops queue's worker is a thread (an op may block, and `stop().wait()` has to work from a thread of the runtime): one thread per queue. `context.go` is not ported (only the service and the router use it). |
 | (new, in place of `sfufakes`, `typesfakes`, `routingfakes`, `transportfakes`) | `crates/musivum-fakes`, `testutils/fakes.rs` | | A procedural macro that makes a trait's fake at compile time, with counterfeiter's calls. 18 tests of its own; the uses of fakes in `downtrack_downstream_integration_test.go` and `room_test.go` were written out with it line for line as a check. A trait of 150 methods adds about a third of a second to a check of the tests. |
 | (new) | `webrtc/track.rs`, `webrtc/peerconnection/` | | Written new: the traits `pkg/sfu` meets the WebRTC library through, and musivum's peer connection on `rtc`. Twelve tests. See `docs/webrtc-library.md`. |
@@ -99,6 +100,10 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/rtc/types/interfaces.go` | `rtc/types/interfaces.rs` | none upstream | The seventeen interfaces as traits with fakes: 327 of 330 methods (left out: the three that return zap's deferred fields or the observability reporters). The rules by which a signature became Rust's are in `docs/porting-guide.md`. Seven tests added; the tables of close reasons are compared with a run of the original. |
 | `pkg/rtc/testutils.go` | `rtc/testutils.rs` | none upstream | The mock participant and track that most tests of the package start from. One test added. |
 | `pkg/rtc/types/ice.go` | `rtc/types/ice.rs` | none upstream | On the candidate type of `rtc`. Eight tests added, their expected values from a run of the original over 25 candidate lines. Where `rtc`'s candidate parser differs from pion's the test asserts the library's answer with pion's beside it: an IPv6 address with a zone and a host name ending in `.invalid` are parse errors, `tcptype` is only read directly behind the type. Nothing calls `set_selected_pair` yet: the layer has no event for the selected pair. |
+| `pkg/rtc/uptrackmanager.go` | `rtc/uptrackmanager.rs` | 2 / 2 | |
+| `pkg/rtc/roomtrackmanager.go`, `medialossproxy.go`, `signalanddatastats.go` | `rtc/` (same names) | none upstream | Twelve tests added. Of `signalanddatastats.go` the counting and the reports to telemetry are ported; what feeds the observability reporters is left out, so `BytesTrackStats::new` takes four arguments where upstream's takes seven. |
+| `pkg/rtc/supervisor/` (two files) | `rtc/supervisor/` (same names) | 2 / 2 | One test added. |
+| `pkg/rtc/datatrack.go`, `datadowntrack.go`, `datatrack_stats.go`, `updatatrackmanager.go` | `rtc/` (same names) | 1 / 1 | Six tests added, their expected bytes and counts from a run of the original. The byte statistics (`BytesTrackStats`) are not wired in yet: the places are marked. |
 | `pkg/rtc/dynacast/` (six files) | `rtc/dynacast/` (same names) | 3 / 3 | The base is generic over the state of its manager, which its one lock guards as upstream. The listener is held weakly (the media track is listener and owner). A manager dropped without `close()` notifies nobody afterwards. `RegressTo` with nothing to regress to does nothing where Go dereferences nil. |
 
 The files of the row group from `rangemap.go` down were also run against the Go originals
@@ -257,6 +262,18 @@ What looked wrong or fragile upstream and was ported as it is:
   is silently ignored. `GetLocalIPAddresses` does not look at whether an interface is up.
   `port_range_start` alone suppresses the default ports in `Validate`, and then neither a
   range nor a port is used.
+- `rtc/uptrackmanager.go`: `maybeRevokeSubscriptions` calls into the tracks with the write
+  lock held. `roomtrackmanager.go`: `GetTrackInfo` gives nothing while the earliest track
+  under an id is closing, even if a later one under that id is open. `medialossproxy.go`
+  has no timer: a collected loss is passed on only by the next report after the interval.
+- `rtc/datatrack.go`: `Close` neither closes nor removes the down tracks, so a closed track
+  refuses new subscribers and keeps forwarding to the ones it has. `updatatrackmanager.go`:
+  a second track under the same handle replaces the first without closing it (the refusal
+  is in the participant). `supervisor`: after `Stop` it checks once more at its next tick.
+- `pkg/config`: `config-sample.yaml` documents `debug_handler_port:`, which is not a key
+  and fails strict loading upstream too. A secret that YAML reads as a number is silently
+  dropped on the `LIVEKIT_KEYS` path and kept as text in the file's `keys:`. A file of only
+  comments gives "could not parse config: EOF".
 - `rtc/signalling`: `signallerAsync.WriteMessage` warns "unknown message type" for a
   message that is no signal response and then writes it to the sink anyway; the handler
   drops the errors of `HandleOffer` and `UpdateMetadata` without logging them, and logs the
