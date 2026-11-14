@@ -21,7 +21,11 @@
 //   settings" is equality where the original compares pointers.
 // - `testResolver.Resolve(nil, ..)` is called with the fake participant: the resolver takes
 //   a participant, not an optional one.
-// - `require.Eventually` is `eventually_async`; its message is the comment after the call.
+// - `require.Eventually` is `eventually`, at the end of the tests: `eventually_async` with
+//   the two times of this file, after one check interval, since testify looks for the first
+//   time after one tick and `eventually_async` at once ("needs subscribe did not persist
+//   across track close" is about what the worker has done by then). Its message is the
+//   comment after the call.
 // - The goroutines of `TestConcurrentFirstSubscribe` are tasks that start together.
 
 use std::sync::LazyLock;
@@ -85,22 +89,12 @@ async fn test_subscribe() {
         sm.subscribe_to_track(&"track".into(), false);
         let s = sm.subscription("track");
         assert!(s.is_desired(), "{name}");
-        eventually_async(
-            || sub_count.load() == 1,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // track was not subscribed
+        eventually(|| sub_count.load() == 1).await; // track was not subscribed
 
         assert!(s.get_subscribed_track().is_some(), "{name}");
         assert_eq!(1, sm.get_subscribed_tracks().len(), "{name}");
 
-        eventually_async(
-            || sm.get_subscribed_participants().len() == 1,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // GetSubscribedParticipants should have returned one item
+        eventually(|| sm.get_subscribed_participants().len() == 1).await; // GetSubscribedParticipants should have returned one item
         assert_eq!(
             "pubID",
             sm.get_subscribed_participants()[0].as_str(),
@@ -113,7 +107,7 @@ async fn test_subscribe() {
 
         // ensure bound
         set_test_subscribed_track_bound(s.get_subscribed_track().unwrap());
-        eventually_async(|| !s.needs_bind(), SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL).await; // track was not bound
+        eventually(|| !s.needs_bind()).await; // track was not bound
 
         // telemetry event should have been sent
         assert_eq!(1, tl.on_track_subscribed_call_count(), "{name}");
@@ -124,34 +118,14 @@ async fn test_subscribe() {
         resolver.set_pause(true);
         // ensure its resilience after being closed
         set_test_subscribed_track_closed(s.get_subscribed_track().unwrap(), false);
-        eventually_async(
-            || s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // needs subscribe did not persist across track close
+        eventually(|| s.needs_subscribe()).await; // needs subscribe did not persist across track close
         resolver.set_pause(false);
 
-        eventually_async(
-            || s.is_desired() && !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // track was not resubscribed
+        eventually(|| s.is_desired() && !s.needs_subscribe()).await; // track was not resubscribed
 
         // was subscribed twice, unsubscribed once (due to close)
-        eventually_async(
-            || num_participant_subscribed.load() == 2,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // participant subscribe status was not updated twice
-        eventually_async(
-            || num_participant_unsubscribed.load() == 1,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // participant unsubscribe status was not updated
+        eventually(|| num_participant_subscribed.load() == 2).await; // participant subscribe status was not updated twice
+        eventually(|| num_participant_unsubscribed.load() == 1).await; // participant unsubscribe status was not updated
     }
 
     {
@@ -172,12 +146,7 @@ async fn test_subscribe() {
 
         sm.subscribe_to_track(&"track".into(), false);
         let s = sm.subscription("track");
-        eventually_async(
-            || !s.get_has_permission(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should not have permission to subscribe
+        eventually(|| !s.get_has_permission()).await; // should not have permission to subscribe
 
         time::sleep(SUBSCRIPTION_TIMEOUT).await;
 
@@ -195,12 +164,7 @@ async fn test_subscribe() {
         // give permissions now
         resolver.lock.lock().has_permission = true;
 
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // should be subscribed
 
         assert_eq!(1, sm.get_subscribed_tracks().len(), "{name}");
     }
@@ -223,19 +187,14 @@ async fn test_subscribe() {
 
         sm.subscribe_to_track(&"track".into(), false);
         let s = sm.subscription("track");
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // should be subscribed
 
         resolver.lock.lock().has_track = false;
 
         // publisher triggers close
         set_test_subscribed_track_closed(s.get_subscribed_track().unwrap(), false);
 
-        eventually_async(|| !s.is_desired(), SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL).await; // isDesired not set to false
+        eventually(|| !s.is_desired()).await; // isDesired not set to false
     }
 }
 
@@ -309,31 +268,22 @@ async fn test_unsubscribe() {
     sm.unsubscribe_from_track(&"track".into());
     assert!(!s.is_desired());
 
-    eventually_async(
-        || {
-            if s.needs_unsubscribe() {
-                return false;
-            }
-            if sm.pending_unsubscribes.load() != 0 {
-                return false;
-            }
-            let sub_len = sm.lock.read().subscriptions.len();
-            sub_len == 0
-        },
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
+    eventually(|| {
+        if s.needs_unsubscribe() {
+            return false;
+        }
+        if sm.pending_unsubscribes.load() != 0 {
+            return false;
+        }
+        let sub_len = sm.lock.read().subscriptions.len();
+        sub_len == 0
+    })
     .await; // Track was not unsubscribed
 
     // no traces should be left
     assert_eq!(0, sm.get_subscribed_tracks().len());
     // the observer is dropped on a goroutine of its own
-    eventually_async(
-        || !track_changed_notifier.has_observers(),
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // observer was not removed
+    eventually(|| !track_changed_notifier.has_observers()).await; // observer was not removed
 
     let tl = sm.telemetry_listener();
     assert_eq!(1, tl.on_track_unsubscribed_call_count());
@@ -365,12 +315,7 @@ async fn test_subscribe_status_changed() {
     sm.subscribe_to_track(&"track2".into(), false);
     let s1 = sm.subscription("track1");
     let s2 = sm.subscription("track2");
-    eventually_async(
-        || !s1.needs_subscribe() && !s2.needs_subscribe(),
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // track1 and track2 should be subscribed
+    eventually(|| !s1.needs_subscribe() && !s2.needs_subscribe()).await; // track1 and track2 should be subscribed
     let st1 = s1.get_subscribed_track().unwrap();
     st1.on_close(Some(Box::new({
         let sm = sm.sm.clone();
@@ -400,39 +345,19 @@ async fn test_subscribe_status_changed() {
         }
     });
 
-    eventually_async(
-        || num_participant_subscribed.load() == 1,
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // should be subscribed to publisher
+    eventually(|| num_participant_subscribed.load() == 1).await; // should be subscribed to publisher
     assert_eq!(0, num_participant_unsubscribed.load());
     assert!(sm.is_subscribed_to(&"pubID".into()));
 
     // now unsubscribe track2, no event should be fired
     sm.unsubscribe_from_track(&"track2".into());
-    eventually_async(
-        || !s2.needs_unsubscribe(),
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // track2 should be unsubscribed
+    eventually(|| !s2.needs_unsubscribe()).await; // track2 should be unsubscribed
     assert_eq!(0, num_participant_unsubscribed.load());
 
     // unsubscribe track1, expect event
     sm.unsubscribe_from_track(&"track1".into());
-    eventually_async(
-        || !s1.needs_unsubscribe(),
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // track1 should be unsubscribed
-    eventually_async(
-        || num_participant_unsubscribed.load() == 1,
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // should be subscribed to publisher
+    eventually(|| !s1.needs_unsubscribe()).await; // track1 should be unsubscribed
+    eventually(|| num_participant_unsubscribed.load() == 1).await; // should be subscribed to publisher
     assert!(!sm.is_subscribed_to(&"pubID".into()));
 }
 
@@ -458,20 +383,10 @@ async fn test_update_settings_before_subscription() {
     sm.subscribe_to_track(&"track".into(), false);
 
     let s = sm.subscription("track");
-    eventually_async(
-        || !s.needs_subscribe(),
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // Track should be subscribed
+    eventually(|| !s.needs_subscribe()).await; // Track should be subscribed
 
     let st = fakes::downcast::<FakeSubscribedTrack>(s.get_subscribed_track().unwrap());
-    eventually_async(
-        || st.update_subscriber_settings_call_count() == 1,
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // UpdateSubscriberSettings should be called once
+    eventually(|| st.update_subscriber_settings_call_count() == 1).await; // UpdateSubscriberSettings should be called once
 
     let (applied, _) = st.update_subscriber_settings_args_for_call(0);
     assert_eq!(settings.disabled, applied.disabled);
@@ -546,25 +461,16 @@ async fn test_concurrent_first_subscribe() {
         }
 
         let s = sm.subscription("track");
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // the subscription that is kept should own the down track
+        eventually(|| !s.needs_subscribe()).await; // the subscription that is kept should own the down track
         let st = fakes::downcast::<FakeSubscribedTrack>(s.get_subscribed_track().unwrap());
-        eventually_async(
-            || {
-                let n = st.update_subscriber_settings_call_count();
-                if n == 0 {
-                    return false;
-                }
-                let (applied, _) = st.update_subscriber_settings_args_for_call(n - 1);
-                applied == settings
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            let n = st.update_subscriber_settings_call_count();
+            if n == 0 {
+                return false;
+            }
+            let (applied, _) = st.update_subscriber_settings_args_for_call(n - 1);
+            applied == settings
+        })
         .await; // the down track should get the settings
 
         sm.close(false);
@@ -592,38 +498,25 @@ async fn test_settings_kept_for_subscribe() {
         sm.subscribe_to_track(&"track".into(), false);
 
         let s = sm.subscription("track");
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // track should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // track should be subscribed
         let st = fakes::downcast::<FakeSubscribedTrack>(s.get_subscribed_track().unwrap());
-        eventually_async(
-            || {
-                let n = st.update_subscriber_settings_call_count();
-                if n == 0 {
-                    return false;
-                }
-                let (applied, _) = st.update_subscriber_settings_args_for_call(n - 1);
-                applied == settings
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            let n = st.update_subscriber_settings_call_count();
+            if n == 0 {
+                return false;
+            }
+            let (applied, _) = st.update_subscriber_settings_args_for_call(n - 1);
+            applied == settings
+        })
         .await; // the down track should get the settings
 
         // settings for a track that is never subscribed are cleaned up after notFoundTimeout
         sm.update_subscribed_track_settings(&"other".into(), &settings);
-        eventually_async(
-            || {
-                let m = sm.lock.read();
-                !m.subscriptions
-                    .contains_key(&livekit::TrackId::from("other"))
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            let m = sm.lock.read();
+            !m.subscriptions
+                .contains_key(&livekit::TrackId::from("other"))
+        })
         .await; // unused settings should be cleaned up
     }
 
@@ -646,12 +539,7 @@ async fn test_settings_kept_for_subscribe() {
         sm.subscribe_to_data_track(&"track".into());
 
         let s = sm.data_track_subscription("track");
-        eventually_async(
-            || s.get_data_down_track().is_some(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // data track should be subscribed
+        eventually(|| s.get_data_down_track().is_some()).await; // data track should be subscribed
         let ddt = fakes::downcast::<FakeDataDownTrack>(s.get_data_down_track().unwrap());
         let n = ddt.update_subscription_options_call_count();
         assert_ne!(0, n, "{name}");
@@ -717,19 +605,15 @@ async fn test_subscribe_burst_overflows_queue() {
         }
         drop(release);
 
-        eventually_async(
-            || {
-                let m = sm.lock.read();
-                for s in m.subscriptions.values() {
-                    if s.needs_subscribe() {
-                        return false;
-                    }
+        eventually(|| {
+            let m = sm.lock.read();
+            for s in m.subscriptions.values() {
+                if s.needs_subscribe() {
+                    return false;
                 }
-                m.subscriptions.len() == num_tracks
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+            }
+            m.subscriptions.len() == num_tracks
+        })
         .await; // every track should be subscribed
     }
 
@@ -769,19 +653,15 @@ async fn test_subscribe_burst_overflows_queue() {
         }
         drop(release);
 
-        eventually_async(
-            || {
-                let m = sm.lock.read();
-                for s in m.data_track_subscriptions.values() {
-                    if s.needs_subscribe() {
-                        return false;
-                    }
+        eventually(|| {
+            let m = sm.lock.read();
+            for s in m.data_track_subscriptions.values() {
+                if s.needs_subscribe() {
+                    return false;
                 }
-                m.data_track_subscriptions.len() == num_tracks
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+            }
+            m.data_track_subscriptions.len() == num_tracks
+        })
         .await; // every data track should be subscribed
     }
 }
@@ -829,22 +709,12 @@ async fn test_subscription_limits() {
     sm.subscribe_to_track(&"track".into(), false);
     let s = sm.subscription("track");
     assert!(s.is_desired());
-    eventually_async(
-        || sub_count.load() == 1,
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // track was not subscribed
+    eventually(|| sub_count.load() == 1).await; // track was not subscribed
 
     assert!(s.get_subscribed_track().is_some());
     assert_eq!(1, sm.get_subscribed_tracks().len());
 
-    eventually_async(
-        || sm.get_subscribed_participants().len() == 1,
-        SUB_SETTLE_TIMEOUT,
-        SUB_CHECK_INTERVAL,
-    )
-    .await; // GetSubscribedParticipants should have returned one item
+    eventually(|| sm.get_subscribed_participants().len() == 1).await; // GetSubscribedParticipants should have returned one item
     assert_eq!("pubID", sm.get_subscribed_participants()[0].as_str());
 
     // ensure telemetry events are sent
@@ -853,7 +723,7 @@ async fn test_subscription_limits() {
 
     // ensure bound
     set_test_subscribed_track_bound(s.get_subscribed_track().unwrap());
-    eventually_async(|| !s.needs_bind(), SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL).await; // track was not bound
+    eventually(|| !s.needs_bind()).await; // track was not bound
 
     // telemetry event should have been sent
     assert_eq!(1, tl.on_track_subscribed_call_count());
@@ -886,7 +756,7 @@ async fn test_subscription_limits() {
 
     // ensure bound
     set_test_subscribed_track_bound(s2.get_subscribed_track().unwrap());
-    eventually_async(|| !s2.needs_bind(), SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL).await; // track was not bound
+    eventually(|| !s2.needs_bind()).await; // track was not bound
 
     // subscribe to track1 again, which should pending
     sm.subscribe_to_track(&"track".into(), false);
@@ -912,12 +782,7 @@ async fn test_subscribe_data_track() {
 
         sm.subscribe_to_data_track(&"track".into());
         let s = sm.data_track_subscription("track");
-        eventually_async(
-            || !s.get_has_permission(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should not have permission to subscribe
+        eventually(|| !s.get_has_permission()).await; // should not have permission to subscribe
 
         time::sleep(SUBSCRIPTION_TIMEOUT).await;
 
@@ -939,12 +804,7 @@ async fn test_subscribe_data_track() {
         // give permissions now
         resolver.set_has_permission(true);
 
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // should be subscribed
         assert!(s.get_data_down_track().is_some(), "{name}");
         assert_eq!(1, resolver.data_track.add_subscriber_call_count(), "{name}");
     }
@@ -960,12 +820,7 @@ async fn test_subscribe_data_track() {
 
         sm.subscribe_to_data_track(&"track".into());
         let s = sm.data_track_subscription("track");
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // should be subscribed
 
         // revoke permission and close the down track like the publisher would
         // (DataTrack.RevokeDisallowedSubscribers -> RemoveSubscriber -> DataDownTrack.Close)
@@ -977,24 +832,14 @@ async fn test_subscribe_data_track() {
         // subscription stays desired but is denied on resubscribe attempts
         assert!(s.get_data_down_track().is_none(), "{name}");
         assert!(s.is_desired(), "{name}");
-        eventually_async(
-            || !s.get_has_permission(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should not have permission to resubscribe
+        eventually(|| !s.get_has_permission()).await; // should not have permission to resubscribe
         assert!(s.needs_subscribe(), "{name}");
         assert_eq!(1, resolver.data_track.add_subscriber_call_count(), "{name}");
 
         // give permission back, should resubscribe
         resolver.set_has_permission(true);
 
-        eventually_async(
-            || !s.needs_subscribe() && s.get_data_down_track().is_some(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be resubscribed
+        eventually(|| !s.needs_subscribe() && s.get_data_down_track().is_some()).await; // should be resubscribed
         assert_eq!(2, resolver.data_track.add_subscriber_call_count(), "{name}");
     }
 
@@ -1009,12 +854,7 @@ async fn test_subscribe_data_track() {
 
         sm.subscribe_to_data_track(&"track".into());
         let s = sm.data_track_subscription("track");
-        eventually_async(
-            || !s.needs_subscribe(),
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // should be subscribed
+        eventually(|| !s.needs_subscribe()).await; // should be subscribed
 
         // the client subscribes again while the removal runs,
         // then the down track closes, as DataTrack.RemoveSubscriber does
@@ -1028,14 +868,10 @@ async fn test_subscribe_data_track() {
         });
         sm.unsubscribe_from_data_track(&"track".into());
 
-        eventually_async(
-            || {
-                resolver.data_track.add_subscriber_call_count() == 2
-                    && s.get_data_down_track().is_some()
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            resolver.data_track.add_subscriber_call_count() == 2
+                && s.get_data_down_track().is_some()
+        })
         .await; // should be subscribed again
         assert!(
             Arc::ptr_eq(&s, &sm.data_track_subscription("track")),
@@ -1058,23 +894,14 @@ async fn test_subscribe_data_track() {
         let s = sm.data_track_subscription("track");
 
         // let the worker attempt (and fail) the subscribe
-        eventually_async(
-            || s.get_num_attempts() > 0,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // no subscribe attempt was made
+        eventually(|| s.get_num_attempts() > 0).await; // no subscribe attempt was made
 
         sm.unsubscribe_from_data_track(&"track".into());
-        eventually_async(
-            || {
-                let m = sm.lock.read();
-                !m.data_track_subscriptions
-                    .contains_key(&livekit::TrackId::from("track"))
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            let m = sm.lock.read();
+            !m.data_track_subscriptions
+                .contains_key(&livekit::TrackId::from("track"))
+        })
         .await; // data track subscription was not cleaned up
     }
 }
@@ -1153,7 +980,7 @@ async fn test_subscribe_pacer_takes_video_tokens_only() {
         });
 
         sm.subscribe_to_track(&"track".into(), tc.is_sync);
-        eventually_async(|| attempted.load(), SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL).await; // subscribe was not attempted
+        eventually(|| attempted.load()).await; // subscribe was not attempted
 
         assert_eq!(
             tc.token_is_used,
@@ -1201,14 +1028,10 @@ async fn test_subscribe_revoked_in_flight() {
         });
 
         sm.subscribe_to_track(&"track".into(), false);
-        eventually_async(
-            || {
-                let tracks = tracks.lock();
-                !tracks.is_empty() && tracks[0].remove_subscriber_call_count() == 1
-            },
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
+        eventually(|| {
+            let tracks = tracks.lock();
+            !tracks.is_empty() && tracks[0].remove_subscriber_call_count() == 1
+        })
         .await; // the subscriber should be removed
 
         let (sub_id, is_expected_to_resume) = tracks.lock()[0].remove_subscriber_args_for_call(0);
@@ -1230,12 +1053,7 @@ async fn test_subscribe_revoked_in_flight() {
         });
 
         sm.subscribe_to_data_track(&"track".into());
-        eventually_async(
-            || resolver.data_track.remove_subscriber_call_count() == 1,
-            SUB_SETTLE_TIMEOUT,
-            SUB_CHECK_INTERVAL,
-        )
-        .await; // the subscriber should be removed
+        eventually(|| resolver.data_track.remove_subscriber_call_count() == 1).await; // the subscriber should be removed
 
         assert_eq!(
             sm.participant.id(),
@@ -1243,6 +1061,17 @@ async fn test_subscribe_revoked_in_flight() {
             "{name}"
         );
         assert!(sm.get_subscribed_participants().is_empty(), "{name}");
+    }
+}
+
+// require.Eventually(t, condition, subSettleTimeout, subCheckInterval, msg)
+#[track_caller]
+fn eventually(condition: impl FnMut() -> bool) -> impl Future<Output = ()> {
+    let wait = eventually_async(condition, SUB_SETTLE_TIMEOUT, SUB_CHECK_INTERVAL);
+    async move {
+        // testify's first look is after one tick
+        tokio::time::sleep(SUB_CHECK_INTERVAL).await;
+        wait.await
     }
 }
 
