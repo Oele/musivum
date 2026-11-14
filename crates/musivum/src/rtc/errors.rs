@@ -57,18 +57,21 @@ pub enum Error {
     // mediatracksubscriptions.go (`errAlreadySubscribed`, which datatrack.go returns too)
     #[error("already subscribed")]
     AlreadySubscribed,
+    // mediatracksubscriptions.go (`errNotFound`)
+    #[error("not found")]
+    NotFound,
 
     // datatrack.go (`errReceiverClosed`)
     #[error("datatrack is closed")]
     ReceiverClosed,
 
-    // subscriptionmanager.go: it defines no errors of its own. It tells these two apart, which
-    // are ErrNotOpen and ErrNoReceiver of mediatrackreceiver.go,
+    // mediatrackreceiver.go (`ErrNotOpen`, `ErrNoReceiver`). subscriptionmanager.go defines no
+    // errors of its own: it tells these two apart,
     #[error("track is not open")]
     NotOpen,
     #[error("cannot subscribe without a receiver in place")]
     NoReceiver,
-    // and WaitUntilSubscribed returns Go's context.DeadlineExceeded when its time is up
+    // and its WaitUntilSubscribed returns Go's context.DeadlineExceeded when its time is up
     #[error("context deadline exceeded")]
     DeadlineExceeded,
 
