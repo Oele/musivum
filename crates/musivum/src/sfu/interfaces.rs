@@ -9,7 +9,11 @@
 // (`Arc`), one that is handed in is borrowed. `REDTransformer` repeats `GetDownTracks`, which
 // it has from `TrackReceiver`. At the end, a track sender is made a member of the down
 // track spreader's two traits, which upstream is a matter of having the methods.
+// `TrackReceiver` has `Any` as a supertrait, for the places where upstream asserts the type
+// behind the interface (`r.(*sfu.WebRTCReceiver)`): an `Arc<dyn TrackReceiver>` coerces to
+// `Arc<dyn Any + Send + Sync>`, which is downcast.
 
+use std::any::Any;
 use std::sync::Arc;
 
 use crate::go::time::Duration;
@@ -29,7 +33,7 @@ pub type DebugInfo = serde_json::Map<String, serde_json::Value>;
 
 // TrackReceiver defines an interface receive media from remote peer
 #[cfg_attr(test, musivum_fakes::fake)]
-pub trait TrackReceiver: Send + Sync {
+pub trait TrackReceiver: Any + Send + Sync {
     fn track_id(&self) -> livekit::TrackId;
     fn stream_id(&self) -> String;
 
