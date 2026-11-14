@@ -40,8 +40,9 @@
 //   original would dereference nil); the kind in an atomic pointer is a `OnceLock`.
 // - `notify_data_track_subscriber_handles` reads the publisher of a subscription under the
 //   subscription's lock; the original reads the two fields without it.
-// - A subscribed track without a media track (`media_track()` is `None`): where the original
-//   calls a method on the nil track, nothing is done for it here.
+// - A subscribed track without a media track (`media_track()` is `None`) and a data down
+//   track without a data track: where the original calls a method on the nil track, nothing
+//   is done for it here.
 // - Errors: `errAlreadySubscribed`, `ErrNotOpen` and `ErrNoReceiver` are of files that are
 //   not ported yet and are variants of the package's `Error`; `context.DeadlineExceeded` is
 //   `Error::DeadlineExceeded`. `*rtcerr.InvalidStateError`, which pion's `RemoveTrack`
@@ -1595,9 +1596,10 @@ impl SubscriptionManager {
                 let Some(data_down_track) = sub.get_data_down_track() else {
                     continue;
                 };
+                let handle = data_down_track.handle() as u32;
                 let s = sub.lock.read();
                 handles.insert(
-                    data_down_track.handle() as u32,
+                    handle,
                     livekit::data_track_subscriber_handles::PublishedDataTrack {
                         publisher_identity: s.publisher_identity.to_string(),
                         publisher_sid: s.publisher_id.to_string(),
