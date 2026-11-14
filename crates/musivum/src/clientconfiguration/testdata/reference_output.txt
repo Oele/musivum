@@ -1,0 +1,93 @@
+REF client	0		0							=>	unknown		0							=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	2.17.1	16	macOS	14.5		Safari	18.3		=>	js	2.17.1	16	macos	14.5		safari	18.3		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	2.17.1	17	macOS	15.3.1		Safari	18.3.1	192.0.2.7	=>	js	2.17.1	17	macos	15.3.1		safari	18.3.1	192.0.2.7	=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=0 screen=2 resume=2 disabled={codecs=[video/VP8;x=1,video/H265] publish=[video/VP8]} relay=1
+REF client	1	2.16.10	17	iOS	18.4	iPhone15,2	Safari	18.4		=>	js	2.16.10	17	ios	18.4	iphone15,2	safari	18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=2 disabled={nil} relay=1
+REF client	1	2.17.2	15	macOS			safari	18.10		=>	js	2.17.2	15	macos			safari	18.10		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=0 screen=2 resume=2 disabled={codecs=[video/VP8;x=1] publish=[]} relay=1
+REF client	1		0	macOS			safari	18.2		=>	js		0	macos			safari	18.2		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	3	9	macOS			safari	18		=>	js	3	9	macos			safari	18		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=2 disabled={nil} relay=1
+REF client	1	3.0.0	9	macOS			safari	19		=>	js	3.0.0	9	macos			safari	19		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=2 disabled={nil} relay=1
+REF client	1	1.0.0-alpha	9	iOS	17.6.1		safari	17.6.1		=>	js	1.0.0-alpha	9	ios	17.6.1		safari	17.6.1		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	1.0.0-rc.1	9	iOS			safari			=>	js	1.0.0-rc.1	9	ios			safari			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=2 disabled={nil} relay=1
+REF client	0		0				safari	18.3.0		=>	unknown		0				safari	18.3.0		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.3.0-beta		=>	unknown		0				safari	18.3.0-beta		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.3.1-beta		=>	unknown		0				safari	18.3.1-beta		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.3.0+build		=>	unknown		0				safari	18.3.0+build		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.03		=>	unknown		0				safari	18.03		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.3.0.1		=>	unknown		0				safari	18.3.0.1		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	9.1.2.3		=>	unknown		0				safari	9.1.2.3		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	100.0.0.0		=>	unknown		0				safari	100.0.0.0		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	100.0		=>	unknown		0				safari	100.0		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.4 		=>	unknown		0				safari	18.4 		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	 18.4		=>	unknown		0				safari	 18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	v18.4		=>	unknown		0				safari	v18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	18.3-beta		=>	unknown		0				safari	18.3-beta		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari	99999999999999999999.1		=>	unknown		0				safari	99999999999999999999.1		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	iOS			SAFARI	18.4		=>	unknown		0	ios			safari	18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				SAFARİ	18.4		=>	unknown		0				safari	18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				safari 	18.4		=>	unknown		0				safari 	18.4		=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0				Mobile Safari	18.4		=>	unknown		0				mobile safari	18.4		=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	2.17.1	16	linux			Chrome	120.0.6099.129		=>	js	2.17.1	16	linux			chrome	120.0.6099.129		=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	linux			firefox			=>	unknown		0	linux			firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	2.17.1	9	macOS	14.5		Firefox	155.0		=>	js	2.17.1	9	macos	14.5		firefox	155.0		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=0 screen=2 resume=0 disabled={codecs=[video/VP8;x=1,video/H265] publish=[video/VP8]} relay=0
+REF client	1	2.17.1	9	android	14	Pixel 8	Firefox Mobile	156.0		=>	js	2.17.1	9	android	14	pixel 8	firefox mobile	156.0		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=0 screen=2 resume=2 disabled={codecs=[video/VP8;x=1] publish=[]} relay=1
+REF client	0		0	Android			FIREFOX MOBILE			=>	unknown		0	android			firefox mobile			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android			firefox			=>	unknown		0	android			firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android			firefox  mobile			=>	unknown		0	android			firefox  mobile			=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android			FİREFOX			=>	unknown		0	android			firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android 			firefox			=>	unknown		0	android 			firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	ANDROİD			firefox			=>	unknown		0	android			firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	1	2.17.1	16	Android	13	Xiaomi 2201117TI	Chrome	120.0.6099.129		=>	js	2.17.1	16	android	13	xiaomi 2201117ti	chrome	120.0.6099.129		=>	video=nil screen=nil resume=0 disabled={codecs=[] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0			xiaomi 2201117ti	chrome			=>	unknown		0			xiaomi 2201117ti	chrome			=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	3	2.5.0	12	android	13	XIAOMI 2201117TI			192.0.2.70	=>	android	2.5.0	12	android	13	xiaomi 2201117ti			192.0.2.70	=>	video=nil screen=nil resume=0 disabled={codecs=[] publish=[video/H264]} relay=0	=>	video=1 screen=nil resume=2 disabled={nil} relay=2
+REF client	0		0	android		xiaomi 2201117ti 				=>	unknown		0	android		xiaomi 2201117ti 				=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	ios		Xiaomi 2201117TI				=>	unknown		0	ios		xiaomi 2201117ti				=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android		Xiaomi 2201117TI	safari	18.4		=>	unknown		0	android		xiaomi 2201117ti	safari	18.4		=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/VP9,video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	0		0	android		Xiaomi 2201117TI	firefox mobile			=>	unknown		0	android		xiaomi 2201117ti	firefox mobile			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[video/H264]} relay=0	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF client	7	2.17.1	6	ios	14.5					=>	react_native	2.17.1	6	ios	14.5					=>	nil	=>	video=1 screen=2 resume=2 disabled={codecs=[video/VP8;x=1,video/H265] publish=[video/VP8]} relay=2
+REF client	99	2.17.0	6						192.0.2.7	=>	99	2.17.0	6						192.0.2.7	=>	nil	=>	video=1 screen=nil resume=2 disabled={codecs=[video/H265] publish=[video/VP8]} relay=2
+REF client	-1	2.18.0-rc.1	6		14.5.1				2001:db8::1	=>	-1	2.18.0-rc.1	6		14.5.1				2001:db8::1	=>	nil	=>	video=0 screen=2 resume=2 disabled={codecs=[video/VP8;x=1] publish=[]} relay=1
+REF client	15	3	2147483647	Windows	11					=>	dotnet	3	2147483647	windows	11					=>	nil	=>	video=nil screen=nil resume=2 disabled={nil} relay=1
+REF client	16	3.0.0+build	-1				firefox			=>	16	3.0.0+build	-1				firefox			=>	video=nil screen=nil resume=0 disabled={codecs=[video/AV1] publish=[]} relay=0	=>	nil
+REF client	2	0.9	12	iOS	17.0	iPad13,4				=>	swift	0.9	12	ios	17.0	ipad13,4				=>	nil	=>	video=nil screen=nil resume=1 disabled={nil} relay=0
+REF version	version	18.3	18.3	=>	010110	11	0
+REF version	browser_version	18.3.0	18.3	=>	010110	11	0
+REF version	version	18.3.1	18.3	=>	001101	11	1
+REF version	browser_version	18.10	18.3	=>	001101	11	1
+REF version	version	18.2	18.3	=>	110001	11	-1
+REF version	browser_version	18	18.3	=>	110001	11	-1
+REF version	version	19	18.3	=>	001101	11	1
+REF version	browser_version		18.3	=>	110001	01	-1
+REF version	version	18.03	18.3	=>	110001	01	-1
+REF version	browser_version	18.3.0.1	18.3	=>	001101	01	-1
+REF version	version	9.1.2.3	18.3	=>	001101	01	-1
+REF version	browser_version	100.0.0.0	18.3	=>	110001	01	-1
+REF version	version	100.0	18.3	=>	001101	11	1
+REF version	browser_version	18.4 	18.3	=>	001101	01	-1
+REF version	version	v18.4	18.3	=>	001101	01	-1
+REF version	browser_version	18.3-beta	18.3	=>	001101	01	-1
+REF version	version	18.3.0-beta	18.3	=>	110001	11	-1
+REF version	browser_version	18.3.0+build	18.3	=>	010110	11	0
+REF version	version	99999999999999999999.1	18.3	=>	001101	11	1
+REF version	browser_version	2.17.1	2.16.10	=>	001101	11	1
+REF version	version	2.17.1	2.17.1	=>	010110	11	0
+REF version	browser_version	2.9.0	2.16.10	=>	110001	11	-1
+REF version	version	2.17	2.17.0	=>	010110	11	0
+REF version	browser_version	2.17.1-rc.1	2.17.1	=>	110001	11	-1
+REF version	version	1.0.0-alpha	1.0.0-alpha.1	=>	110001	11	-1
+REF version	browser_version	1.0.0-alpha.1	1.0.0-alpha.beta	=>	110001	11	-1
+REF version	version	1.0.0-alpha.beta	1.0.0-beta	=>	110001	11	-1
+REF version	browser_version	1.0.0-beta.2	1.0.0-beta.11	=>	110001	11	-1
+REF version	version	1.0.0-beta.11	1.0.0-rc.1	=>	110001	11	-1
+REF version	browser_version	1.0.0-rc.1	1.0.0	=>	110001	11	-1
+REF version	version	1.0.0-2	1.0.0-10	=>	110001	11	-1
+REF version	browser_version	1.0.0-10	1.0.0-a	=>	110001	11	-1
+REF version	version	1.0.0-a	1.0.0-A	=>	001101	11	1
+REF version	browser_version	1.0.0-01	1.0.0-1	=>	110001	01	-1
+REF version	version	1.0.0+a	1.0.0+b	=>	010110	11	0
+REF version	browser_version	1.0.0-a+b	1.0.0-a	=>	010110	11	0
+REF version	version	1.0.0-	1.0.0	=>	001101	01	-1
+REF version	browser_version	1.0.0--	1.0.0-a	=>	110001	11	-1
+REF version	version			=>	010110	00	0
+REF version	browser_version	abc	abd	=>	110001	00	0
+REF version	version	01	1	=>	110001	01	-1
+REF version	browser_version	1.2.3	1.2.3.4	=>	110001	10	1
