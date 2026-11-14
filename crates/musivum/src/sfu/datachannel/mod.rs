@@ -1,6 +1,8 @@
-//! LiveKit's `pkg/sfu/datachannel`. `datachannel_writer.go` is not ported yet: it wraps the
-//! data channel of the WebRTC library.
+//! LiveKit's `pkg/sfu/datachannel`: the bitrate of what a data channel drains, and the writer
+//! that sends to a data channel with back pressure.
 
 mod bitrate;
+mod datachannel_writer;
 
 pub use bitrate::*;
+pub use datachannel_writer::*;
