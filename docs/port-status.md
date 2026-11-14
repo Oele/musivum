@@ -4,8 +4,9 @@ One line per upstream file or package that has been dealt with. "Tests" is the n
 upstream test functions that were ported and pass, of the number upstream has; a difference
 is explained in the notes. `docs/port-map.md` says what each file is and where it goes.
 
-Differences from upstream's behaviour that were found on the way are listed at the end: what
-looked wrong upstream and was ported as it is, and what could not be ported as it is.
+After the table: the options of LiveKit's configuration that are read but not applied, where
+the port cannot be the original, and how musivum compares with LiveKit in real calls, on a
+degraded network and under load.
 
 ## Done
 
@@ -290,7 +291,3 @@ where pion writes straight through; closing that means changing the connection l
 `rtc`. Not measured yet: latency and freezes under load, runs of minutes, joins and leaves
 during a run. Each ops queue is a thread of its own (four per participant): they cost
 threads, not CPU.
-
-## In progress, not on `main`
-
-Nothing at the moment.

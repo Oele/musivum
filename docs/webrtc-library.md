@@ -1,8 +1,9 @@
 # The WebRTC library: `rtc`
 
-Step 3 of `docs/PORTING.md`. Decided on 2026-11-14: musivum stands on **`rtc`**, the
-protocol core of webrtc-rs (0.21.1, MIT or Apache-2.0), with its RTP crate patched by one
-field and five places of its own patched. This page says why, what was run to find out, and what was not.
+Decided on 2026-11-14: musivum stands on **`rtc`**, the protocol core of webrtc-rs (0.21.1,
+MIT or Apache-2.0), with its RTP crate patched by one field and five places of its own
+patched. This page says why, what was run to find out, what musivum's connection layer on it
+does, and what was not tested.
 
 ## What the library has to do
 
@@ -97,7 +98,7 @@ hard-coded.
    padding of up to 255 bytes and counts padding received. `third_party/rtc-rtp` is the
    crate with one field more (`Header::padding_size`, as pion has it), used through
    `[patch.crates-io]`; the whole of `rtc` builds against it unchanged. To be proposed
-   upstream, when the owner says so.
+   upstream; not proposed yet.
 2. **RTCP stops at the interceptors.** By design: an application gets RTCP when one of its
    own interceptors marks it (`Attribute::DeliverToApplication`). musivum's own interceptor
    is where the ported code takes RTP and RTCP anyway.
@@ -123,7 +124,7 @@ hard-coded.
    media section, where `rtc` used the preferences it had set from it (pion uses its media
    engine's negotiated codecs). It cannot be done above the crate: its media engine cannot
    be read once a connection has it, and a local description has to be set as the crate
-   wrote it. To be proposed upstream, when the owner says so.
+   wrote it. To be proposed upstream; not proposed yet.
 
 None of these changes the structure of the port.
 
@@ -279,13 +280,13 @@ done since, the others each with a stand-in on the transport's side:
 
 ## Not tested
 
-- Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
-  signalling in place (step 5).
-- A network that is not the loopback interface: address translation, loss and delay, ICE
-  restarts when the address changes, TURN, ICE over TCP with a browser. `rtc` has an
-  example for ICE restart; a TURN server that LiveKit embeds is a separate matter and
-  stays an open question of the plan.
-- Load: many connections and tracks on one socket, CPU per packet.
+- Clients other than Chrome: Safari and WebKit (Element X on iOS among them) and LiveKit's
+  native SDKs. Chrome, Element Call in Chrome and Element X on Android were run.
+- Networks other than one host: address translation and ICE restarts when an address
+  changes. Loss, delay and bandwidth caps are tested through a relay in user space
+  (`tests/netem`); TURN and ICE over TCP with a browser on loopback and behind a homeserver
+  on one host.
+- Load beyond 100 subscribers of a track and 10 calls of 4 (`tests/load`).
 - H.264, VP9 and AV1 with their layer modes, RED and FlexFEC: the library carries them as
   payload; what matters is in the ported code.
 - How long `rtc` has been used in production. Its sans-I/O core dates from 2026; it is

@@ -14,8 +14,8 @@ way, to look at first.
   `github.com/pion/...`, `github.com/livekit/webrtc-pion/v4@...` which is the `pion/webrtc`
   LiveKit uses). Only open what `CLAUDE.md` allows; when in doubt, look at the module's
   `LICENSE` first.
-- `reference/` is not committed and is not in a git worktree: use the absolute path of the
-  main checkout.
+- `reference/` is not committed, so a git worktree of the repository does not have it: use
+  the main checkout's.
 - `scripts/go-reference-test.sh -run TestName -v ./pkg/sfu` runs an upstream test at the pin.
   That is how "what does the original do here" is answered.
 
@@ -330,7 +330,7 @@ implements or calls these traits; the header of the file has them at greater len
   generated inputs) gets the same by hand: `ulimit -d 8388608` in the shell that starts it
   (`-d`, not `-v`: a limit on address space keeps programs with many threads from starting
   them), and `timeout`.
-- Scratch files go in the repository's `target/` or under `~/.cache/musivum`, not in `/tmp`.
+- Scratch files go in the repository's `target/`, not in `/tmp`.
 - Test servers listen on the loopback interface, on ephemeral ports or ports from 39000 to
   39999 that are free; never LiveKit's default ports (7880, 7881, 5349, 3478, 50000 to
   60000), so that a LiveKit on the same machine is not disturbed.

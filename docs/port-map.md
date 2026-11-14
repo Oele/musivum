@@ -1,8 +1,10 @@
 # The port map
 
 What every file of LiveKit's `pkg/sfu` and `pkg/rtc` at v1.13.11 becomes in musivum, what it
-depends on and what its tests need. Written from the source on 2026-11-14; `docs/PORTING.md`
-has the plan this page belongs to, `docs/port-status.md` has what is done.
+depends on and what its tests need: the survey made from the source on 2026-11-14, before
+the port. Where the port went otherwise (much of `pkg/service`, `pkg/routing` and
+`pkg/telemetry` was ported after all, for one node), `docs/port-status.md` has what was done;
+the steps named below are those of the plan of that day.
 
 Line counts are whole files (licence header, comments and blank lines included), as `wc -l`
 gives them. "Tests" is the `_test.go` file next to a source file where there is one.

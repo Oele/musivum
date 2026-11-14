@@ -1,10 +1,10 @@
 # The port
 
-The plan. It was written when the project was set up, on 2026-11-14, and corrected the same
-day from the survey of LiveKit's source: `docs/port-map.md` is the map, file by file, and
-`docs/port-status.md` says what is done.
+What musivum takes from LiveKit and how, what it stands on, and how it is checked against
+LiveKit. `docs/port-map.md` is the survey of LiveKit's source made before the port, file by
+file; `docs/port-status.md` says what is done and how musivum compares with LiveKit.
 
-## What musivum is to be
+## What musivum is
 
 A media server that LiveKit's client SDKs can hold a call through without knowing that it is
 not LiveKit: join a room, publish audio, video and screen sharing with simulcast, receive the
@@ -22,8 +22,9 @@ lines of tests (whole files, generated fakes not counted).
 |---|---|---|---|
 | `pkg/sfu`: receiving, buffering and forwarding media; choosing layers; estimating bandwidth | 35k lines | 16.5k | **Ported**, with its tests. This is the reason for porting at all. It needs pion only for packet types and at four seams. |
 | `pkg/rtc`: rooms, participants, tracks, subscriptions, the signalling messages | 26k | 7.7k | **Ported where it is logic** (who gets what, when); the parts that are wiring to the WebRTC library (`transport.go` above all) are written for the Rust one. |
-| `pkg/service`: the WebSocket and HTTP endpoints, the room API, webhooks, tokens | ~12k | ~6k | **Written new and small**: one node, the signalling endpoint, and the handful of API calls a Matrix homeserver or token service makes. |
-| `pkg/routing`, `pkg/agent`, `pkg/telemetry`, the rest | ~13k | ~8k | **Left out**: running as a cluster, agents, analytics. So are recording, ingest and telephony, which are separate programs upstream. |
+| `pkg/service`: the WebSocket and HTTP endpoints, the room API, webhooks, tokens, TURN | ~12k | ~6k | **Ported for one node**: the signalling endpoint, the room API over Twirp, the room manager, the embedded TURN server, authentication. The HTTP server itself is musivum's own (axum), and the library offers the endpoints over the `http` crate's types. |
+| `pkg/routing`, `pkg/telemetry` | ~4k | ~2k | **Ported for one node**: the local router and node, the telemetry service with its webhooks and Prometheus metrics. |
+| `pkg/agent`, the rest of `pkg/service` | ~9k | ~6k | **Left out**: running as a cluster, agents, analytics sent to LiveKit, egress, ingress, SIP, WHIP. Recording, ingest and telephony are separate programs upstream. |
 
 LiveKit's protocol definitions (`livekit/protocol`, Protocol Buffers) are used as they are.
 Two more repositories of LiveKit's have code that the above stands on and that is ported with
@@ -38,8 +39,10 @@ stands on **`rtc`**, the protocol core of webrtc-rs (MIT or Apache-2.0): no I/O 
 pion's vocabulary (peer connection, transceivers, interceptors), and, what decided it, it
 hands over RTP and RTCP as they are and leaves retransmission, feedback, bandwidth estimation
 and pacing to LiveKit's ported code. str0m, the other candidate, does those itself.
-`docs/webrtc-library.md` has the experiment that was run, what `rtc` lacks (one field in its
-RTP packet, carried as a patch in `third_party/rtc-rtp`) and what was not tested.
+`docs/webrtc-library.md` has the experiment that was run, the connection layer musivum
+built on `rtc` (one UDP socket per address and port for all connections, ICE over TCP), what
+`rtc` lacks and the two small patches musivum carries for it (`third_party/rtc-rtp`,
+`third_party/rtc`).
 
 ## Sources used beyond the listed ones
 
@@ -127,29 +130,32 @@ was checked:
   translated its ChaCha8 generator was removed, and identifiers take their random numbers
   from the `rand` crate.
 
-## Order of work
+## How it was built
 
-1. **Survey.** Read `pkg/sfu` and `pkg/rtc` and write `docs/port-map.md`: for every upstream
-   file, whether it is ported, rewritten or left out, what it depends on, and what its tests
-   need. Read which version of the protocol the pinned release speaks.
-2. **`pkg/sfu`**, leaves first, each file with its tests, in the layers of the port map:
-   what it stands on in `mediatransportutil` and `protocol`, then statistics and bandwidth
-   estimation, the buffer, layer selection, and last the forwarder, the receiver and the
-   down track. It needs no network and its tests say when it is right.
-3. **The WebRTC library** (chosen: `rtc`) and the wiring to it: the peer connection
-   (`pkg/rtc/transport.go`) and the logic of `pkg/rtc`.
-4. **Signalling**: the WebSocket endpoint and the messages a call needs.
-5. **A first call**: two browsers with LiveKit's JavaScript SDK, then Element Call.
-6. **Rooms, the API and webhooks** that a homeserver needs; building it into asaroton behind
-   a setting.
-7. **Quality**: against LiveKit on a degraded network, see below.
+In this order: a survey of LiveKit's source (`docs/port-map.md`); all of `pkg/sfu` with its
+tests, leaves first, which needs no network; the choice of the WebRTC library and a
+connection layer on it; `pkg/rtc` (rooms, participants, transports, subscriptions); the
+signalling endpoint, the room manager and the server binary; then the first call through
+musivum with LiveKit's JavaScript SDK in a browser, and the comparisons with LiveKit below.
+The room API, webhooks, metrics, ICE over TCP and the embedded TURN server followed.
+
+## What is not done
+
+- Clients other than Chrome (and Element Call and Element X on Android, which use it):
+  Safari and WebKit, which includes Element X on iOS, and LiveKit's native SDKs.
+- More than one machine, and networks other than the loopback interface beyond what a
+  homeserver's lab on one host covers: address translation and ICE restarts on an address
+  change are untested.
+- Latency and freezes under load, and runs of hours.
+- What LiveKit does for a cluster, agents, egress, ingress, SIP and WHIP: left out on purpose.
 
 ## How it is checked
 
 - **The ported tests.** A ported file is done when its ported tests pass.
-- **Real clients against both servers.** The same scripted call (LiveKit's JavaScript SDK in
-  a headless browser, LiveKit's Rust SDK, Element Call) against LiveKit and against musivum;
-  what the clients observe has to match.
+- **Real clients against both servers.** The same scripted call (`tests/call`: two
+  participants with LiveKit's JavaScript SDK in headless Chrome) against LiveKit and against
+  musivum; what the clients observe has to match (20 observations, and a 21st for a variant
+  through TURN only). Element Call and Element X were run behind a homeserver as well.
 - **A degraded network.** `NETEM=all tests/call/run.sh <target>` runs the scripted call with
   all media through an impairment relay in user space (`tests/netem`, `netem-relay`): loss
   at random and in bursts, delay with jitter, and a bandwidth cap with a queue, per client
@@ -160,11 +166,10 @@ was checked:
   500 kbit/s for 20 s, the publisher's uplink capped to 1000 kbit/s for 20 s, a 3 s
   blackout. Once a second Chrome's statistics give the layer and frame rate a subscriber
   receives, its freezes, losses, NACKs, PLIs, jitter buffer delay and round-trip time, and
-  from those the time to get back to its layer and frame rate. LiveKit's results are in
-  `tests/netem/baseline/`; `node tests/netem/compare.js baseline/reference musivum` marks
-  where musivum freezes more, recovers later, or gets a lower layer or frame rate. Until
-  nothing is marked, LiveKit stays the default wherever both can be used. A run on a busy
-  machine is flagged and says little.
+  from those the time to get back to its layer and frame rate. Three runs per scenario and
+  server are in `tests/netem/runs/`; `node tests/netem/compare.js 'runs/*/reference'
+  'runs/*/musivum'` gives medians and ranges, and marks a difference only where the two
+  servers' ranges do not overlap. A run on a busy machine is flagged and says little.
 - **Load.** `tests/load/run.sh <reference|musivum> [a b c d]` runs LiveKit's own load
   generator (`lk perf load-test` of livekit-cli v2.19.4, Apache-2.0, LiveKit's release
   binary) against one server on the loopback interface (ports 39560 to 39562), 60 s per
@@ -173,9 +178,9 @@ was checked:
   samples the server's CPU, RSS and threads, the machine's load and the CPU temperature;
   `lk` reports per subscriber the tracks it got, their bitrate and the packets lost. A run
   starts below 75 °C and a load of 8, and is stopped above 90 °C for 30 s (the fan takes a
-  few seconds to spin up) or 97 °C for 10 s, a load of 16 or an RSS of 6 GB. Results are in `tests/load/results/`; `python3 -I tests/load/compare.py`
-  marks where musivum has fewer subscribers with media, more loss, errors, or more than
-  twice LiveKit's CPU.
+  few seconds to spin up) or 97 °C for 10 s, a load of 16 or an RSS of 6 GB. Three runs per
+  scenario and server are in `tests/load/runs/`; `python3 -I tests/load/compare.py
+  'runs/*/reference' 'runs/*/musivum'` compares them the same way.
 
 ## Following upstream
 
@@ -185,9 +190,7 @@ port the changed tests, move the pin. Ported files stay close to their originals
 
 ## Open questions
 
-- (Settled 2026-11-14: LiveKit's embedded TURN server is ported, from pion/turn, so that
-  musivum stays a drop-in replacement for deployments that enable it.)
-- Proposing the padding size field and a sender's codecs to webrtc-rs, so that
+- Proposing the padding size field and a transceiver's codec handling to webrtc-rs, so that
   `third_party/rtc-rtp` and `third_party/rtc` can go.
-- (Settled: the server reads LiveKit's own configuration file, `crate::config`. Sections for
-  what musivum leaves out are accepted and ignored, with a log line each.)
+- The remaining CPU difference under load (4 to 18% more than LiveKit): most of it is in the
+  write of each packet through `rtc`'s pipeline (`docs/port-status.md`, "Under load").
