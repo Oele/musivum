@@ -9,6 +9,7 @@ pub mod connectionquality;
 pub mod datachannel;
 mod errors;
 pub mod flexfec;
+mod forwarder;
 mod forwardstats;
 mod interfaces;
 pub mod pacer;
@@ -30,6 +31,7 @@ pub mod utils;
 pub mod videolayerselector;
 
 pub use errors::*;
+pub use forwarder::*;
 pub use forwardstats::*;
 pub use interfaces::*;
 pub use playoutdelay::*;

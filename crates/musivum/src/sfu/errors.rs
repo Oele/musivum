@@ -18,6 +18,21 @@ pub enum Error {
     DuplicatePacket,
     #[error("padding cannot send on non-frame boundary")]
     PaddingNotOnFrameBoundary,
+    #[error("unknown kind of codec")]
+    UnknownKind,
+
+    // forwarder.go: the two `errX` values, and the three `fmt.Errorf` of
+    // `getRefLayerRTPTimestamp`, with the layers they name
+    #[error("skip start on out-of-order packet")]
+    SkipStartOnOutOfOrderPacket,
+    #[error("switch point too far behind")]
+    SwitchPointTooFarBehind,
+    #[error("invalid layer(s), refLayer: {ref_layer}, targetLayer: {target_layer}")]
+    InvalidLayers { ref_layer: i32, target_layer: i32 },
+    #[error("unavailable layer ref, refLayer: {ref_layer}, targetLayer: {target_layer}")]
+    UnavailableLayerRef { ref_layer: i32, target_layer: i32 },
+    #[error("unavailable layer target, refLayer: {ref_layer}, targetLayer: {target_layer}")]
+    UnavailableLayerTarget { ref_layer: i32, target_layer: i32 },
 
     // receiver_base.go
     #[error("receiver closed")]
@@ -26,6 +41,10 @@ pub enum Error {
     // redreceiver.go: a `fmt.Errorf` there, with the size of the payload that does not fit
     #[error("red payload don't have enough space, needsize {0}")]
     RedPayloadNoSpace(usize),
+
+    // an error of the codec munger, which forwarder.go passes on
+    #[error(transparent)]
+    CodecMunger(#[from] crate::sfu::codecmunger::Error),
 
     // errors of other packages that redreceiver.go and redprimaryreceiver.go pass on
     #[error(transparent)]

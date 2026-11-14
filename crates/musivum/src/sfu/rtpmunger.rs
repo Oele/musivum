@@ -45,7 +45,8 @@ pub struct RtpMunger {
     logger: Logger,
 
     ext_highest_incoming_sn: u64,
-    sn_range_map: utils::RangeMap<u64, u64>,
+    // seen by the package, as in the original: the forwarder's test reaches into it
+    pub(super) sn_range_map: utils::RangeMap<u64, u64>,
 
     ext_last_sn: u64,
     ext_second_last_sn: u64,
