@@ -86,6 +86,8 @@ mod tests {
             names,
             [
                 "livekit_node_service_operation",
+                "livekit_node_twirp_request_status",
+                "livekit_node_twirp_request_latency_ms",
                 "livekit_keyframe_total",
                 "livekit_forward_latency",
                 "livekit_forward_latency_ns",
@@ -127,9 +129,9 @@ mod tests {
                 "livekit_webhook_queue_length",
             ]
         );
-        assert_eq!(families[1].label_names, ["direction"]);
+        assert_eq!(families[3].label_names, ["direction"]);
 
-        let histogram = &families[3];
+        let histogram = &families[5];
         assert!(histogram.label_names.is_empty());
         assert_eq!(histogram.samples.len(), 1);
         let Value::Histogram(snapshot) = &histogram.samples[0].value else {

@@ -14,7 +14,7 @@
 
 use std::sync::OnceLock;
 
-use super::{Counter, MetricFamily, MetricVec, packets, rooms};
+use super::{Counter, Histogram, MetricFamily, MetricVec, packets, rooms};
 use crate::go::time::{self, Duration};
 use crate::protocol::livekit;
 use crate::protocol::utils::hwstats::{self, CpuStats, MemoryStats};
@@ -25,6 +25,15 @@ static MEMORY_STATS: OnceLock<Result<MemoryStats, hwstats::Error>> = OnceLock::n
 
 pub static PROM_SERVICE_OPERATION_COUNTER: MetricVec<Counter, 3> =
     MetricVec::new(["type", "status", "error_type"], Counter::new);
+pub static PROM_TWIRP_REQUEST_STATUS_COUNTER: MetricVec<Counter, 4> =
+    MetricVec::new(["service", "method", "status", "code"], Counter::new);
+pub static PROM_TWIRP_REQUEST_LATENCY: MetricVec<Histogram<13>, 3> =
+    MetricVec::new(["service", "method", "status"], || {
+        Histogram::new([
+            5.0, 10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0, 30000.0,
+            60000.0,
+        ])
+    });
 
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
@@ -32,6 +41,16 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "livekit_node_service_operation",
         "",
         &PROM_SERVICE_OPERATION_COUNTER,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_node_twirp_request_status",
+        "",
+        &PROM_TWIRP_REQUEST_STATUS_COUNTER,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_node_twirp_request_latency_ms",
+        "",
+        &PROM_TWIRP_REQUEST_LATENCY,
     ));
 }
 
@@ -45,6 +64,23 @@ pub fn record_service_operation_error(op: &str, error: &str) {
     PROM_SERVICE_OPERATION_COUNTER
         .with_label_values([op, "error", error])
         .add(1);
+}
+
+pub fn record_twirp_request_status(service: &str, method: &str, status_family: &str, code: &str) {
+    PROM_TWIRP_REQUEST_STATUS_COUNTER
+        .with_label_values([service, method, status_family, code])
+        .add(1);
+}
+
+pub fn record_twirp_request_latency(
+    service: &str,
+    method: &str,
+    duration: Duration,
+    status_family: &str,
+) {
+    PROM_TWIRP_REQUEST_LATENCY
+        .with_label_values([service, method, status_family])
+        .observe(duration.milliseconds() as f64);
 }
 
 // node_nonwindows.go
@@ -337,5 +373,32 @@ mod tests {
         record_service_operation_error("an operation of this test", "write_message");
         assert_eq!(success + 1, count("success", ""));
         assert_eq!(error + 2, count("error", "write_message"));
+    }
+
+    #[test]
+    fn twirp_requests_count_by_status_and_latency() {
+        let status = || {
+            PROM_TWIRP_REQUEST_STATUS_COUNTER
+                .with_label_values(["a service of this test", "Method", "4xx", "not_found"])
+                .get()
+        };
+        let latency = || {
+            PROM_TWIRP_REQUEST_LATENCY
+                .with_label_values(["a service of this test", "Method", "200"])
+                .snapshot()
+        };
+        let (before, latency_before) = (status(), latency());
+        record_twirp_request_status("a service of this test", "Method", "4xx", "not_found");
+        record_twirp_request_latency(
+            "a service of this test",
+            "Method",
+            Duration::from_millis(7),
+            "200",
+        );
+        assert_eq!(before + 1, status());
+        let latency_after = latency();
+        assert_eq!(latency_before.count + 1, latency_after.count);
+        assert_eq!(latency_before.le(10.0) + 1, latency_after.le(10.0));
+        assert_eq!(latency_before.le(5.0), latency_after.le(5.0));
     }
 }

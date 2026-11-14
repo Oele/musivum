@@ -23,6 +23,9 @@ hmac = "0.13.0"
 musivum-protocol = { version = "0.0.0", path = "../musivum-protocol" }
 parking_lot = "0.13.0"
 pbjson-types = "0.9"
+# Messages of the protocol read by their descriptors, for the JSON form of the room API that
+# its Twirp server reads and writes (service/protojson.rs). Already in the build through protox.
+prost-reflect = { version = "0.16.5", default-features = false }
 rand = "0.10.3"
 # The HTTP client webhooks are sent with (protocol/webhook/httpclient.rs): rustls with ring and
 # the system's root certificates, no OpenSSL.

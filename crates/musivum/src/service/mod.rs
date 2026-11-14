@@ -23,17 +23,25 @@
 //! - [`RtcService`] (`rtcservice.rs`): the signalling endpoint a client connects to (`/rtc`,
 //!   `/rtc/v1` and their `validate`), which hands a server an [`RtcUpgrade`] to run on the
 //!   upgraded socket.
+//! - [`RoomService`] (`roomservice.rs`): LiveKit's room API, which calls into the rooms and
+//!   participants of the node through the clients of `routing`; and its Twirp server
+//!   [`RoomServiceServer`] (`twirp.rs`), a function from a request's parts and body to the
+//!   response, with the hooks that log and count the calls.
 //!
-//! [`useragent`] is written new: it stands in for the user agent parser the original uses.
+//! [`useragent`] is written new: it stands in for the user agent parser the original uses. So
+//! is `protojson.rs`: the JSON form of the room API's messages as Go's `protojson` writes them.
 
 mod auth;
 mod errors;
 mod interfaces;
 mod localstore;
+mod protojson;
 mod roomallocator;
 mod roommanager;
+mod roomservice;
 mod rtcservice;
 mod signal;
+mod twirp;
 pub mod useragent;
 mod utils;
 mod wsprotocol;
@@ -44,7 +52,9 @@ pub use interfaces::*;
 pub use localstore::*;
 pub use roomallocator::*;
 pub use roommanager::*;
+pub use roomservice::*;
 pub use rtcservice::*;
 pub use signal::*;
+pub use twirp::*;
 pub use utils::*;
 pub use wsprotocol::*;

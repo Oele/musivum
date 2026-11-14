@@ -28,6 +28,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let descriptors = protox::compile(FILES, [&dir])?;
     let out = PathBuf::from(std::env::var("OUT_DIR")?);
 
+    use protox::prost::Message as _;
+    // The definitions themselves, for what has to know a message's fields at run time.
+    std::fs::write(
+        out.join("file_descriptor_set.bin"),
+        descriptors.encode_to_vec(),
+    )?;
+
     let mut config = prost_build::Config::new();
     config
         // Well-known types that serialize to JSON the way Protocol Buffers says they do.
@@ -35,7 +42,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .extern_path(".google.protobuf", "::pbjson_types");
     config.compile_fds(descriptors.clone())?;
 
-    use protox::prost::Message as _;
     pbjson_build::Builder::new()
         .register_descriptors(&descriptors.encode_to_vec())?
         .out_dir(&out)

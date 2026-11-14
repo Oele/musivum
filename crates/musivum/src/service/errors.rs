@@ -7,16 +7,23 @@
 // that the original wraps with a detail (`fmt.Errorf("%w: ...", ErrX, ...)`) is a variant of
 // its own with the same text. Upstream these errors are psrpc errors with a code;
 // `to_http` gives the status psrpc's `ToHttp` makes of that code. Not here: the errors of
-// egress, ingress and SIP (`ErrEgressNotFound`, `ErrEgressNotConnected`,
-// `ErrIngressNotConnected`, `ErrIngressNotFound`, `ErrIngressNonReusable`,
-// `ErrSIPNotConnected`, `ErrSIPTrunkNotFound`, `ErrSIPDispatchRuleNotFound`,
-// `ErrSIPParticipantNotFound`), which musivum leaves out.
+// egress, ingress and SIP (`ErrEgressNotFound`, `ErrIngressNotConnected`, `ErrIngressNotFound`,
+// `ErrIngressNonReusable`, `ErrSIPNotConnected`, `ErrSIPTrunkNotFound`,
+// `ErrSIPDispatchRuleNotFound`, `ErrSIPParticipantNotFound`), which musivum leaves out;
+// `ErrEgressNotConnected` is here, as the room service answers with it when there is no
+// egress. For the room service (roomservice.rs) there are also an error made as a Twirp error,
+// an error that came back through psrpc (`routing::PsrpcError`), `psrpc_error`, which finds the
+// psrpc error in an error as Go's `errors.As` does, and the conversion of an error into what
+// psrpc carries to a client (`From<Error> for routing::PsrpcError`).
 
 use std::io;
 
 use http::StatusCode;
 
-use crate::{routing, rtc};
+use super::TwirpError;
+use crate::protocol::utils as putils;
+use crate::routing::{self, PsrpcError, PsrpcErrorCode};
+use crate::rtc;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
@@ -62,6 +69,8 @@ pub enum Error {
     NoConnectResponse,
     #[error("destination identity is required")]
     DestinationIdentityRequired,
+    #[error("egress not connected (redis required)")]
+    EgressNotConnected,
 
     // ErrRoomNameExceedsLimits and ErrParticipantIdentityExceedsLimits as ValidateConnectRequest
     // wraps them (utils.go)
@@ -169,6 +178,16 @@ pub enum Error {
     /// gorilla/websocket's `HandshakeError`: why a request could not be upgraded.
     #[error("{0}")]
     Handshake(String),
+
+    // roomservice.go
+    /// An error made as a Twirp error (`twirp.NewError`, `twirp.InvalidArgumentError`,
+    /// `twirpAuthError`), which the Twirp server answers with as it is.
+    #[error("{0}")]
+    Twirp(TwirpError),
+    /// An error that came back through psrpc, from the server of a room or a participant
+    /// (`routing::TypedRoomClient`, `TypedParticipantClient`), or `psrpc.ErrUnimplemented`.
+    #[error(transparent)]
+    Psrpc(#[from] PsrpcError),
 }
 
 impl Error {
@@ -196,7 +215,8 @@ impl Error {
             Error::OperationFailed
             | Error::RoomLockFailed
             | Error::RoomUnlockFailed
-            | Error::InvalidMessageType => StatusCode::INTERNAL_SERVER_ERROR,
+            | Error::InvalidMessageType
+            | Error::EgressNotConnected => StatusCode::INTERNAL_SERVER_ERROR,
             // psrpc.NotFound
             Error::ParticipantNotFound | Error::RoomNotFound | Error::TrackNotFound => {
                 StatusCode::NOT_FOUND
@@ -207,8 +227,102 @@ impl Error {
             Error::Routing(routing::Error::RequestTimedOut) => StatusCode::SERVICE_UNAVAILABLE,
             // an error of the room manager, passed back as psrpc passes it
             Error::Routing(routing::Error::Service(err)) => return err.to_http(),
+            Error::Psrpc(err) => err.code().to_http(),
             _ => return None,
         })
+    }
+
+    /// The psrpc error in the error, as Go's `errors.As(err, &psrpcErr)` finds it: its code
+    /// and its own text (for an error that wraps one, the text of the wrapped error). `None`
+    /// for an error that is not a psrpc error upstream and wraps none.
+    pub fn psrpc_error(&self) -> Option<PsrpcError> {
+        let code = match self {
+            // psrpc.InvalidArgument
+            Error::IdentityEmpty
+            | Error::ParticipantSidEmpty
+            | Error::NameExceedsLimits
+            | Error::MetadataExceedsLimits
+            | Error::AttributeExceedsLimits
+            | Error::NoRoomName
+            | Error::RoomNameExceedsLimits
+            | Error::ParticipantIdentityExceedsLimits
+            | Error::DestinationSameAsSourceRoom
+            | Error::WebHookMissingApiKey
+            | Error::NoConnectRequest
+            | Error::NoConnectResponse
+            | Error::DestinationIdentityRequired
+            | Error::UnknownRoomConfiguration => PsrpcErrorCode::InvalidArgument,
+            // psrpc.Internal
+            Error::OperationFailed
+            | Error::RoomLockFailed
+            | Error::RoomUnlockFailed
+            | Error::InvalidMessageType
+            | Error::EgressNotConnected => PsrpcErrorCode::Internal,
+            // psrpc.NotFound
+            Error::ParticipantNotFound | Error::RoomNotFound | Error::TrackNotFound => {
+                PsrpcErrorCode::NotFound
+            }
+            // psrpc.FailedPrecondition
+            Error::RemoteUnmuteNoteEnabled => PsrpcErrorCode::FailedPrecondition,
+
+            // `fmt.Errorf("%w: max length %d", ...)` of a psrpc error
+            Error::RoomNameExceedsLimitsMaxLength(_) => {
+                return Error::RoomNameExceedsLimits.psrpc_error();
+            }
+            Error::ParticipantIdentityExceedsLimitsMaxLength(_) => {
+                return Error::ParticipantIdentityExceedsLimits.psrpc_error();
+            }
+
+            Error::Psrpc(err) => return Some(err.clone()),
+            Error::Routing(err) => match err {
+                // an error of the room manager, passed back as psrpc passes it
+                routing::Error::Service(err) => return err.psrpc_error(),
+                // psrpc.ErrRequestTimedOut
+                routing::Error::RequestTimedOut => PsrpcErrorCode::DeadlineExceeded,
+                _ => return None,
+            },
+            Error::Rtc(err) => match err {
+                // `PsrpcError()` of the RPC's error
+                rtc::Error::DataChannelRpc(err) => match err.code {
+                    putils::DATA_CHANNEL_RPC_APPLICATION_ERROR => PsrpcErrorCode::Internal,
+                    putils::DATA_CHANNEL_RPC_CONNECTION_TIMEOUT => PsrpcErrorCode::Canceled,
+                    putils::DATA_CHANNEL_RPC_RESPONSE_TIMEOUT => PsrpcErrorCode::Canceled,
+                    putils::DATA_CHANNEL_RPC_RECIPIENT_DISCONNECTED => PsrpcErrorCode::Unavailable,
+                    putils::DATA_CHANNEL_RPC_RESPONSE_PAYLOAD_TOO_LARGE => {
+                        PsrpcErrorCode::MalformedResponse
+                    }
+                    putils::DATA_CHANNEL_RPC_SEND_FAILED => PsrpcErrorCode::Internal,
+                    putils::DATA_CHANNEL_RPC_UNSUPPORTED_METHOD => PsrpcErrorCode::InvalidArgument,
+                    putils::DATA_CHANNEL_RPC_RECIPIENT_NOT_FOUND => PsrpcErrorCode::NotFound,
+                    putils::DATA_CHANNEL_RPC_REQUEST_PAYLOAD_TOO_LARGE => {
+                        PsrpcErrorCode::MalformedRequest
+                    }
+                    putils::DATA_CHANNEL_RPC_UNSUPPORTED_SERVER => PsrpcErrorCode::Unimplemented,
+                    putils::DATA_CHANNEL_RPC_UNSUPPORTED_VERSION => PsrpcErrorCode::Unimplemented,
+                    _ => PsrpcErrorCode::Internal,
+                },
+                // participant.go's errors of `SupportsMoving`
+                rtc::Error::MoveOldClientVersion | rtc::Error::CannotBeMoved { .. } => {
+                    PsrpcErrorCode::FailedPrecondition
+                }
+                _ => return None,
+            },
+            _ => return None,
+        };
+        Some(PsrpcError::new(code, self.to_string()))
+    }
+}
+
+/// What psrpc's server makes of a handler's error for the client: the psrpc error in it, with
+/// its code and text, or else the error's text with the code `Unknown`. This is how the room
+/// manager's errors go back through the bus (`routing::RoomServerImpl`,
+/// `ParticipantServerImpl`).
+impl From<Error> for PsrpcError {
+    fn from(err: Error) -> PsrpcError {
+        match err.psrpc_error() {
+            Some(err) => err,
+            None => PsrpcError::new(PsrpcErrorCode::Unknown, err.to_string()),
+        }
     }
 }
 

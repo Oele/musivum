@@ -17,6 +17,12 @@ pub mod logger {
 
 pub use prost::Message;
 
+/// The definitions the types are generated from, as a `google.protobuf.FileDescriptorSet` with
+/// the files they import: for code that has to know a message's fields at run time (the JSON
+/// form of LiveKit's room API, which the generated serde code does not give).
+pub const FILE_DESCRIPTOR_SET: &[u8] =
+    include_bytes!(concat!(env!("OUT_DIR"), "/file_descriptor_set.bin"));
+
 /// `google.protobuf.Timestamp` as the messages have it in their fields: Go's
 /// `timestamppb.Timestamp`.
 pub use pbjson_types::Timestamp;

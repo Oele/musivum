@@ -14,7 +14,11 @@
 //! - the routers ([`Router`], [`MessageRouter`], [`LocalRouter`]) and what they call on the
 //!   node: the signal client ([`SignalClient`]), which starts a session on the node's signal
 //!   server, and the room manager client ([`RoomManagerClient`]), both through the bus of
-//!   the process ([`MessageBus`]) where upstream has psrpc's.
+//!   the process ([`MessageBus`]) where upstream has psrpc's;
+//! - the calls of the room service into a room and a participant (`rpc.rs`, from LiveKit's
+//!   protocol: [`TypedRoomClient`], [`TypedParticipantClient`] and the servers they reach
+//!   through the bus, [`RoomServerImpl`] and [`ParticipantServerImpl`]), with the errors
+//!   psrpc carries back ([`PsrpcError`]).
 //!
 //! The endpoint a client is connected to writes the client's requests into one channel,
 //! which the participant reads, and the participant writes its responses into another,
@@ -32,6 +36,7 @@ mod messagechannel;
 mod node;
 mod nodestats;
 mod roommanager;
+mod rpc;
 mod signal;
 
 pub mod selector;
@@ -45,4 +50,5 @@ pub use messagechannel::*;
 pub use node::*;
 pub use nodestats::*;
 pub use roommanager::*;
+pub use rpc::*;
 pub use signal::*;
