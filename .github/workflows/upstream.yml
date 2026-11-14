@@ -1,0 +1,93 @@
+# Once a week and by hand: whether LiveKit has released a version newer than the pin
+# (upstream.toml), and if it has, what changed in the files musivum is ported from
+# (scripts/upstream-diff.sh). The report's summary goes into an issue of this repository
+# titled "LiveKit vX.Y.Z", unless an open issue has that title; the whole report with its diffs
+# is the run's artifact. docs/PORTING.md, "Following upstream", is what is done with it.
+#
+# It reads LiveKit's releases and fetches public sources (LiveKit's repository, Go modules
+# through the Go proxy). The one thing it writes is that issue, in this repository, with the
+# workflow's own token.
+name: upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "41 5 * * 2"   # Tuesdays, 05:41 UTC
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: upstream
+  cancel-in-progress: false
+
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: LiveKit's latest release, against the pin
+        id: release
+        run: |
+          # A fork has the workflow too; the issues are this repository's own.
+          if [ "$(gh api "repos/$REPO" --jq .fork)" = true ]; then
+            echo "a fork: nothing to do"
+            exit 0
+          fi
+          latest=$(gh release view --repo livekit/livekit --json tagName --jq .tagName)
+          pinned=$(sed -n 's/^tag = "\(.*\)"$/\1/p' upstream.toml | head -n 1)
+          echo "LiveKit's latest release: $latest; the pin: $pinned"
+          # The tag comes from outside: only a plain version goes any further.
+          if ! [[ "$latest" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::warning::LiveKit's latest release is tagged \"$latest\", not a version"
+            exit 0
+          fi
+          newest=$(printf '%s\n%s\n' "$pinned" "$latest" | sort -V | tail -n 1)
+          if [ "$latest" != "$pinned" ] && [ "$newest" = "$latest" ]; then
+            echo "tag=$latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-go@v5
+        if: steps.release.outputs.tag
+        with:
+          go-version: stable
+          cache: false
+
+      - name: What changed in the files musivum is ported from
+        if: steps.release.outputs.tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: scripts/upstream-diff.sh "$TAG"
+
+      - uses: actions/upload-artifact@v4
+        if: steps.release.outputs.tag
+        with:
+          name: upstream-${{ steps.release.outputs.tag }}
+          path: target/upstream/${{ steps.release.outputs.tag }}/
+
+      - name: An issue, unless one with its title is open
+        if: steps.release.outputs.tag
+        env:
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          title="LiveKit $TAG"
+          open=$(gh issue list --repo "$REPO" --state open --search "\"$title\" in:title" \
+            --json title --jq "map(select(.title == \"$title\")) | length")
+          if [ "$open" != 0 ]; then
+            echo "an open issue is titled \"$title\""
+            exit 0
+          fi
+          {
+            head -c 60000 "target/upstream/$TAG/summary.md"
+            echo
+            echo "The whole report and the diffs per Rust file: the artifact upstream-$TAG of" \
+              "$GITHUB_SERVER_URL/$REPO/actions/runs/$GITHUB_RUN_ID, or \`scripts/upstream-diff.sh $TAG\`." \
+              "What is done with them: \`docs/PORTING.md\`, \"Following upstream\"."
+          } > target/upstream/issue.md
+          gh issue create --repo "$REPO" --title "$title" --body-file target/upstream/issue.md

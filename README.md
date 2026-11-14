@@ -101,6 +101,9 @@ embedding program needs them.
   `cargo clippy --workspace --all-targets -- -D warnings` and `cargo test --workspace`. CI
   runs it on every push and pull request (`.github/workflows/check.yml`), and the browser
   call against musivum by hand and weekly (`call.yml`).
+- `scripts/upstream-diff.sh <tag>` reports what a new release of LiveKit changed in the files
+  musivum is ported from; `upstream.yml` runs it weekly and opens an issue per release.
+  `docs/PORTING.md` ("Following upstream") is the procedure.
 - `tests/call` runs the scripted browser call against `musivum` or `reference` (LiveKit at
   the pinned version); `tests/netem` and `tests/load` are the degraded network and the load
   test. They need Node, Chrome, and for the reference `livekit-server` and LiveKit's `lk`.

@@ -184,9 +184,49 @@ The room API, webhooks, metrics, ICE over TCP and the embedded TURN server follo
 
 ## Following upstream
 
-`upstream.toml` pins the version that was ported. To move it: list what changed upstream
-between the two tags in the files that were ported, apply those changes to the Rust files,
-port the changed tests, move the pin. Ported files stay close to their originals for this.
+`upstream.toml` pins the version of LiveKit that was ported and the modules its `go.mod`
+names; the header of every ported file names its origin at that version. Ported files stay
+close to their originals so that each release can be followed as a diff. Per release:
+
+1. **The weekly check.** `.github/workflows/upstream.yml` looks up LiveKit's latest release
+   every Tuesday (and by hand). When it is newer than the pin, it runs the report below and
+   opens an issue "LiveKit vX.Y.Z" in this repository with its summary; the whole report is
+   the run's artifact.
+2. **The report.** `scripts/upstream-diff.sh vX.Y.Z` fetches LiveKit at the pin and at the
+   new tag, and the Go modules that moved, into `target/upstream/`, reads the header of every
+   Rust file, and writes `target/upstream/vX.Y.Z/report.md`: per Rust file the origin files
+   that changed and the size of their diff (the diff is in `diffs/<Rust file>.diff`); origin
+   files deleted or renamed; new upstream files in the ported packages; the copied `.proto`
+   files that changed; headers it could not read; places that name the old version outside
+   a header; the Rust files whose origins did not change. `--from <tag>` compares from
+   another tag than the pin. `python3 -I scripts/upstream_diff_test.py` holds its reading of
+   headers against every header in the tree: a new form of header goes into both.
+3. **Porting the changes.** Each Rust file whose origins changed takes their diff by the
+   rules of the first port (`docs/porting-guide.md`): the same names, the upstream change
+   translated where it falls, the changed tests ported with it and passing, a header that
+   names the new version and says in "Changes" what still differs. One commit per ported
+   file (with its test file); the files are independent, so agents can share them out by
+   package. A new upstream file gets a decision: ported with its tests, or left out with a
+   line that says so in the Rust file nearest to it. A deleted or renamed origin is followed.
+4. **The modules.** When the protocol moves, the same files of its new version are copied
+   over `crates/musivum-protocol/protobufs/` (its README). Files ported from pion's modules
+   and the others the report lists are ported files like LiveKit's, step 3. musivum's
+   WebRTC library, webrtc-rs's `rtc` and `rtc-rtp`, is not part of the pin: when it is
+   moved, the new crate replaces the sources in `third_party/<crate>/` and its
+   `MUSIVUM.patch` is applied again, or the directory goes when upstream has the change
+   (`MUSIVUM.md` there).
+5. **Moving the pin.** `scripts/upstream-diff.sh --bump-unchanged vX.Y.Z` writes the new
+   version into each header whose origins did not change, and into no other; the places the
+   report lists as naming the old version outside a header are looked at by hand.
+   `target/upstream/vX.Y.Z/upstream.toml` becomes `upstream.toml`, and
+   `scripts/fetch-reference.sh` fetches the new reference. Run against the new pin, the
+   report lists no header that does not name it.
+6. **Before it is committed.** `scripts/check.sh`; the browser call against both servers
+   (`tests/call/run.sh musivum` and `reference`, with `livekit-server` at the new version);
+   and for a release that touches `pkg/sfu`'s forwarding (`forwarder.go`, `downtrack.go`,
+   `buffer/`, `sequencer.go`), bandwidth (`bwe/`, `streamallocator/`, `pacer/`) or layer
+   selection (`videolayerselector/`), the degraded-network and load comparisons (`tests/netem`,
+   `tests/load`, three runs per scenario and server, as above).
 
 ## Open questions
 
