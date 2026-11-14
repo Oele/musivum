@@ -6,10 +6,14 @@
 
 pub mod dynacast;
 pub mod signalling;
+pub mod supervisor;
 pub mod transport;
 pub mod types;
 
 mod clientinfo;
+mod datadowntrack;
+mod datatrack;
+mod datatrack_stats;
 mod errors;
 mod medialossproxy;
 mod participant_data_blob;
@@ -19,10 +23,13 @@ mod subscribepacer;
 #[cfg(test)]
 pub mod testutils;
 mod uptrackmanager;
+mod updatatrackmanager;
 mod user_packet_deduper;
 mod utils;
 
 pub use clientinfo::*;
+pub use datadowntrack::*;
+pub use datatrack::*;
 pub use errors::*;
 pub use medialossproxy::*;
 pub use participant_data_blob::*;
@@ -30,5 +37,6 @@ pub use roomtrackmanager::*;
 pub use signalanddatastats::*;
 pub use subscribepacer::*;
 pub use uptrackmanager::*;
+pub use updatatrackmanager::*;
 pub use user_packet_deduper::*;
 pub use utils::*;

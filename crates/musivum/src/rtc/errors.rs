@@ -54,6 +54,14 @@ pub enum Error {
     #[error("either participant identity or SID needed")]
     SubscriptionPermissionNeedsId,
 
+    // mediatracksubscriptions.go (`errAlreadySubscribed`, which datatrack.go returns too)
+    #[error("already subscribed")]
+    AlreadySubscribed,
+
+    // datatrack.go (`errReceiverClosed`)
+    #[error("datatrack is closed")]
+    ReceiverClosed,
+
     // errors of other packages that the methods of `types/interfaces.go` pass on: of the
     // sink a participant's messages are written to, of the signal handler and the limits on
     // a participant's metadata, of the down track a subscription makes, of the peer
@@ -68,6 +76,10 @@ pub enum Error {
     Webrtc(#[from] crate::webrtc::Error),
     #[error(transparent)]
     DataChannelRpc(#[from] crate::protocol::utils::DataChannelRpcError),
+    // of the supervisor of a participant's publications, which `OperationMonitor::check`
+    // returns
+    #[error(transparent)]
+    Supervisor(#[from] crate::rtc::supervisor::Error),
 }
 
 #[cfg(test)]
