@@ -130,22 +130,27 @@ reader task for the node routes datagrams into a queue of 1,024 per connection. 
 that blocks stalls that connection's reading and timers; a panic in a callback ends the
 connection's task without a close event.
 
-Found in `rtc` 0.21.1 while building it (source references are in the commit's report,
-kept in the header comments of `peerconnection/mod.rs`):
+Found in `rtc` 0.21.1 while building it (the places named are under `src/` of the crate):
 
-1. **The RTX stream of a simulcast layer is not paired with its layer** (`rtc` has a TODO
-   at that place). The RTX packets reach the sink, but no stream is announced for that
+1. **The RTX stream of a simulcast layer is not paired with its layer**
+   (`peer_connection/handler/interceptor.rs`, `bind_by_rid`, which has a TODO for the
+   repair stream id). The RTX packets reach the sink, but no stream is announced for that
    SSRC and `TrackRemote::rtx_ssrc()` stays 0. LiveKit learns the pairing from the first
    RTX packets itself (`pkg/sfu/interceptor/rtx.go`), which is the part to port for it.
 2. **A data channel added by a later negotiation never opens**: the SCTP association is
-   only begun when DTLS completes. LiveKit creates its channels before the first offer.
-3. A channel the remote opened reports no retransmission limits.
-4. `rtc` has no getters for the connection's states (the layer tracks them from events)
-   and sets the gathering state back on every local description.
-5. `set_local_description` insists on the text `create_offer` or `create_answer` gave:
+   only begun when DTLS completes (`peer_connection/handler/sctp.rs`). LiveKit creates its channels before the first offer.
+3. A channel the remote opened reports no retransmission limits
+   (`data_channel/internal.rs`, `accept`).
+4. `rtc` has no public getters for the connection's states (`peer_connection/mod.rs`; the
+   layer tracks them from events) and sets the gathering state back on every local
+   description. An ICE restart reuses credentials that were fixed with
+   `with_ice_credentials` (`peer_connection/internal.rs`), so a node must not fix them.
+5. `set_local_description` insists on the text `create_offer` or `create_answer` gave
+   (`peer_connection/internal.rs`):
    the SDP cannot be changed before it is set locally, which LiveKit does in places
    (`pkg/rtc/transport.go`); what it changes there has to be reached another way.
-6. A rollback removes transceivers by index; passed through, untested.
+6. A rollback removes transceivers by index (`peer_connection/internal.rs`); passed
+   through, untested.
 7. Not there yet in the layer: detached data channels with deadlines (LiveKit writes with a
    deadline; here `send` never blocks and `buffered_amount` is what the writer has to go
    by), what migration between nodes needs, the selected candidate pair other than through
