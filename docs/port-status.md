@@ -496,8 +496,20 @@ What looked wrong or fragile upstream and was ported as it is:
 - protocol `utils/rtputil`: the factor 3 in the reduction loop of `NewRTPConverter` does
   nothing (10^9 has no factor 3). protocol `utils/parallel.go`: a step of 0 never ends.
 
+## The first call
+
+On 2026-11-14 the scripted call of `tests/call` (two participants with LiveKit's JavaScript
+SDK in headless Chrome: join, publish simulcast video and audio, subscribe, layer switching
+by element size, data of both kinds, active speakers, mute, connection quality, unpublish,
+leave) went through musivum with all 20 observations as against LiveKit, in four runs in a
+row. The call needed no fix to go through; comparing its signalling and logs with LiveKit's
+found three differences, fixed: the connection layer announced a remote stream again after
+every renegotiation (`on_track` is now once per stream, as pion's), the setting engine left
+out the TCP network types (no TCP candidates were offered), and TCP candidates lacked pion's
+priority offset. What still differs: no IPv6 candidates (the node listens on IPv4 only), and
+candidate lines without pion's `ufrag` attribute.
+
 ## In progress, not on `main`
 
-The first call through musivum: the room manager and the signalling endpoint wired into
-`musivum-server`, and `tests/call/run.sh musivum` driven until the scripted call matches the
-reference's. Then: the room API glued to the room manager and served by the binary.
+IPv6 and more listeners in the connection layer; the Prometheus endpoint. Then: the room API
+glued to the room manager and served by the binary.

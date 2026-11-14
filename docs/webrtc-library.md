@@ -214,10 +214,11 @@ is not returned by `replace_track`: it is reported where the track reports its b
 
 Found then: **`rtc` forgets every receiver's stream at each negotiation** (`start_rtp` in
 `peer_connection/internal.rs` resets the receiver's track). At the first packet after a
-renegotiation the stream is announced again (`bind_remote_stream` a second time, no unbind
-in between, `on_track` again). A user of the layer that counts announcements has to expect
-that; a transceiver stopped between a renegotiation and the stream's next packet unbinds
-nothing at the sink.
+renegotiation the stream is bound again at the sink (`bind_remote_stream` a second time, no
+unbind in between). The layer passes `on_track` on once per stream, as pion fires `OnTrack`
+(found by the first call, where LiveKit's participant published the same track twice); the
+sink has to expect the second bind. A transceiver stopped between a renegotiation and the
+stream's next packet unbinds nothing at the sink.
 
 Added since: **ICE over TCP** (RFC 6544), with no change to `rtc`. Its ICE agent tells TCP
 from UDP by the protocol it is given, answers a check that came over a stream as a
