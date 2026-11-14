@@ -67,7 +67,8 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
 | `pkg/sfu/errors.go` | `sfu/errors.rs` | none upstream | The package's errors; empty upstream at the pin, the four values of the munger are defined in `downtrack.go` there. |
-| `pkg/telemetry/telemetryservice.go` (the interface), `analyticsservice.go` (interface and null service), `StatsKey`, `ReferenceGuard`, `CondenseStat` | `telemetry/` (same names) | none in scope | The 37 calls `pkg/rtc` reports through, as a trait with a fake and a null service; nothing is behind it yet (the implementation, the stats workers and their three test files are not ported). `context.Context` is dropped from every method; an `error` argument is its text. `RoomProjectReporter` is left out (it returns a type of the protocol's observability package). Five tests added. |
+| `pkg/telemetry/` (`telemetryservice.go`, `events.go`, `stats.go`, `statsworker.go`, `statsconn.go`; `analyticsservice.go` interface and null service) | `telemetry/` (same names) | 20 / 20 | The service behind the 37 calls `pkg/rtc` reports through: webhook events, statistics into the counters, the stats workers. The analytics half of each event is built and handed to the null analytics service (LiveKit's recorder is left out). A differential test sends the five webhooks of a room's life to an in-process server and compares body, content type, user agent and the signed token's claims with what the original sends for the same calls: equal. `RoomProjectReporter` is left out (observability). |
+| protocol `webhook/`, `utils/timeoutqueue.go` | `protocol/webhook/` | 10 / 10 | The notifiers with their queues, the filter, the verifier. Sent with reqwest (rustls, no OpenSSL) through `retryablehttp.rs`, written new with go-retryablehttp's documented retries and backoff. `timeoutqueue.rs` and `pool.rs` (frostbyte73/core) are here for now; their places are `protocol/utils` and beside `Throttle`. |
 | `pkg/telemetry/prometheus` (two functions of `packets.go`) | `telemetry/prometheus/` | | Written new: counters, gauges and histograms without a Prometheus dependency, readable by tests and by a later endpoint. Its module comment says how a function is added. |
 | `pkg/sfu/flexfec/decoder.go` | `sfu/flexfec/decoder.rs` | 19 / 19 | The lookup of media packets is handed to `decode_fec` with every packet instead of to the constructor (it reads the buffer's state under the buffer's lock). Three benchmarks left out. `reference_test.rs` compares decoder and encoder with 241 lines of the original's output, all three masks included. |
 | pion/interceptor `pkg/flexfec/flexfec_encoder_03.go`, `flexfec_coverage.go`, `flexfec_encoder.go`, `util/` | `webrtc/interceptor/flexfec/` (tests only) | 11 / 11 | The FlexFEC-03 encoder, for the decoder's tests. pion's own decoder, its interceptor and their tests are not ported. |
@@ -277,6 +278,11 @@ What looked wrong or fragile upstream and was ported as it is:
   is silently ignored. `GetLocalIPAddresses` does not look at whether an interface is up.
   `port_range_start` alone suppresses the default ports in `Validate`, and then neither a
   range nor a port is used.
+- protocol `webhook`: any answer that is not a 5xx (a 401, a 404) counts as sent.
+  `DefaultNotifier.QueueNotify` returns at the first notifier's error, so later URLs miss
+  that event; its `SetKeys`, `SetFilter` and `RegisterProcessedHook` never reach the extra
+  notifier. A `Retry-After` is not capped. `errNoKey` says "no singing key". Read without a
+  lock upstream (a data race) and under it here: `IsAllowed`, `EventKey`.
 - `pkg/routing`: `LocalRouter.Stop()` does not stop the statistics worker. A node without
   statistics counts as available and then panics when sorted by them;
   `NewLocalNodeFromNodeProto` gives such a node. `hwstats` panics on an empty file, and

@@ -265,7 +265,7 @@ the code is written against the Rust library. X = left out.
 | `pkg/clientconfiguration` | 348 / 189 | Ported: per-client settings (which browsers get which codecs disabled and the like). The rules are written in a script language upstream (tengo); they become Rust conditions. |
 | `pkg/service` | 12820 / 4793 | Written new and small. Read for behaviour: `rtcservice.go` (the WebSocket endpoint and its query parameters), `signal.go`, `wsprotocol.go`, `roommanager.go` (starting a session: 1,261 lines of which the single-node path is a fraction), `auth.go`, `roomservice.go` and `twirp.go` (the room API), `turn.go`. Left out: Redis stores, agents, SIP, ingress, egress, WHIP, WebTransport. |
 | `pkg/routing` | 1592 / 50 | One node's part: the message sink and source, the local router and node, its statistics and the selector's limits. The relay between nodes (`redisrouter.go`, psrpc) is left out; a local bus stands where psrpc's was. |
-| `pkg/telemetry` | 1786 / 950 | Left out as a service. The few calls that carry events webhooks need (participant joined, left, track published) go to a small trait. |
+| `pkg/telemetry` | 1786 / 950 | Ported: the service that turns the room's and participants' calls into webhooks and statistics. The analytics sent to LiveKit's recorder are left out (a null service). |
 | `pkg/telemetry/prometheus` | 1432 / 127 | See "How Go becomes Rust". |
 | `pkg/agent`, `pkg/metric` | 5300 | Left out. |
 | `test/` | 5055 | LiveKit's integration tests with its Go client. `singlenode_test.go` and `scenarios.go` are the list of behaviours a call has to show; they are run against musivum from outside (see `docs/PORTING.md`, "How it is checked"), not ported. |
@@ -298,7 +298,7 @@ the code is written against the Rust library. X = left out.
 | `sdp` | 768 / 240 | W | Helpers on pion's SDP type (finding the simulcast rids, the BUNDLE mid, DTLS fingerprints). |
 | `signalling` | 86 | P | |
 | `datatrack` | 500 / 558 | P | The data track packet format. With data tracks. |
-| `webhook` | 1431 / 984 | N | Sending webhooks is written new (a signed HTTP POST); the event shapes are the protocol's. |
+| `webhook` | 1431 / 984 | P | Ported, with its queues and the verifier; the HTTP client with retries in place of go-retryablehttp is written new on reqwest. |
 | `observability`, `rpc`, `psrpc`, `redis`, `egress`, `ingress`, `sip`, `agent`, `connector` | | X | |
 
 ## What the tests need

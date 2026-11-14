@@ -82,7 +82,13 @@ was checked:
   system's load with: its Linux readers of `/proc/loadavg`, `/proc/stat` and `/proc/meminfo`
   are ported in `routing/hwstats/osstat.rs`. Its notice is in `NOTICE`.
 - **frostbyte73/core v0.1.1** (MIT), small helpers LiveKit uses: its `Throttle` is ported in
-  `routing/hwstats/cpu.rs`. Its notice is in `NOTICE`.
+  `routing/hwstats/cpu.rs`, its `Pool` (with the part of `Fuse` it uses) in
+  `protocol/webhook/pool.rs`. Its notice is in `NOTICE`.
+- **hashicorp/go-retryablehttp v0.7.8** (MPL-2.0), the HTTP client LiveKit sends webhooks
+  with: its source was **not** opened, nor go-cleanhttp's. `protocol/webhook/retryablehttp.rs`
+  is written new from its documentation (the README and the godoc of `NewClient`,
+  `DefaultRetryPolicy`, `DefaultBackoff`, `ErrorHandler`) and from a Go test that called only
+  its exported API at the pin and watched what it did against test servers.
 - **livekit/psrpc v0.8.2** (Apache-2.0), LiveKit's RPC between nodes: read for what its
   local bus does for a single node; `routing/bus.rs` stands in its place, written new.
 - **Go's standard library** (BSD-3-Clause) was read for what the originals call
