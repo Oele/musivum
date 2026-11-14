@@ -29,8 +29,8 @@
 //   `on_ice_config_changed`) and finds no relay candidate here.
 // - `AddICECandidate` takes the target as the enum: the original's arm for an unknown target
 //   cannot be reached and is a comment. The participant converts the request's `i32`.
-// - `PingTimeoutSeconds` (participant.go), which is not ported yet, is written out here for
-//   this file's use.
+// - `PingTimeoutSeconds` is participant.rs's `PING_TIMEOUT_SECONDS`, an `i32` as the join
+//   response has it, converted where it is used.
 // - `GetDataTrackTransport` hands out the transport as `types::DataTrackTransport`: Go's
 //   `*PCTransport` is one by having the method, and the `impl` that says so is at the end of
 //   this file, the one place that needs it.
@@ -73,8 +73,8 @@ use crate::rtc::transport::{self, NegotiationState};
 use crate::rtc::types;
 use crate::rtc::{
     BytesTrackStats, ClientInfo, DATA_TRACK_DATA_CHANNEL, Error, LOSSY_DATA_CHANNEL,
-    MediaLossProxy, MediaLossProxyParams, PcTransport, RELIABLE_DATA_CHANNEL, RtcpFeedbackConfig,
-    TransportParams, WebRtcConfig, logger_with_pc_target,
+    MediaLossProxy, MediaLossProxyParams, PING_TIMEOUT_SECONDS, PcTransport, RELIABLE_DATA_CHANNEL,
+    RtcpFeedbackConfig, TransportParams, WebRtcConfig, logger_with_pc_target,
 };
 use crate::sfu;
 use crate::sfu::datachannel;
@@ -98,9 +98,6 @@ const PREFER_NEXT_BY_FAILURE_WINDOW: Duration = time::MINUTE;
 const UDP_LOSS_FRAC_UNSTABLE: u32 = 25;
 // if in last 32 times RR, the unstable report count over this threshold, the connection is unstable
 const UDP_LOSS_UNSTABLE_COUNT_THRESHOLD: u32 = 20;
-
-// `PingTimeoutSeconds` of participant.go, which is not ported yet.
-const PING_TIMEOUT_SECONDS: i64 = 15;
 
 // -------------------------------
 
@@ -1469,7 +1466,7 @@ impl TransportManagerInner {
     }
 
     fn has_recent_signal_locked(&self) -> bool {
-        time::since(self.last_signal_at) < Duration::from_secs(PING_TIMEOUT_SECONDS)
+        time::since(self.last_signal_at) < Duration::from_secs(i64::from(PING_TIMEOUT_SECONDS))
     }
 }
 

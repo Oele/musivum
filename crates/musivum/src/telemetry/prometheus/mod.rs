@@ -47,13 +47,17 @@
 //!    `collectors.rs`; keep what is general there and what is LiveKit's out of it.
 
 mod collectors;
+mod datapacket;
 mod node;
 mod packets;
+mod quality;
 mod rooms;
 
 pub use collectors::*;
+pub use datapacket::*;
 pub use node::*;
 pub use packets::*;
+pub use quality::*;
 pub use rooms::*;
 
 /// Every metric of the package as it stands now, for whoever serves them.
@@ -62,6 +66,8 @@ pub fn gather() -> Vec<MetricFamily> {
     node::collect(&mut families);
     packets::collect(&mut families);
     rooms::collect(&mut families);
+    quality::collect(&mut families);
+    datapacket::collect(&mut families);
     // the collectors of the protocol's webhook package, which upstream registers with these
     crate::protocol::webhook::collect(&mut families);
     families
@@ -109,6 +115,12 @@ mod tests {
                 "livekit_track_packet_trailer_total",
                 "livekit_track_packet_trailer_feature_total",
                 "livekit_track_publish_counter",
+                "livekit_session_start_time_ms",
+                "livekit_session_duration_ms",
+                "livekit_quality_rating",
+                "livekit_quality_score",
+                "livekit_datapacket_stream_dest_count",
+                "livekit_datapacket_stream_bytes",
                 "livekit_webhook_dispatch_total",
                 "livekit_webhook_queue_length",
             ]

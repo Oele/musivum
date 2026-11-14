@@ -46,8 +46,6 @@
 // - A request source may be nil (upstream's tests pass nil): the map holds an `Option`, and
 //   `ReplaceParticipantRequestSource` closes the old one only if there is one, where Go would
 //   call `Close` on nil.
-// - `PingIntervalSeconds` and `PingTimeoutSeconds` are constants of participant.go, which is
-//   not ported yet: their values are written out here, private, until it is.
 // - `connectionDetailsFields` gives pairs of key and value for a log line, which
 //   `infow_fields` writes. `GetOtherParticipantInfo`, `PushAndDequeueUpdates`, `CompareParticipant`
 //   and the broadcast functions take the participants and the room they only read as
@@ -116,11 +114,6 @@ const ROOM_UPDATE_INTERVAL: Duration = Duration::from_secs(5);
 const ROOM_UPDATE_INTERVAL: Duration = Duration::from_millis(10);
 
 // Not here: `ErrJobShutdownTimeout` and `AgentStore`, of the agents.
-
-// `PingIntervalSeconds` and `PingTimeoutSeconds` of participant.go, which is not ported yet:
-// these go when participant.rs has them.
-const PING_INTERVAL_SECONDS: i32 = 5;
-const PING_TIMEOUT_SECONDS: i32 = 15;
 
 #[derive(Clone, Copy, Debug, Default)]
 struct BroadcastOptions {
@@ -1122,8 +1115,8 @@ impl Room {
             subscriber_primary: participant.subscriber_as_primary(),
             client_configuration: participant.get_client_configuration(),
             // sane defaults for ping interval & timeout
-            ping_interval: PING_INTERVAL_SECONDS,
-            ping_timeout: PING_TIMEOUT_SECONDS,
+            ping_interval: super::PING_INTERVAL_SECONDS,
+            ping_timeout: super::PING_TIMEOUT_SECONDS,
             server_info: Some(self.server_info.clone()),
             server_version: self.server_info.version.clone(),
             server_region: self.server_info.region.clone(),

@@ -67,6 +67,51 @@ pub static PROM_TRACK_PACKET_TRAILER_BY_FEATURE_CURRENT: MetricVec<Gauge, 1> =
 pub static PROM_TRACK_PUBLISH_COUNTER: MetricVec<Counter, 2> =
     MetricVec::new(["kind", "state"], Counter::new);
 
+// Added for the participant (participant.go).
+pub(super) static TRACK_PUBLISH_CANCELS: atomic::Int32 = atomic::Int32::new(0);
+// prometheus.ExponentialBucketsRange(100, 10000, 15), as Go computes it
+pub static PROM_SESSION_START_TIME: MetricVec<Histogram<15>, 3> =
+    MetricVec::new(["protocol_version", "warp", "sdk"], || {
+        Histogram::new([
+            100.0,
+            138.94954943731375,
+            193.06977288832496,
+            268.26957952797244,
+            372.7593720314938,
+            517.9474679231207,
+            719.6856730011514,
+            999.999999999999,
+            1389.495494373136,
+            1930.6977288832477,
+            2682.695795279722,
+            3727.593720314934,
+            5179.474679231202,
+            7196.856730011506,
+            9999.999999999978,
+        ])
+    });
+// prometheus.ExponentialBucketsRange(100, 4*60*60*1000, 15), as Go computes it
+pub static PROM_SESSION_DURATION: MetricVec<Histogram<15>, 1> =
+    MetricVec::new(["protocol_version"], || {
+        Histogram::new([
+            100.0,
+            233.59011674382418,
+            545.6434264039341,
+            1274.5691167419518,
+            2977.267487778254,
+            6954.602600477145,
+            16245.264333523593,
+            37947.33192202059,
+            88641.21693781434,
+            207057.12212818698,
+            483664.9733056345,
+            1.1297935757936179e6,
+            2.639086132660537e6,
+            6.164644378251824e6,
+            1.440000000000003e7,
+        ])
+    });
+
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
     families.push(MetricFamily::of_vec(
@@ -118,6 +163,16 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "livekit_track_publish_counter",
         "",
         &PROM_TRACK_PUBLISH_COUNTER,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_session_start_time_ms",
+        "",
+        &PROM_SESSION_START_TIME,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_session_duration_ms",
+        "",
+        &PROM_SESSION_DURATION,
     ));
 }
 
@@ -292,6 +347,46 @@ pub fn record_track_publish_success(kind: &str) {
         .inc();
 }
 
+pub fn record_track_publish_cancels(kind: &str, num_cancels: i32) {
+    TRACK_PUBLISH_CANCELS.add(num_cancels);
+    PROM_TRACK_PUBLISH_COUNTER
+        .with_label_values([kind, "cancel"])
+        .add(u64::try_from(num_cancels).expect("counter cannot decrease in value"));
+}
+
+pub fn record_publish_time(
+    country: &str,
+    source: livekit::TrackSource,
+    track_type: livekit::TrackType,
+    d: Duration,
+    sdk: livekit::client_info::Sdk,
+    kind: livekit::participant_info::Kind,
+) {
+    record_pub_sub_stream_start_time("publish", country, source, track_type, d, sdk, kind, 1);
+}
+
+pub fn record_session_start_time(
+    protocol_version: i64,
+    warp: bool,
+    sdk: livekit::client_info::Sdk,
+    d: Duration,
+) {
+    // strconv.Itoa(protocolVersion), strconv.FormatBool(warp), sdk.String()
+    PROM_SESSION_START_TIME
+        .with_label_values([
+            &protocol_version.to_string(),
+            &warp.to_string(),
+            sdk.as_str_name(),
+        ])
+        .observe(d.milliseconds() as f64);
+}
+
+pub fn record_session_duration(protocol_version: i64, d: Duration) {
+    PROM_SESSION_DURATION
+        .with_label_values([&protocol_version.to_string()])
+        .observe(d.milliseconds() as f64);
+}
+
 pub fn record_track_subscribe_success(kind: &str) {
     // modify both current and total counters
     PROM_TRACK_SUBSCRIBED_CURRENT
@@ -451,6 +546,77 @@ mod tests {
             after_late.le(2000.0) - after_late.le(1000.0)
         );
         assert_eq!(before_late.sum + 1500.0, after_late.sum);
+    }
+
+    #[test]
+    fn publish_times_cancels_and_sessions_count_under_their_labels() {
+        let publish = || {
+            PROM_PUB_SUB_TIME
+                .with_label_values([
+                    "publish",
+                    "SCREEN_SHARE",
+                    "VIDEO",
+                    "a country of this test",
+                    "GO",
+                    "INGRESS",
+                    "1",
+                ])
+                .snapshot()
+        };
+        let cancels = || {
+            PROM_TRACK_PUBLISH_COUNTER
+                .with_label_values(["a kind of this test", "cancel"])
+                .get()
+        };
+        let start = || {
+            PROM_SESSION_START_TIME
+                .with_label_values(["9999", "false", "GO"])
+                .snapshot()
+        };
+        let duration = || PROM_SESSION_DURATION.with_label_values(["9999"]).snapshot();
+        let (before_publish, before_cancels, before_total) =
+            (publish(), cancels(), TRACK_PUBLISH_CANCELS.load());
+        let (before_start, before_duration) = (start(), duration());
+
+        // 600 ms: above 500, not above 700
+        record_publish_time(
+            "a country of this test",
+            livekit::TrackSource::ScreenShare,
+            livekit::TrackType::Video,
+            Duration::from_millis(600),
+            livekit::client_info::Sdk::Go,
+            livekit::participant_info::Kind::Ingress,
+        );
+        record_track_publish_cancels("a kind of this test", 2);
+        // 150 ms: above 138.9..., not above 193.0...
+        record_session_start_time(
+            9999,
+            false,
+            livekit::client_info::Sdk::Go,
+            Duration::from_millis(150),
+        );
+        // an hour: above 2639086.1..., not above 6164644.3...
+        record_session_duration(9999, Duration::from_secs(3600));
+
+        let after_publish = publish();
+        assert_eq!(
+            before_publish.le(700.0) - before_publish.le(500.0) + 1,
+            after_publish.le(700.0) - after_publish.le(500.0)
+        );
+        assert_eq!(before_cancels + 2, cancels());
+        assert!(TRACK_PUBLISH_CANCELS.load() >= before_total + 2);
+        let after_start = start();
+        assert_eq!(before_start.count + 1, after_start.count);
+        assert_eq!(
+            before_start.le(193.06977288832496) - before_start.le(138.94954943731375) + 1,
+            after_start.le(193.06977288832496) - after_start.le(138.94954943731375)
+        );
+        let after_duration = duration();
+        assert_eq!(before_duration.sum + 3_600_000.0, after_duration.sum);
+        assert_eq!(
+            before_duration.le(6.164644378251824e6) - before_duration.le(2.639086132660537e6) + 1,
+            after_duration.le(6.164644378251824e6) - after_duration.le(2.639086132660537e6)
+        );
     }
 
     #[test]

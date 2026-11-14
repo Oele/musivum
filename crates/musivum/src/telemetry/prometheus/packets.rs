@@ -64,6 +64,8 @@ pub(super) static RETRANSMIT_BYTES: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static RETRANSMIT_PACKETS: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static PARTICIPANT_RTC_CONNECTED: atomic::Uint64 = atomic::Uint64::new(0);
 pub(super) static PARTICIPANT_RTC_ACTIVE: atomic::Uint64 = atomic::Uint64::new(0);
+// Added for the participant (participant.go).
+pub(super) static PARTICIPANT_RTC_CANCELED: atomic::Uint64 = atomic::Uint64::new(0);
 
 // promPacketLabels
 pub static PROM_PACKET_TOTAL: MetricVec<Counter, 3> =
@@ -434,6 +436,37 @@ pub fn increment_participant_rtc_active(active: u32, warp: bool) {
     }
 }
 
+pub fn increment_participant_rtc_canceled(
+    canceled: u64,
+    warp: bool,
+    sdk: livekit::client_info::Sdk,
+) {
+    if canceled > 0 {
+        PARTICIPANT_RTC_CANCELED.add(canceled);
+        // strconv.FormatBool(warp), sdk.String()
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["rtc_canceled", &warp.to_string(), sdk.as_str_name()])
+            .add(canceled);
+    }
+}
+
+// todo: check if need to record warp to rtcSucc/Failure
+pub fn increment_participant_rtc_success(success: u64, warp: bool, sdk: livekit::client_info::Sdk) {
+    if success > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["rtc_success", &warp.to_string(), sdk.as_str_name()])
+            .add(success);
+    }
+}
+
+pub fn increment_participant_rtc_failure(failure: u64, warp: bool, sdk: livekit::client_info::Sdk) {
+    if failure > 0 {
+        PROM_PARTICIPANT_JOIN
+            .with_label_values(["rtc_failure", &warp.to_string(), sdk.as_str_name()])
+            .add(failure);
+    }
+}
+
 pub fn add_connection(direction: Direction) {
     PROM_CONNECTIONS
         .with_label_values([direction.as_str()])
@@ -645,6 +678,32 @@ mod tests {
         assert_eq!(0, PROM_RTT.with_label_values(labels).snapshot().count);
         let jitter = PROM_JITTER.with_label_values(labels).snapshot();
         assert_eq!((1, 20000.0), (jitter.count, jitter.sum));
+    }
+
+    #[test]
+    fn rtc_outcomes_count_under_their_state_and_skip_zeros() {
+        let count = |state: &str| {
+            PROM_PARTICIPANT_JOIN
+                .with_label_values([state, "true", "UNITY"])
+                .get()
+        };
+        let before = (
+            count("rtc_canceled"),
+            count("rtc_success"),
+            count("rtc_failure"),
+            PARTICIPANT_RTC_CANCELED.load(),
+        );
+        increment_participant_rtc_canceled(2, true, livekit::client_info::Sdk::Unity);
+        increment_participant_rtc_canceled(0, true, livekit::client_info::Sdk::Unity);
+        increment_participant_rtc_success(3, true, livekit::client_info::Sdk::Unity);
+        increment_participant_rtc_failure(4, true, livekit::client_info::Sdk::Unity);
+        increment_participant_rtc_failure(0, true, livekit::client_info::Sdk::Unity);
+        // the participants of other tests may count under these labels too
+        assert!(count("rtc_canceled") >= before.0 + 2);
+        assert!(count("rtc_success") >= before.1 + 3);
+        assert!(count("rtc_failure") >= before.2 + 4);
+        assert!(PARTICIPANT_RTC_CANCELED.load() >= before.3 + 2);
+        assert_eq!("UNITY", livekit::client_info::Sdk::Unity.as_str_name());
     }
 
     #[test]

@@ -148,6 +148,18 @@ pub enum Error {
     Sdp(#[from] crate::protocol::sdp::Error),
     #[error(transparent)]
     DataChannelWriter(#[from] crate::sfu::datachannel::Error),
+
+    // participant.go: `ErrMoveOldClientVersion` and the other error of `SupportsMoving`,
+    // `FailedPrecondition`s of psrpc upstream, which is not ported
+    #[error("participant client version does not support moving")]
+    MoveOldClientVersion,
+    #[error("{kind} participants cannot be moved, one-shot signaling mode: {one_shot}")]
+    CannotBeMoved { kind: String, one_shot: bool },
+    // the errors participant.go makes where it returns them (`errors.New`)
+    #[error("could not find published track")]
+    CouldNotFindPublishedTrack,
+    #[error("could not find track")]
+    CouldNotFindTrack,
 }
 
 #[cfg(test)]
