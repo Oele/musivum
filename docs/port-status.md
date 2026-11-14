@@ -80,7 +80,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/buffer/dependencydescriptorparser.go` | `sfu/buffer/dependencydescriptorparser.rs` | 7 / 7 | The assertion on allocations is left out. Decode targets are sorted with a stable sort (Go's is stable only up to 12 elements). Also run against the original with 680,650 packets: identical wherever the input bytes were. |
 | `pkg/sfu/buffer/streamstats.go` | `sfu/buffer/streamstats.rs` | none upstream | Written, not declared in the module yet: it needs `rtpstats`. |
 | `pkg/sfu/testutils/data.go` | `sfu/testutils/data.rs` | none upstream | Test helpers. The two test codecs are functions. |
-| `pkg/sfu/buffer/buffer_base.go` | `sfu/buffer/buffer_base.rs` | | Only the type `ExtPacket` so far, so that what takes packets from the buffer can be ported before it. |
+| `pkg/sfu/buffer/buffer_base.go`, `buffer.go`, `factory.go` | `sfu/buffer/buffer_base.rs`, `buffer.rs`, `factory.rs` | 21 / 21 | One lock for the buffer and its base, as upstream. A read waits as a blocking call (`read_extended`, for a plain thread) or as a future (`read_extended_async`, for a task); both give `None` for a restart and `Eof` once closed. `Buffer.Read`, which only pion called, has no counterpart. The factory is the map it was; `packetio.BufferPacketType` is an enum. No pools: a read copies the packet once. Also run against the original with 28,445 operations on three kinds of stream (loss, RTX repair, reordering, padding, wraps, a publisher restart, a reader that falls behind): 12,958 lines, identical; 355 pinned. Left out of the comparison, because the original reads the clock there: rates and jitter, PLIs, the timing of NACKs (the NACK queue's content is compared instead), the audio level. One assertion on allocations and two benchmarks left out. The out-of-band sequence number paths are ported and reached by nothing, here as upstream. |
 | `pkg/rtc/types/protocol_version.go`, `trafficstats.go` | `rtc/types/` (same names) | none upstream | Five tests added. `livekit.StreamType` is written out (its proto file is not compiled here). |
 | `pkg/rtc/transport/negotiationstate.go` | `rtc/transport/negotiationstate.rs` | none upstream | |
 | `pkg/rtc/clientinfo.go`, `errors.go`, `user_packet_deduper.go`, `subscribepacer.go`, `utils.go`, `participant_data_blob.go` | `rtc/` (same names) | 14 / 14 | Twenty tests added, with values from the original. `Recover` is `recover` and `recover_async` around `catch_unwind`. `IsEOF` is a guess until the transport's write errors exist. |
@@ -283,6 +283,14 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `buffer/buffer.go`: `Write` always reports 0 bytes written; `Close` calls `onClose` on
+  every call; the FEC decoder is fed media packets under their padding-adjusted sequence
+  numbers while the FEC masks are in the publisher's numbering (it affects only the
+  decoder's tracking of the newest number and of gaps). `buffer_base.go`: a packet handed
+  to an unbound buffer, a restart before the bind, and a bind to a codec that is neither
+  audio nor video each dereference nil upstream and panic with a message here.
+  `TestCodecChange` registers a callback for a stream restart that nothing in the test
+  causes.
 - `forwardstats.go`, the sample buffer: a producer reserves a slot, stores the value and
   then publishes the slot's number, without a lock. A producer that is held up between
   reserving and publishing for longer than the other producers need to go once round its
