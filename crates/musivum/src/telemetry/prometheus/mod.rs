@@ -47,16 +47,19 @@
 //!    `collectors.rs`; keep what is general there and what is LiveKit's out of it.
 
 mod collectors;
+mod node;
 mod packets;
 mod rooms;
 
 pub use collectors::*;
+pub use node::*;
 pub use packets::*;
 pub use rooms::*;
 
 /// Every metric of the package as it stands now, for whoever serves them.
 pub fn gather() -> Vec<MetricFamily> {
     let mut families = Vec::new();
+    node::collect(&mut families);
     packets::collect(&mut families);
     rooms::collect(&mut families);
     families
@@ -74,18 +77,22 @@ mod tests {
         assert_eq!(
             names,
             [
+                "livekit_node_service_operation",
                 "livekit_keyframe_total",
                 "livekit_forward_latency",
                 "livekit_forward_latency_ns",
                 "livekit_rtx_capped_total",
+                "livekit_fec_total",
+                "livekit_fec_bytes",
                 "livekit_track_subscribe_counter",
                 "livekit_pubsubtime_ms",
                 "livekit_subscribe_pace_shadow_delay_ms",
+                "livekit_peer_connection_state",
             ]
         );
-        assert_eq!(families[0].label_names, ["direction"]);
+        assert_eq!(families[1].label_names, ["direction"]);
 
-        let histogram = &families[2];
+        let histogram = &families[3];
         assert!(histogram.label_names.is_empty());
         assert_eq!(histogram.samples.len(), 1);
         let Value::Histogram(snapshot) = &histogram.samples[0].value else {

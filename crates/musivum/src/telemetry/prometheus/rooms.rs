@@ -40,6 +40,9 @@ pub static PROM_SUBSCRIBE_PACE_SHADOW: MetricVec<Histogram<14>, 1> =
         ])
     });
 
+pub static PROM_PEER_CONNECTION: MetricVec<Counter, 2> =
+    MetricVec::new(["transport", "state"], Counter::new);
+
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
     families.push(MetricFamily::of_vec(
@@ -57,6 +60,18 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "Wait that pacing video subscribes at each rate would add, per video subscribe.",
         &PROM_SUBSCRIBE_PACE_SHADOW,
     ));
+    families.push(MetricFamily::of_vec(
+        "livekit_peer_connection_state",
+        "",
+        &PROM_PEER_CONNECTION,
+    ));
+}
+
+pub fn record_peer_connection_state(transport: livekit::SignalTarget, state: &str) {
+    // transport.String()
+    PROM_PEER_CONNECTION
+        .with_label_values([transport.as_str_name(), state])
+        .inc();
 }
 
 pub fn record_subscribe_time(
@@ -148,6 +163,23 @@ mod tests {
     use super::super::HistogramSnapshot;
     use super::*;
     use crate::go::time::SECOND;
+
+    #[test]
+    fn a_peer_connection_state_counts_under_its_transport() {
+        let count = |transport: livekit::SignalTarget| {
+            PROM_PEER_CONNECTION
+                .with_label_values([transport.as_str_name(), "a state of this test"])
+                .get()
+        };
+        let before = count(livekit::SignalTarget::Subscriber);
+        record_peer_connection_state(livekit::SignalTarget::Subscriber, "a state of this test");
+        record_peer_connection_state(livekit::SignalTarget::Subscriber, "a state of this test");
+        assert_eq!(before + 2, count(livekit::SignalTarget::Subscriber));
+        assert_eq!(
+            "SUBSCRIBER",
+            livekit::SignalTarget::Subscriber.as_str_name()
+        );
+    }
 
     #[test]
     fn a_subscribe_time_counts_under_its_labels() {

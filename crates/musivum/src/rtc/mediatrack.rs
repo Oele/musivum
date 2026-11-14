@@ -53,9 +53,6 @@
 //   atomic the callback owns.
 // - The two `OnSubscribed...Change` functions of the params get the protocol messages and
 //   the lists borrowed.
-// - Not here yet: `buff.OnFECRecovery(... prometheus.RecordFECUpstream ...)`, as
-//   `telemetry::prometheus` has no `record_fec_upstream` (with its two counters
-//   `livekit_fec_total` and `livekit_fec_bytes`); a comment stands at its place.
 
 use std::any::Any;
 use std::collections::HashMap;
@@ -86,6 +83,7 @@ use crate::sfu::buffer;
 use crate::sfu::connectionquality;
 use crate::sfu::interceptor;
 use crate::telemetry;
+use crate::telemetry::prometheus;
 use crate::webrtc;
 use crate::webrtc::rtcp;
 use crate::webrtc::rtcp::extended_report::{DLRRReportBlock, ExtendedReport};
@@ -858,9 +856,9 @@ impl MediaTrack {
             });
         }
 
-        // Here upstream counts what the buffer's FEC decoder did (`buff.OnFECRecovery` with
-        // `prometheus.RecordFECUpstream`): `telemetry::prometheus` has no such counter yet,
-        // see the header.
+        buff.on_fec_recovery(|received, recovered, discarded, bytes_received| {
+            prometheus::record_fec_upstream(received, recovered, discarded, bytes_received as u64);
+        });
 
         // if subscriber request fps before fps calculated, update them after fps updated.
         {

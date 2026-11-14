@@ -147,6 +147,88 @@ fn watch_negotiation_state(t: &PcTransport) -> Arc<Mutex<Option<NegotiationState
     negotiation_state
 }
 
+// New for musivum: the counters LiveKit's transport reports to (`RecordPeerConnectionState`,
+// `RecordServiceOperationSuccess`) are reached when two transports negotiate and connect.
+// The counters are shared by every test of the crate, which run at the same time: each is
+// compared before and after, and only "at least" is asserted.
+#[tokio::test(flavor = "multi_thread")]
+async fn test_negotiation_reports_to_the_counters() {
+    use crate::telemetry::prometheus::{PROM_PEER_CONNECTION, PROM_SERVICE_OPERATION_COUNTER};
+    let state = |transport: livekit::SignalTarget, state: &str| {
+        PROM_PEER_CONNECTION
+            .with_label_values([transport.as_str_name(), state])
+            .get()
+    };
+    let success = |op: &str| {
+        PROM_SERVICE_OPERATION_COUNTER
+            .with_label_values([op, "success", ""])
+            .get()
+    };
+
+    let handler_a = Arc::new(FakeHandler::default());
+    let mut params_a = transport_params(&handler_a);
+    params_a.is_offerer = true;
+    params_a.transport = livekit::SignalTarget::Subscriber;
+    let transport_a = PcTransport::new(params_a).unwrap();
+    transport_a
+        .pc
+        .create_data_channel(RELIABLE_DATA_CHANNEL, None)
+        .unwrap();
+
+    let handler_b = Arc::new(FakeHandler::default());
+    let mut params_b = transport_params(&handler_b);
+    params_b.transport = livekit::SignalTarget::Publisher;
+    let transport_b = PcTransport::new(params_b).unwrap();
+
+    let before = (
+        success("offer"),
+        success("answer"),
+        success("peer_connection"),
+        state(livekit::SignalTarget::Subscriber, "started"),
+        state(livekit::SignalTarget::Subscriber, "connected"),
+        state(livekit::SignalTarget::Publisher, "connected"),
+    );
+
+    handle_ice_exchange(&transport_a, &transport_b, &handler_a, &handler_b);
+    connect_transports(
+        &transport_a,
+        &transport_b,
+        &handler_a,
+        &handler_b,
+        false,
+        1,
+        1,
+    )
+    .await;
+
+    let after = (
+        success("offer"),
+        success("answer"),
+        success("peer_connection"),
+        state(livekit::SignalTarget::Subscriber, "started"),
+        state(livekit::SignalTarget::Subscriber, "connected"),
+        state(livekit::SignalTarget::Publisher, "connected"),
+    );
+    assert!(after.0 > before.0, "offer: {before:?} -> {after:?}");
+    assert!(after.1 > before.1, "answer: {before:?} -> {after:?}");
+    assert!(
+        after.2 >= before.2 + 2,
+        "peer_connection: {before:?} -> {after:?}"
+    );
+    assert!(after.3 > before.3, "started: {before:?} -> {after:?}");
+    assert!(
+        after.4 > before.4,
+        "subscriber connected: {before:?} -> {after:?}"
+    );
+    assert!(
+        after.5 > before.5,
+        "publisher connected: {before:?} -> {after:?}"
+    );
+
+    transport_a.close();
+    transport_b.close();
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_missing_answer_during_ice_restart() {
     let handler_a = Arc::new(FakeHandler::default());

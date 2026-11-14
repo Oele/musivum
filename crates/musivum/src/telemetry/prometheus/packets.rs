@@ -47,6 +47,11 @@ pub static PROM_FORWARD_LATENCY_HIST: Histogram<10> = Histogram::new(
     ],
 );
 pub static PROM_RTX_CAPPED_TOTAL: MetricVec<Counter, 1> = MetricVec::new(["kind"], Counter::new);
+// promFECLabels
+pub static PROM_FEC_PACKET_TOTAL: MetricVec<Counter, 2> =
+    MetricVec::new(["direction", "type"], Counter::new);
+pub static PROM_FEC_PACKET_BYTES: MetricVec<Counter, 2> =
+    MetricVec::new(["direction", "type"], Counter::new);
 
 // The collectors of this file under the names upstream registers them with.
 pub(super) fn collect(families: &mut Vec<MetricFamily>) {
@@ -70,6 +75,44 @@ pub(super) fn collect(families: &mut Vec<MetricFamily>) {
         "NACKed packets not retransmitted because the down track was over its retransmission budget.",
         &PROM_RTX_CAPPED_TOTAL,
     ));
+    families.push(MetricFamily::of_vec(
+        "livekit_fec_total",
+        "",
+        &PROM_FEC_PACKET_TOTAL,
+    ));
+    families.push(MetricFamily::of_vec(
+        "livekit_fec_bytes",
+        "",
+        &PROM_FEC_PACKET_BYTES,
+    ));
+}
+
+pub fn record_fec_upstream(
+    received: usize,
+    recovered: usize,
+    discarded: usize,
+    bytes_received: u64,
+) {
+    if received > 0 {
+        PROM_FEC_PACKET_TOTAL
+            .with_label_values([Direction::Incoming.as_str(), "received"])
+            .add(received as u64);
+    }
+    if recovered > 0 {
+        PROM_FEC_PACKET_TOTAL
+            .with_label_values([Direction::Incoming.as_str(), "recovered"])
+            .add(recovered as u64);
+    }
+    if discarded > 0 {
+        PROM_FEC_PACKET_TOTAL
+            .with_label_values([Direction::Incoming.as_str(), "discarded"])
+            .add(discarded as u64);
+    }
+    if bytes_received > 0 {
+        PROM_FEC_PACKET_BYTES
+            .with_label_values([Direction::Incoming.as_str(), "received"])
+            .add(bytes_received);
+    }
 }
 
 pub fn record_rtx_capped(kind: &str, packets: u32) {
@@ -100,6 +143,38 @@ pub fn increment_key_frames(direction: Direction) {
 mod tests {
     use super::super::HistogramSnapshot;
     use super::*;
+
+    #[test]
+    fn fec_from_publishers_counts_by_type_and_skips_zeros() {
+        let count = |t: &str| {
+            PROM_FEC_PACKET_TOTAL
+                .with_label_values([Direction::Incoming.as_str(), t])
+                .get()
+        };
+        let bytes = || {
+            PROM_FEC_PACKET_BYTES
+                .with_label_values([Direction::Incoming.as_str(), "received"])
+                .get()
+        };
+        let before = (
+            count("received"),
+            count("recovered"),
+            count("discarded"),
+            bytes(),
+        );
+        record_fec_upstream(5, 2, 1, 1200);
+        record_fec_upstream(3, 0, 0, 0);
+        let after = (
+            count("received"),
+            count("recovered"),
+            count("discarded"),
+            bytes(),
+        );
+        assert!(after.0 >= before.0 + 8);
+        assert!(after.1 >= before.1 + 2);
+        assert!(after.2 > before.2);
+        assert!(after.3 >= before.3 + 1200);
+    }
 
     #[test]
     fn capped_retransmissions_count_under_their_kind() {

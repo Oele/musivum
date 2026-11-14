@@ -58,9 +58,6 @@
 //   transport weakly where Go embeds the pointer. The fields upstream touches only on that
 //   worker are in a mutex of their own (`events`), held for each read or write only, never
 //   across a call out, as upstream holds no lock there.
-// - The Prometheus calls (`RecordPeerConnectionState`, `RecordServiceOperationSuccess`,
-//   `RecordServiceOperationError`) are not in `crate::telemetry::prometheus` yet: each is a
-//   comment at its place.
 // - `errors.Wrap` is `Error::Wrap`; `errors.Is(err, webrtc.ErrUnsupportedCodec)` looks
 //   through it. Errors of the connection are `Error::Webrtc`, of the SDP helpers
 //   `Error::Sdp`. The checks for `ErrConnectionClosed` compare with the layer's.
@@ -112,6 +109,7 @@ use crate::sfu::pacer::{self, PacerBehavior};
 use crate::sfu::rtpextension::playoutdelay as pd;
 use crate::sfu::streamallocator::{self, StreamAllocator, StreamAllocatorParams};
 use crate::sfu::utils as sfuutils;
+use crate::telemetry::prometheus;
 use crate::utils;
 use crate::webrtc;
 use crate::webrtc::ice;
@@ -1000,7 +998,7 @@ impl PcTransport {
                 timer.stop();
             }
 
-            // prometheus.RecordPeerConnectionState(t.params.Transport, "ice_connected")
+            prometheus::record_peer_connection_state(self.params.transport, "ice_connected");
         }
 
         if let Some(timer) = inner.may_failed_ice_stats_timer.take() {
@@ -1097,8 +1095,8 @@ impl PcTransport {
         }
 
         inner.peer_connection_first_connected_at = at;
-        // prometheus.RecordServiceOperationSuccess("peer_connection")
-        // prometheus.RecordPeerConnectionState(t.params.Transport, "connected")
+        prometheus::record_service_operation_success("peer_connection");
+        prometheus::record_peer_connection_state(self.params.transport, "connected");
         true
     }
 
@@ -1320,7 +1318,10 @@ impl PcTransport {
             let mut inner = self.lock.write();
             if !inner.has_fully_established_recorded {
                 inner.has_fully_established_recorded = true;
-                // prometheus.RecordPeerConnectionState(t.params.Transport, "fully_established")
+                prometheus::record_peer_connection_state(
+                    self.params.transport,
+                    "fully_established",
+                );
             }
         }
     }
@@ -3171,7 +3172,7 @@ impl PcTransport {
                     return Ok(());
                 }
 
-                // prometheus.RecordServiceOperationError("offer", "create")
+                prometheus::record_service_operation_error("offer", "create");
                 return Err(wrap(err, "create offer failed"));
             }
         };
@@ -3193,12 +3194,12 @@ impl PcTransport {
                 return Ok(());
             }
 
-            // prometheus.RecordServiceOperationError("offer", "local_description")
+            prometheus::record_service_operation_error("offer", "local_description");
             return Err(wrap(err, "setting local description failed"));
         }
 
         if is_start_of_connection_sequence {
-            // prometheus.RecordPeerConnectionState(t.params.Transport, "started")
+            prometheus::record_peer_connection_state(self.params.transport, "started");
         }
 
         //
@@ -3235,10 +3236,10 @@ impl PcTransport {
             self.local_offer_id.inc(),
             &self.get_mid_to_track_id_mapping(),
         ) {
-            // prometheus.RecordServiceOperationError("offer", "write_message")
+            prometheus::record_service_operation_error("offer", "write_message");
             return Err(wrap(err, "could not send offer"));
         }
-        // prometheus.RecordServiceOperationSuccess("offer")
+        prometheus::record_service_operation_success("offer");
 
         self.local_description_sent()
     }
@@ -3305,8 +3306,12 @@ impl PcTransport {
                 return Ok(());
             }
 
-            // prometheus.RecordServiceOperationError(sdpType, "remote_description"), the type
-            // "answer" for an answer, "offer" for anything else
+            let sdp_type = if sd.r#type == SdpType::Answer {
+                "answer"
+            } else {
+                "offer"
+            };
+            prometheus::record_service_operation_error(sdp_type, "remote_description");
             return Err(wrap(err, "setting remote description failed"));
         }
         self.set_remote_offer_parsed(sd.r#type, Some(Arc::new(parsed.clone())));
@@ -3357,7 +3362,7 @@ impl PcTransport {
                     return Ok(());
                 }
 
-                // prometheus.RecordServiceOperationError("answer", "create")
+                prometheus::record_service_operation_error("answer", "create");
                 return Err(wrap(err, "create answer failed"));
             }
         };
@@ -3368,7 +3373,7 @@ impl PcTransport {
         }
 
         if let Err(err) = self.pc.set_local_description(answer.clone()) {
-            // prometheus.RecordServiceOperationError("answer", "local_description")
+            prometheus::record_service_operation_error("answer", "local_description");
             return Err(wrap(err, "setting local description failed"));
         }
 
@@ -3400,11 +3405,11 @@ impl PcTransport {
                 .handler
                 .on_answer(answer, answer_id, &self.get_mid_to_track_id_mapping())
         {
-            // prometheus.RecordServiceOperationError("answer", "write_message")
+            prometheus::record_service_operation_error("answer", "write_message");
             return Err(wrap(err, "could not send answer"));
         }
         self.local_answer_id.store(answer_id);
-        // prometheus.RecordServiceOperationSuccess("answer")
+        prometheus::record_service_operation_success("answer");
 
         self.send_unmatched_media_requirement(false)?;
 
@@ -3486,7 +3491,7 @@ impl PcTransport {
         self.set_remote_description(sd, &mut parsed)?;
 
         if is_start_of_connection_sequence {
-            // prometheus.RecordPeerConnectionState(t.params.Transport, "started")
+            prometheus::record_peer_connection_state(self.params.transport, "started");
         }
 
         self.params.handler.on_set_remote_description_offer();
@@ -3631,13 +3636,17 @@ impl PcTransport {
                             );
                         }
 
-                        // prometheus.RecordServiceOperationError("offer", "write_message") or
-                        // prometheus.RecordServiceOperationSuccess("offer")
-                        self.params.handler.on_offer(
+                        let result = self.params.handler.on_offer(
                             offer,
                             self.local_offer_id.inc(),
                             &self.get_mid_to_track_id_mapping(),
-                        )
+                        );
+                        if result.is_err() {
+                            prometheus::record_service_operation_error("offer", "write_message");
+                        } else {
+                            prometheus::record_service_operation_success("offer");
+                        }
+                        result
                     }
                 }
             }
@@ -3648,7 +3657,7 @@ impl PcTransport {
                     "recovering from client negotiation state on ICE restart"
                 );
                 if let Err(err) = self.pc.set_remote_description(current_remote_description) {
-                    // prometheus.RecordServiceOperationError("offer", "remote_description")
+                    prometheus::record_service_operation_error("offer", "remote_description");
                     Err(wrap(err, "set remote description failed"))
                 } else {
                     self.set_negotiation_state(NegotiationState::None);
