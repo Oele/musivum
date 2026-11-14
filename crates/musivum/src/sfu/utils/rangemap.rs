@@ -4,7 +4,8 @@
 // arithmetic Go's unsigned integers have; the errors are one enum, and the one that the
 // original wraps with details (`fmt.Errorf("%w, ...")`) carries those details as text;
 // `MarshalLogObject` is `Debug`; the size is unsigned, so there is no negative size to raise
-// to `minRanges`.
+// to `minRanges`. The enum of the errors is the one of the package: it also has the errors of
+// helpers.go.
 
 use std::fmt;
 
@@ -20,6 +21,19 @@ pub enum Error {
     KeyTooOld,
     #[error("key excluded")]
     KeyExcluded,
+
+    // The errors of helpers.go. The original wraps each of the first three with what was
+    // expected and what there was (`fmt.Errorf("%w, expected: ..., actual: ...")`): that is
+    // the text they carry.
+    #[error("invalid RTP version, {0}")]
+    InvalidRtpVersion(String),
+    #[error("RTP payload type mismatch, {0}")]
+    RtpPayloadTypeMismatch(String),
+    #[error("RTP SSRC mismatch, {0}")]
+    RtpSsrcMismatch(String),
+    /// pion's `webrtc.ErrCodecNotFound`, which `CodecParametersFuzzySearch` returns as it is.
+    #[error("codec not found")]
+    CodecNotFound,
 }
 
 /// The keys of the map: `uint32 | uint64` upstream.

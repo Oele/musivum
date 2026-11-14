@@ -2,4 +2,6 @@
 
 mod data;
 
+pub mod rtptest;
+
 pub use data::*;

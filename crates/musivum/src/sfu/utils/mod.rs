@@ -1,10 +1,12 @@
-//! LiveKit's `pkg/sfu/utils`. `helpers.go` is not ported yet: it needs modules that are not
-//! there yet. `race.go` and `norace.go` are Go build tags and have no counterpart.
+//! LiveKit's `pkg/sfu/utils`. `race.go` and `norace.go` are Go build tags and have no
+//! counterpart.
 
 mod debounce;
 mod downtrackspreader;
+mod helpers;
 mod rangemap;
 
 pub use debounce::*;
 pub use downtrackspreader::*;
+pub use helpers::*;
 pub use rangemap::*;
