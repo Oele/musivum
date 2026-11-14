@@ -43,6 +43,11 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/rtpextension/playoutdelay/playoutdelay.go` | `sfu/rtpextension/playoutdelay/playoutdelay.rs` | 1 / 1 | |
 | `pkg/sfu/rtpextension/abscapturetime/abscapturetime.go` | `sfu/rtpextension/abscapturetime/abscapturetime.rs` | none upstream | One test added. |
 | `pkg/sfu/datachannel/bitrate.go` | `sfu/datachannel/bitrate.rs` | 6 / 6 | |
+| `pkg/sfu/buffer/videolayerutils.go` | `sfu/buffer/videolayerutils.rs` | 7 / 7 | Qualities are taken and returned as the protocol's enum: a number that is no value of the enum comes back as the default where Go returns the number. Also compared with the original over 290 track infos in every rid space: identical. |
+| `pkg/sfu/buffer/frameintegrity.go` | `sfu/buffer/frameintegrity.rs` | 3 / 3 | A frame entity is handed the packet history instead of pointing to it. Also compared with the original (100,000 queries): identical. |
+| `pkg/sfu/buffer/datastats.go` | `sfu/buffer/datastats.rs` | 2 / 2 | |
+| `pkg/sfu/buffer/rtcpreader.go` | `sfu/buffer/rtcpreader.rs` | none upstream | One test added. `Read` has no counterpart. `close` without a callback set does nothing (the original calls a nil function). |
+| `pkg/sfu/buffer/streamstats.go` | `sfu/buffer/streamstats.rs` | none upstream | Written, not declared in the module yet: it needs `rtpstats`. |
 | `pkg/sfu/testutils/data.go` | `sfu/testutils/data.rs` | none upstream | Test helpers. The two test codecs are functions. |
 | `pkg/sfu/buffer/buffer_base.go` | `sfu/buffer/buffer_base.rs` | | Only the type `ExtPacket` so far, so that what takes packets from the buffer can be ported before it. |
 
@@ -58,6 +63,9 @@ with the same pseudo-random inputs (34,021 lines of output, identical).
   `decode_target_indications` is taken as nil. A descriptor made by hand with nil frame
   diffs is therefore written differently (`08005a10` where Go writes `08005a`); the cases
   are pinned in `reference_test.rs`.
+- **The zero time in a protocol timestamp.** Go's `timestamppb.New(time.Time{})` gives year
+  1; `go::time::Time` cannot tell its zero from the Unix epoch, and `timestamppb_new` gives
+  the epoch for it.
 - **Assertions on allocations per call** (`testing.AllocsPerRun`, in about ten upstream test
   files) are left out: counting allocations needs an allocator of the test binary's own,
   which needs `unsafe`, and the workspace forbids it.
@@ -126,6 +134,14 @@ What looked wrong or fragile upstream and was ported as it is:
   dereference upstream; the selector there wraps the call in `recover()`).
 - `dependencydescriptor/dependencydescriptorreader.go`: a reused descriptor keeps its
   attached structure and active decode targets from the packet before.
+- `buffer/videolayerutils.go`, `LayerPresenceFromTrackInfo`: indexes an array with a
+  layer's quality after checking only that it is not above `HIGH`. A negative quality in a
+  `TrackInfo` panics, in Go (run at the pin) and in the port. To be checked with
+  `pkg/rtc` whether a client's layers reach a `TrackInfo` unvalidated.
+- `buffer/frameintegrity.go`, `PacketsConsecutive`: with a history of 64 packets or fewer
+  it can shift by a negative count, which panics in Go (run) and in the port. LiveKit uses
+  1024. `buffer/rtcpreader.go`: `Write` reports 0 bytes written on success.
+  `buffer/datastats.go`: a duration of zero gives an infinite or undefined bitrate.
 - mtu `codec/vp8.go`: `MarshalTo` trusts `HeaderSize` and panics on a buffer that is at
   least that large but smaller than what the flags write; `Unmarshal` does not reset a
   reused struct. `codec/h26xhelper.go`: `parseH264SPS` ignores read errors (a truncated SPS
