@@ -183,13 +183,26 @@ Still not there, each with what it would take:
   announces on the first packet only.
 - **Detached data channels**: the ported writer waits on the buffered amount instead.
 - **Migration between nodes** (`SetMid`, `SetSender`): left out with migration itself.
-- For the packet sink: it is not told about local streams or about the connection's close
-  (two defaulted methods of `PacketSink` and their calls), a buffer's `write` takes no
-  arrival time, and the codec of a payload type cannot be asked of the connection for a
-  stream that was not announced (the repair stream of a simulcast layer is therefore
-  announced to its user when it is paired, which is normally at its first packet).
+- For the packet sink: it now hears of local streams and of the connection's close, and
+  buffers take the socket's arrival time. The connection can tell the codec of a payload
+  type (`get_rtp_parameters_by_payload_type`), but the sink does not ask it yet: the repair
+  stream of a simulcast layer is still announced to its user when it is paired, normally at
+  its first packet.
 - Nothing bounds the number of SSRCs a peer can make buffers for; pion has the same
   exposure.
+
+Third round: a sender's track can be replaced on its transceiver without a negotiation
+(`replace_track`, used by LiveKit to reuse a transceiver for the next subscription), and a
+transceiver can be stopped through the seam. Unlike pion's, the replacement binds and
+unbinds on the connection's task after the call returns, so a failure to bind the new track
+is not returned by `replace_track`: it is reported where the track reports its binding.
+
+Found then: **`rtc` forgets every receiver's stream at each negotiation** (`start_rtp` in
+`peer_connection/internal.rs` resets the receiver's track). At the first packet after a
+renegotiation the stream is announced again (`bind_remote_stream` a second time, no unbind
+in between, `on_track` again). A user of the layer that counts announcements has to expect
+that; a transceiver stopped between a renegotiation and the stream's next packet unbinds
+nothing at the sink.
 
 ## Not tested
 
