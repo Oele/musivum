@@ -146,7 +146,7 @@ connection layer (`webrtc/peerconnection`) does not have yet; each is logged whe
 | IPv6 addresses | not advertised | a second (IPv6) listener |
 | `batch_io`, the SCTP window settings, the 16 MiB socket buffers | kept as data | batched writes; settings `rtc` 0.21 does not have; buffer sizes on the node's socket |
 
-Clients that cannot use UDP are therefore not served yet (an open question of the plan).
+ICE over TCP is there (`tcp_port`, `force_tcp`); TURN is not (an open question of the plan).
 
 ## Where the port cannot be the original
 
@@ -498,13 +498,6 @@ What looked wrong or fragile upstream and was ported as it is:
 
 ## In progress, not on `main`
 
-Stopped on 2026-11-14 when the account's usage limit was reached; each is a branch with its
-work in progress committed (not reviewed, not merged):
-
-| What | Branch | State when stopped |
-|---|---|---|
-
-Next after these, in this order: `sfu/rtpstats` and `sfu/bwe/sendsidebwe` (what they
-waited for, the utilities, is merged); `sfu/pacer` (the seam traits are merged); then the
-buffer proper, `connectionquality`, `playoutdelay`; then the forwarder, the receivers, the
-down track, the stream allocator; then `pkg/rtc`.
+The first call through musivum: the room manager and the signalling endpoint wired into
+`musivum-server`, and `tests/call/run.sh musivum` driven until the scripted call matches the
+reference's. Then: the room API glued to the room manager and served by the binary.
