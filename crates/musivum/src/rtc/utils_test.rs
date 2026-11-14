@@ -7,9 +7,7 @@
 
 use super::*;
 
-use std::sync::Arc;
-
-use parking_lot::Mutex;
+use crate::testutils::{LogCapture, capture_log};
 
 #[test]
 fn test_pack_stream_id() {
@@ -228,41 +226,10 @@ fn the_closed_pipe_and_the_end_of_the_input_are_eof() {
     assert!(!is_eof(&io::Error::other("closed")));
 }
 
-// What the logger writes, for the tests of `recover`.
-#[derive(Clone, Default)]
-struct Lines(Arc<Mutex<Vec<u8>>>);
-
-impl io::Write for Lines {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        self.0.lock().extend_from_slice(buf);
-        Ok(buf.len())
-    }
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
-}
-
-impl Lines {
-    fn subscriber(&self) -> impl tracing::Subscriber + Send + Sync + 'static {
-        let writer = self.clone();
-        tracing_subscriber::fmt()
-            .with_max_level(tracing::Level::DEBUG)
-            .with_ansi(false)
-            .without_time()
-            .with_writer(move || writer.clone())
-            .finish()
-    }
-
-    fn text(&self) -> String {
-        String::from_utf8(self.0.lock().clone()).unwrap()
-    }
-}
-
 #[test]
 fn recover_gives_the_result_or_the_panic_and_logs_the_panic() {
-    let lines = Lines::default();
     let l = logger::get_logger().with_values(&[("participant", &"alice")]);
-    tracing::subscriber::with_default(lines.subscriber(), || {
+    let out = capture_log(tracing::Level::DEBUG, || {
         // no panic: the result, and nothing is logged
         let r = recover(Some(&l), || 42);
         assert_eq!(Some(42), r.ok());
@@ -284,7 +251,6 @@ fn recover_gives_the_result_or_the_panic_and_logs_the_panic() {
         assert_eq!(Some(&42u8), r.unwrap_err().downcast_ref::<u8>());
     });
 
-    let out = lines.text();
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(3, lines.len(), "{out}");
     assert!(lines[0].starts_with("ERROR"), "{out}");
@@ -304,9 +270,8 @@ fn recover_gives_the_result_or_the_panic_and_logs_the_panic() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn recover_async_gives_the_result_or_the_panic_and_logs_the_panic() {
-    let lines = Lines::default();
     let l = logger::get_logger().with_values(&[("participant", &"alice")]);
-    let guard = tracing::subscriber::set_default(lines.subscriber());
+    let lines = LogCapture::start(tracing::Level::DEBUG);
 
     // no panic: the result, also of a future that is not ready at once
     let r = recover_async(Some(&l), async {
@@ -338,8 +303,8 @@ async fn recover_async_gives_the_result_or_the_panic_and_logs_the_panic() {
     .await;
     assert_eq!(Some(&42u8), r.unwrap_err().downcast_ref::<u8>());
 
-    drop(guard);
     let out = lines.text();
+    drop(lines);
     let lines: Vec<&str> = out.lines().collect();
     assert_eq!(2, lines.len(), "{out}");
     assert!(

@@ -112,6 +112,99 @@ pub fn with_timeout_async(
     }
 }
 
+thread_local! {
+    // What a test on this thread captures of the log: the most verbose level it wants and
+    // the lines so far. `None` while no capture is going on, and on every other thread.
+    static LOG_CAPTURE: std::cell::RefCell<Option<(tracing::Level, Vec<u8>)>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+struct LogCaptureLines;
+
+impl std::io::Write for LogCaptureLines {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        LOG_CAPTURE.with(|capture| {
+            if let Some((_, lines)) = capture.borrow_mut().as_mut() {
+                lines.extend_from_slice(buf);
+            }
+        });
+        Ok(buf.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+// One subscriber for the whole test binary, which asks the calling thread what it wants to
+// see. A subscriber per test, installed for its thread only (`tracing::subscriber::
+// with_default`), loses lines now and then: while it is the only one, tracing decides whether
+// a call site is of interest once, on the thread that reaches it first, and a test on another
+// thread that logs through the same call site at that moment has it decided as "never".
+fn install_log_capture() {
+    use tracing_subscriber::layer::SubscriberExt;
+
+    static INSTALL: std::sync::Once = std::sync::Once::new();
+    INSTALL.call_once(|| {
+        let wanted = tracing_subscriber::filter::dynamic_filter_fn(|metadata, _| {
+            LOG_CAPTURE.with(|capture| {
+                capture
+                    .borrow()
+                    .as_ref()
+                    .is_some_and(|(max, _)| metadata.level() <= max)
+            })
+        });
+        let lines = tracing_subscriber::fmt::layer()
+            .with_ansi(false)
+            .without_time()
+            .with_writer(|| LogCaptureLines);
+        let subscriber = tracing_subscriber::registry().with(wanted).with(lines);
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("no other subscriber in the test binary");
+    });
+}
+
+/// What the calling thread logs from now on, at `max` and less verbose levels, until this is
+/// dropped: one line per message, level first, without time or colours. For tests of what
+/// the ported code logs. Only what is logged on the thread that started the capture is seen,
+/// and a thread has one capture at a time. Do not install a subscriber of a test's own
+/// instead (see `install_log_capture` for why).
+pub struct LogCapture {
+    // of the thread it was started on
+    _not_send: std::marker::PhantomData<*const ()>,
+}
+
+impl LogCapture {
+    pub fn start(max: tracing::Level) -> LogCapture {
+        install_log_capture();
+        LOG_CAPTURE.with(|capture| *capture.borrow_mut() = Some((max, Vec::new())));
+        LogCapture {
+            _not_send: std::marker::PhantomData,
+        }
+    }
+
+    /// The lines so far.
+    pub fn text(&self) -> String {
+        LOG_CAPTURE.with(|capture| {
+            let capture = capture.borrow();
+            let (_, lines) = capture.as_ref().expect("the capture was started");
+            String::from_utf8(lines.clone()).unwrap()
+        })
+    }
+}
+
+impl Drop for LogCapture {
+    fn drop(&mut self) {
+        LOG_CAPTURE.with(|capture| *capture.borrow_mut() = None);
+    }
+}
+
+/// What `f` logs on the calling thread, see [`LogCapture`].
+pub fn capture_log(max: tracing::Level, f: impl FnOnce()) -> String {
+    let capture = LogCapture::start(max);
+    f();
+    capture.text()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

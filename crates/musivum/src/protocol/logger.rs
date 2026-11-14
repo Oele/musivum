@@ -279,34 +279,7 @@ macro_rules! errorw {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io;
-    use std::sync::Mutex;
-
-    #[derive(Clone, Default)]
-    struct Lines(Arc<Mutex<Vec<u8>>>);
-
-    impl io::Write for Lines {
-        fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-            self.0.lock().unwrap().extend_from_slice(buf);
-            Ok(buf.len())
-        }
-        fn flush(&mut self) -> io::Result<()> {
-            Ok(())
-        }
-    }
-
-    fn capture(max: tracing::Level, f: impl FnOnce()) -> String {
-        let lines = Lines::default();
-        let writer = lines.clone();
-        let subscriber = tracing_subscriber::fmt()
-            .with_max_level(max)
-            .with_ansi(false)
-            .without_time()
-            .with_writer(move || writer.clone())
-            .finish();
-        tracing::subscriber::with_default(subscriber, f);
-        String::from_utf8(lines.0.lock().unwrap().clone()).unwrap()
-    }
+    use crate::testutils::capture_log as capture;
 
     #[test]
     fn a_line_has_the_message_the_error_and_all_values() {
