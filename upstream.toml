@@ -6,3 +6,14 @@ repository = "https://github.com/livekit/livekit"
 tag = "v1.13.11"
 commit = "385aa40f9292fe1db8caad87301e4b285b7c198a"
 license = "Apache-2.0"
+
+# What that version of LiveKit is built from, as its go.mod names it. Parts of these are
+# ported as well (docs/port-map.md); scripts/fetch-reference.sh puts them in reference/gomod.
+[livekit.modules]
+"github.com/livekit/protocol" = { version = "v1.53.1-0.20261023175527-46332a036e25", license = "Apache-2.0" }
+"github.com/livekit/mediatransportutil" = { version = "v0.0.0-20261014192331-dd8e31a0adc0", license = "Apache-2.0" }
+"github.com/pion/rtp" = { version = "v1.10.5", license = "MIT" }
+"github.com/pion/rtcp" = { version = "v1.2.19", license = "MIT" }
+"github.com/pion/interceptor" = { version = "v0.1.49", license = "MIT" }
+"github.com/pion/sdp/v3" = { version = "v3.0.20", license = "MIT" }
+"github.com/pion/webrtc/v4" = { version = "v4.2.18-warp.7", replaced_by = "github.com/livekit/webrtc-pion/v4", license = "MIT" }

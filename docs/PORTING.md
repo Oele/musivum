@@ -1,8 +1,8 @@
 # The port
 
-This is the plan as it stood when the project was set up, on 2026-11-14, before LiveKit's
-source had been read: the sizes below are measured from file sizes, nothing more. The first
-piece of work is the survey that turns this page into a map.
+The plan. It was written when the project was set up, on 2026-11-14, and corrected the same
+day from the survey of LiveKit's source: `docs/port-map.md` is the map, file by file, and
+`docs/port-status.md` says what is done.
 
 ## What musivum is to be
 
@@ -16,41 +16,52 @@ It is a library first, with a server binary around it.
 ## What is taken from LiveKit, and what is not
 
 LiveKit's server at v1.13.11 is about 85,000 lines of Go that people wrote, and about 48,000
-lines of tests.
+lines of tests (whole files, generated fakes not counted).
 
 | Part of LiveKit's server | Size | Tests | In musivum |
 |---|---|---|---|
-| `pkg/sfu`: receiving, buffering and forwarding media; choosing layers; estimating bandwidth | ~32k lines | ~17k | **Ported**, with its tests. This is the reason for porting at all. |
-| `pkg/rtc`: rooms, participants, tracks, subscriptions, the signalling messages | ~25k | ~10k | **Ported where it is logic** (who gets what, when); the parts that are wiring to the WebRTC library are written for the Rust one. |
+| `pkg/sfu`: receiving, buffering and forwarding media; choosing layers; estimating bandwidth | 35k lines | 16.5k | **Ported**, with its tests. This is the reason for porting at all. It needs pion only for packet types and at four seams. |
+| `pkg/rtc`: rooms, participants, tracks, subscriptions, the signalling messages | 26k | 7.7k | **Ported where it is logic** (who gets what, when); the parts that are wiring to the WebRTC library (`transport.go` above all) are written for the Rust one. |
 | `pkg/service`: the WebSocket and HTTP endpoints, the room API, webhooks, tokens | ~12k | ~6k | **Written new and small**: one node, the signalling endpoint, and the handful of API calls a Matrix homeserver or token service makes. |
 | `pkg/routing`, `pkg/agent`, `pkg/telemetry`, the rest | ~13k | ~8k | **Left out**: running as a cluster, agents, analytics. So are recording, ingest and telephony, which are separate programs upstream. |
 
 LiveKit's protocol definitions (`livekit/protocol`, Protocol Buffers) are used as they are.
+Two more repositories of LiveKit's have code that the above stands on and that is ported with
+it: `livekit/mediatransportutil` (about 2,800 lines and 2,200 of tests) and parts of
+`livekit/protocol` (mime types, tokens, SDP helpers).
 
 ## What it stands on
 
 LiveKit is written against pion, the WebRTC library for Go (connection setup, DTLS, SRTP,
 RTP and RTCP, data channels: far more code than LiveKit itself). That is not ported. musivum
-stands on a WebRTC library for Rust, and which one is the first decision to make:
+stands on a WebRTC library for Rust. The candidates:
 
-- **str0m** (MIT): built for servers of this kind, without I/O of its own, one owner per
-  connection. Its shape differs from pion's, so the ported logic meets it through an adapter.
-- **webrtc-rs** (MIT or Apache-2.0): a port of pion to Rust with pion's interfaces, so the
-  ported code would fit with fewer changes; to be checked how complete and how alive it is.
+- **str0m** (MIT or Apache-2.0): built for servers of this kind, without I/O of its own, one
+  owner per connection. Its shape differs from pion's, so the ported logic meets it through
+  an adapter.
+- **rtc** (webrtc-rs, MIT or Apache-2.0): the protocol core of webrtc-rs since its 0.20,
+  without I/O of its own, with pion's vocabulary (peer connection, transceivers,
+  interceptors).
+- **webrtc** (webrtc-rs): the asynchronous interface over `rtc`; its 0.17 line, the direct
+  port of pion, is in maintenance.
 
-To be decided by a small experiment: the same slice of `pkg/sfu` wired to each, judged on how
-much of the original structure survives and on what each library lacks (bandwidth
-estimation, TCP and TURN candidates, simulcast and SVC, data channels).
+To be decided by a small experiment: the same slice of `pkg/sfu` wired to each. The survey
+gave the main criterion: LiveKit does retransmission, feedback, bandwidth estimation, pacing
+and probing itself, so the library has to hand over RTP and RTCP as they are and stay out of
+those. After that: how much of the original structure survives, and what each lacks (TCP and
+TURN candidates, simulcast and SVC, data channels, ICE lite and restarts).
 
 ## Order of work
 
 1. **Survey.** Read `pkg/sfu` and `pkg/rtc` and write `docs/port-map.md`: for every upstream
    file, whether it is ported, rewritten or left out, what it depends on, and what its tests
    need. Read which version of the protocol the pinned release speaks.
-2. **The parts that are pure logic**, leaves first, each with its tests: rewriting sequence
-   numbers and timestamps, reading the codecs' headers, choosing layers, the stream
-   allocator. These need no network and their tests say when they are right.
-3. **The WebRTC library**, chosen by the experiment above, and the wiring to it.
+2. **`pkg/sfu`**, leaves first, each file with its tests, in the layers of the port map:
+   what it stands on in `mediatransportutil` and `protocol`, then statistics and bandwidth
+   estimation, the buffer, layer selection, and last the forwarder, the receiver and the
+   down track. It needs no network and its tests say when it is right.
+3. **The WebRTC library**, chosen by the experiment above, and the wiring to it: the peer
+   connection (`pkg/rtc/transport.go`) and the logic of `pkg/rtc`.
 4. **Signalling**: the WebSocket endpoint and the messages a call needs.
 5. **A first call**: two browsers with LiveKit's JavaScript SDK, then Element Call.
 6. **Rooms, the API and webhooks** that a homeserver needs; building it into asaroton behind
