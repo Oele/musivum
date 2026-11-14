@@ -5,7 +5,7 @@
 #   ./run.sh reference     LiveKit itself (livekit-server, which has to be the pinned
 #                          version), started here with reference-livekit.yaml
 #
-# Everything listens on the loopback interface, on ports 39500 to 39510.
+# Everything listens on the loopback interface, on ports 39500 to 39511.
 set -euo pipefail
 cd "$(dirname "$0")"
 TARGET=${1:-reference}
@@ -26,9 +26,18 @@ case "$TARGET" in
     echo "unknown target: $TARGET" >&2; exit 2 ;;
 esac
 PID=$!
-trap 'kill $PID 2>/dev/null || true' EXIT
+PIDS="$PID"
+trap 'kill $PIDS 2>/dev/null || true' EXIT
 for _ in $(seq 50); do
   (exec 3<>/dev/tcp/127.0.0.1/39500) 2>/dev/null && break
   sleep 0.1
 done
+# With TAP=1 the clients go through sigtap.js, which writes the signalling they exchange
+# with the server to out/<target>-signalling.jsonl.
+if [ "${TAP:-}" = 1 ]; then
+  node sigtap.js 39511 127.0.0.1:39500 "out/$TARGET-signalling.jsonl" &
+  PIDS="$PIDS $!"
+  sleep 0.5
+  URL=ws://127.0.0.1:39511
+fi
 node run.js "$TARGET" "$URL" "$KEY" "$SECRET"
