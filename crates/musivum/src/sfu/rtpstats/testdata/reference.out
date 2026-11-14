@@ -1,0 +1,50 @@
+3 snap 1
+4 flow PADDING_ONLY 0 0 0 0 0 0
+5 flow NONE 65533 65533 0 0 65533 4294960000
+6 flow NONE 65534 65534 0 0 65534 4294960000
+7 flow NONE 65535 65538 0 0 65538 4294966000
+8 flow NONE 0 0 0 1 65536 4294963000
+9 flow NONE 0 0 1 1 65536 4294963000
+10 flow NONE 65539 65539 0 0 65539 4294966000
+11 flow NONE 65540 65540 0 0 65540 4294969000
+12 flow PRE_START_TIMESTAMP 0 0 0 0 0 0
+13 flow OLD_SEQUENCE_NUMBER 0 0 0 0 0 0
+20 sr 1 srdata 4294963600 4294963600 16788979056730932511 1700000000100000000 1700000000100000000 0 0
+21 sr 0 srdata 4294963600 4294963600 16788979056730932511 1700000000100000000 1700000000100000000 0 0
+22 rr 1111 64 2 65541 403 1870664171
+23 flow NONE 65541 65545 0 0 65545 4294981000
+24 delta t=1 p=5 b=1012 hb=12 dup=0 bdup=0 hdup=0 pad=0 bpad=0 hpad=0 fec=0/0/0/0 lost=4 miss=0 ooo=0 fr=1 rtt=42 jit=40b1867daaaaaaaa nacks=0 nrep=0 plis=0 firs=0
+25 proto packets=6 bytes=5576 hbytes=76 lost=6 losspct=42389d8a dup=1 bdup=712 hdup=12 pad=1 bpad=132 hpad=12 ooo=2 frames=4 kf=1 kfset=1 jit=40b097c07aaaaaab jitmax=40b1867daaaaaaaa gap=3:1,4:1 nacks=3 acks=0 misses=0 rep=0 plis=1 pliset=0 firs=2 firset=0 rtt=42 rttmax=42 llplis=0 llset=0 fec=3/900/1/2
+25 drift.packet st=1700000000.000000000 et=1700000000.235000000 dur=3fce147ae147ae14 sts=4294960000 ets=4294981000 ticks=21000 samples=-150 ms=bffaaaaaaaaaaaab rate=40f5d11b3bea3678
+25 drift.ntp nil
+25 drift.received nil
+25 drift.rebased nil
+26 misc hts=13704 hsn=9 ehsn=65545 active=1 rtt=42 kf=1 kfset=1 pliset=0 srtset=1
+27 propdelay 30000000
+30 snap 1
+31 ssnap 1
+41 rrin 0 0
+42 sdelta.s t=1 p=8 b=5080 hb=80 dup=1 bdup=812 hdup=12 pad=1 bpad=162 hpad=12 fec=0/0/0/0 lost=0 miss=1 ooo=2 fr=3 rtt=0 jit=40c09116c0000000 nacks=0 nrep=1 plis=0 firs=0
+42 sdelta.r t=1 p=7 b=4060 hb=60 dup=1 bdup=812 hdup=12 pad=1 bpad=162 hpad=12 fec=0/0/0/0 lost=1 miss=2 ooo=2 fr=2 rtt=0 jit=409a0aaaaaaaaaab nacks=0 nrep=1 plis=0 firs=0
+43 delta t=1 p=8 b=5080 hb=80 dup=1 bdup=812 hdup=12 pad=1 bpad=162 hpad=12 fec=0/0/0/0 lost=1 miss=0 ooo=2 fr=3 rtt=0 jit=40c09116c0000000 nacks=0 nrep=0 plis=0 firs=0
+44 expts 6000087000
+45 proto packets=7 bytes=5080 hbytes=80 lost=1 losspct=4131c71d dup=1 bdup=812 hdup=12 pad=1 bpad=162 hpad=12 ooo=2 frames=3 kf=0 kfset=0 jit=409a0aaaaaaaaaab jitmax=409a0aaaaaaaaaab gap=2:1 nacks=0 acks=2 misses=1 rep=1 plis=0 pliset=0 firs=0 firset=0 rtt=0 rttmax=0 llplis=0 llset=0 fec=0/0/0/0
+45 drift.packet st=1700000000.000000000 et=1700000000.071000000 dur=3fb22d0e56041893 sts=5999997000 ets=6000006000 ticks=9000 samples=2610 ms=403d000000000000 rate=40fef289039b0ad2
+46 misc ehsn=70006 seen=7 rrset=1 active=1 rtt=0 kf=0 kfset=0 pliset=0
+49 snap 1
+50 flowlite 0 65535 65535 65535
+51 flowlite 0 65536 65538 65538
+52 flowlite 0 0 0 65536
+53 flowlite 0 0 0 65538
+54 deltalite t=1 p=4 b=1400 lost=1 ooo=2 nacks=0
+55 proto packets=65538 bytes=1400 hbytes=0 lost=1 losspct=3ac800c8 dup=0 bdup=0 hdup=0 pad=0 bpad=0 hpad=0 ooo=2 frames=0 kf=0 kfset=0 jit=0000000000000000 jitmax=0000000000000000 gap=2:1 nacks=0 acks=0 misses=0 rep=0 plis=0 pliset=0 firs=0 firset=0 rtt=0 rttmax=0 llplis=0 llset=0 fec=0/0/0/0
+55 drift.packet nil
+55 drift.ntp nil
+55 drift.received nil
+55 drift.rebased nil
+61 proto packets=103 bytes=1200 hbytes=0 lost=1 losspct=3f800000 dup=0 bdup=0 hdup=0 pad=0 bpad=0 hpad=0 ooo=1 frames=0 kf=0 kfset=0 jit=0000000000000000 jitmax=0000000000000000 gap=2:1 nacks=0 acks=0 misses=0 rep=0 plis=0 pliset=0 firs=0 firset=0 rtt=0 rttmax=0 llplis=0 llset=0 fec=0/0/0/0
+61 drift.packet nil
+61 drift.ntp nil
+61 drift.received nil
+61 drift.rebased nil
+62 misc ehsn=103

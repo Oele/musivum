@@ -3,10 +3,6 @@
 //! layers, the frame integrity checker, the statistics of a data channel, the RTCP reader),
 //! the packet as the rest of the server sees it (`ExtPacket`) and the types of the
 //! dependency descriptor that travel with it.
-//!
-//! `streamstats.rs` is written but not declared here: it holds `rtpstats::RtpDeltaInfo`,
-//! and `sfu/rtpstats` is not ported yet. When it is, `mod streamstats;` and
-//! `pub use streamstats::*;` are what is missing.
 
 mod buffer_base;
 mod datastats;
@@ -14,6 +10,7 @@ mod dependencydescriptorparser;
 mod fps;
 mod frameintegrity;
 mod rtcpreader;
+mod streamstats;
 mod videolayer;
 mod videolayerutils;
 
@@ -23,6 +20,7 @@ pub use dependencydescriptorparser::*;
 pub use fps::*;
 pub use frameintegrity::*;
 pub use rtcpreader::*;
+pub use streamstats::*;
 pub use videolayer::*;
 pub use videolayerutils::*;
 
