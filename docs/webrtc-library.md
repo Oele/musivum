@@ -161,6 +161,22 @@ Found in `rtc` 0.21.1 while building it (the places named are under `src/` of th
    by), what migration between nodes needs, the selected candidate pair other than through
    the statistics, pion's own congestion control interceptors (not used by default).
 
+What the ported code has asked of the layer since, and does not have yet (each found by the
+port that needed it; to be added before `pkg/rtc/transport.go` is ported):
+
+- an event or accessor for the selected candidate pair (`rtc` has
+  `get_selected_candidate_pair()` on its ICE transport and only an internal change event);
+  `rtc/types/ice.rs` records it for the fallback from UDP to TCP to TURN;
+- re-exports of `rtc`'s ICE candidate types, so that files outside `webrtc/` do not name
+  `rtc` (`rtc/types/ice.rs` and `mediatransportutil/rtcconfig` do today);
+- a distinct error for sending on a closed data channel (upstream acts on it), and more
+  than one listener for a channel's low threshold;
+- candidates per connection (LiveKit gives some clients only the external addresses), a
+  setting engine that can be copied and changed per connection, ICE servers in the
+  configuration;
+- what `docs/port-status.md` lists under the options of the `rtc:` section: a TCP listener,
+  a port range, IPv6, the STUN port.
+
 ## Not tested
 
 - Other clients: Safari, LiveKit's native SDKs (which Element X uses). First with the real
