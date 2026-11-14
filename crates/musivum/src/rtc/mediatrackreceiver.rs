@@ -38,8 +38,6 @@
 //   turns stereo on. That is kept (the update itself, which is borrowed, is not changed).
 // - `GetQualityForDimension`: a size beyond the fourth would give a number that is no
 //   `VideoQuality`; it is `HIGH` here.
-// - `IsParticipantExemptFromTrackPermissionsRestrictions` is of `room.go`, which is not
-//   ported: see the comment at the private copy at the end of this file.
 
 use std::any::Any;
 use std::fmt;
@@ -50,7 +48,8 @@ use serde_json::Value;
 
 use super::{
     DirectionConfig, DummyReceiver, Error, MediaTrackSubscriptions, MediaTrackSubscriptionsParams,
-    ReceiverConfig, WrappedReceiver, WrappedReceiverParams, is_red_enabled, logger_with_track,
+    ReceiverConfig, WrappedReceiver, WrappedReceiverParams,
+    is_participant_exempt_from_track_permissions_restrictions, is_red_enabled, logger_with_track,
     pack_stream_id,
 };
 use crate::go::atomic;
@@ -866,7 +865,7 @@ impl MediaTrackReceiver {
 
         // LK-TODO: large number of subscribers needs to be solved for this loop
         for sub_track in self.media_track_subscriptions.get_all_subscribed_tracks() {
-            if is_participant_exempt_from_track_permissions_restrictions(&sub_track.subscriber()) {
+            if is_participant_exempt_from_track_permissions_restrictions(&*sub_track.subscriber()) {
                 continue;
             }
 
@@ -1651,18 +1650,6 @@ fn as_dummy_receiver(r: &Arc<dyn sfu::TrackReceiver>) -> Option<Arc<DummyReceive
 fn as_web_rtc_receiver(r: &Arc<dyn sfu::TrackReceiver>) -> Option<Arc<sfu::WebRtcReceiver>> {
     let r: Arc<dyn Any + Send + Sync> = r.clone();
     r.downcast::<sfu::WebRtcReceiver>().ok()
-}
-
-// TO MOVE: `IsParticipantExemptFromTrackPermissionsRestrictions` is a public function of
-// `pkg/rtc/room.go`, which is not ported yet. This private copy is here because
-// `revoke_disallowed_subscribers` calls it; whoever ports `room.go` makes the public one
-// there and takes this one out.
-fn is_participant_exempt_from_track_permissions_restrictions(
-    p: &Arc<dyn types::LocalParticipant>,
-) -> bool {
-    // egress/recorder participants bypass permissions as auto-egress does not
-    // have enough context to check permissions
-    p.is_recorder()
 }
 
 // Go's strings.EqualFold(s, t) for a `t` that is ASCII, as a mime type is: whether the two

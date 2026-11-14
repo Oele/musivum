@@ -12,9 +12,7 @@
 // subscriber's `Kind()`, `KindDetails()` and reporter (see signalanddatastats.rs), and with a
 // function that asks the subscriber for its telemetry listener through a `Weak` (the stats
 // would otherwise hold the subscriber, which holds its down tracks); once the subscriber is
-// gone it gives a listener that does nothing. Not here yet, with a comment at its place:
-// `IsParticipantExemptFromTrackPermissionsRestrictions` of `room.go`, which is not ported:
-// it stands at the end of this file until `room.rs` has it.
+// gone it gives a listener that does nothing.
 // Who holds whom: the track holds its subscribers (the participants) and their down tracks
 // strongly, the down tracks a second time in the spreader, until `remove_subscriber` or a
 // down track's `close` takes them out; `close` of the track itself takes nothing out, as
@@ -30,6 +28,7 @@ use tokio_util::sync::CancellationToken;
 
 use super::datadowntrack::{DataDownTrack, DataDownTrackParams};
 use super::datatrack_stats::{DataTrackStats, DataTrackStatsParams};
+use super::room::is_participant_exempt_from_track_permissions_restrictions;
 use super::signalanddatastats::BytesTrackStats;
 use crate::infow;
 use crate::protocol::datatrack;
@@ -333,16 +332,6 @@ impl types::DataTrack for DataTrack {
     fn close(&self) {
         DataTrack::close(self);
     }
-}
-
-// `IsParticipantExemptFromTrackPermissionsRestrictions` of room.go, which is not ported yet:
-// this one goes when `room.rs` has it.
-fn is_participant_exempt_from_track_permissions_restrictions(
-    p: &dyn types::LocalParticipant,
-) -> bool {
-    // egress/recorder participants bypass permissions as auto-egress does not
-    // have enough context to check permissions
-    p.is_recorder()
 }
 
 #[cfg(test)]
