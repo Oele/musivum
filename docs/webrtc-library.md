@@ -118,7 +118,7 @@ and callbacks, and the door LiveKit's buffer factory came through (`PacketSink`:
 incoming RTP packet as bytes and every RTCP packet, RTX, FEC and padding included).
 `crates/musivum/src/webrtc/track.rs` has the traits the ported `pkg/sfu` meets it through
 (`TrackLocal`, `TrackLocalWriter`, `TrackLocalContext`, `TrackRemote`, `RtpSender`,
-`RtpReceiver`, `RtpTransceiver`), without a dependency on `rtc`. Twelve tests run two
+`RtpReceiver`, `RtpTransceiver`), without a dependency on `rtc`. Its first twelve tests run two
 connections against each other in one process (media and RTCP both ways, RTX and padding,
 two clients on one port, data channels, renegotiation, ICE restart, callbacks that call
 back in, close).
@@ -161,21 +161,35 @@ Found in `rtc` 0.21.1 while building it (the places named are under `src/` of th
    by), what migration between nodes needs, the selected candidate pair other than through
    the statistics, pion's own congestion control interceptors (not used by default).
 
-What the ported code has asked of the layer since, and does not have yet (each found by the
-port that needed it; to be added before `pkg/rtc/transport.go` is ported):
+Added since, when the ports that use the layer asked for them: the selected candidate pair
+(an event and an accessor; `rtc` has only an internal event, so the layer looks after each
+STUN message and each ICE state change), a setting engine of the layer's own that can be
+copied and changed per connection (`rtc`'s cannot be read or changed once built), the
+addresses one connection advertises when they differ from the node's, ICE servers in the
+configuration (kept and validated; nothing gathers from them), a distinct error for sending
+on a closed data channel and any number of listeners for a channel's low threshold, and
+`rtc`'s ICE and STUN types under the layer's names, so that nothing outside `webrtc/` names
+the library. The layer has fifteen tests of its own now.
 
-- an event or accessor for the selected candidate pair (`rtc` has
-  `get_selected_candidate_pair()` on its ICE transport and only an internal change event);
-  `rtc/types/ice.rs` records it for the fallback from UDP to TCP to TURN;
-- re-exports of `rtc`'s ICE candidate types, so that files outside `webrtc/` do not name
-  `rtc` (`rtc/types/ice.rs` and `mediatransportutil/rtcconfig` do today);
-- a distinct error for sending on a closed data channel (upstream acts on it), and more
-  than one listener for a channel's low threshold;
-- candidates per connection (LiveKit gives some clients only the external addresses), a
-  setting engine that can be copied and changed per connection, ICE servers in the
-  configuration;
-- what `docs/port-status.md` lists under the options of the `rtc:` section: a TCP listener,
-  a port range, IPv6, the STUN port.
+Still not there, each with what it would take:
+
+- **ICE over TCP**: an accept loop in the node, RFC 4571 framing (`rtc` has it), a route
+  per TCP stream, passive TCP host candidates, a write buffer per stream.
+- **A port range**, **IPv6**, **the STUN port as an ICE port**: more listeners in the node;
+  the routing already keys on family and port.
+- **Server reflexive and relay candidates** from ICE servers: a gatherer (a STUN and TURN
+  client per connection). **mDNS**: a multicast socket and routing of its answers.
+- **Announcing a track before its first packet** (`SetFireOnTrackBeforeFirstRTP`): `rtc`
+  announces on the first packet only.
+- **Detached data channels**: the ported writer waits on the buffered amount instead.
+- **Migration between nodes** (`SetMid`, `SetSender`): left out with migration itself.
+- For the packet sink: it is not told about local streams or about the connection's close
+  (two defaulted methods of `PacketSink` and their calls), a buffer's `write` takes no
+  arrival time, and the codec of a payload type cannot be asked of the connection for a
+  stream that was not announced (the repair stream of a simulcast layer is therefore
+  announced to its user when it is paired, which is normally at its first packet).
+- Nothing bounds the number of SSRCs a peer can make buffers for; pion has the same
+  exposure.
 
 ## Not tested
 

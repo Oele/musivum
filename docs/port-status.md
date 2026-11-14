@@ -54,6 +54,9 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/interfaces.go` | `sfu/interfaces.rs` | | `TrackReceiver`, `RedTransformer`, `TrackSender`, `DownTrackListener` and `DownTrackStreamAllocatorListener` as traits with fakes. |
 | `pkg/sfu/pacer/` (six files) | `sfu/pacer/` (same names) | 2 / 2 | Ten tests added: what each of the three pacers stamps and tells the estimator, compared with a run of the original (header bytes, sizes, send times where LiveKit's rounding differs from pion's). A packet owns its parts: no pools and no scratch buffers, at the cost of two small allocations per send for the stamped extensions. `Pacer` has a fake. One assertion on allocations left out. |
 | `pkg/sfu/redreceiver.go`, `redprimaryreceiver.go` | `sfu/redreceiver.rs`, `redprimaryreceiver.rs` | 4 / 4 | The methods that forward to the wrapped receiver are what Go's embedding was. Seven assertions that compare with `ReceiverBase` are left out until the receiver is ported, and `TestRedReceiverReusedReadBuffer` runs with a stand-in for the buffer: both to be redone then. The state `ForwardRTP` changes has a lock the original does not need. `close_track_senders` of `receiver_base.go` is in `redreceiver.rs` until the receiver is ported. |
+| `pkg/sfu/receiver_base.go`, `receiver.go`, `track_remote.go` | `sfu/receiver_base.rs`, `receiver.rs`, `track_remote.rs` | 2 / 2 | Eight tests added that run a real buffer behind a receiver, most with values from the same steps against the original (packets at the down tracks in order, a down track added later, a read by sequence number, PLI throttling, a restart, the close path, nothing holding a closed receiver). One forwarding task per buffer, which holds its receiver weakly. A RED transformer is dropped on close (it holds the receiver's base). A restart waits for the forwarders with `block_in_place`: the receiver needs the multi-thread runtime. `sfu.go` is pools only and has no counterpart. With it, the assertions of `redreceiver_test.rs` that had waited for the receiver and the buffer are restored. One benchmark left out. |
+| `pkg/sfu/interceptor/rtx.go`, `unhandlesimulcast.go`; mtu `pkg/interceptor/rttfromxr.go` | `sfu/interceptor/` (same names) | none upstream | pion's interceptors as objects the packet sink calls. `unhandlesimulcast` is ported as logic and called by nothing: stamping mid and rid onto packets cannot place a stream in `rtc`, which decides a packet's stream before anything sees it. |
+| (new, in place of pion's buffer factory door) | `sfu/interceptor/sink.rs` | | The packet sink of a connection: RTP to the buffer of its SSRC, each RTCP packet to the reader of every SSRC it is addressed to, repair streams paired from the description or learned from the first packets (the simulcast case `rtc` does not pair), buffers closed with their stream. Eighteen tests with the three ported files, four of them on two connections in one process (media into a bound buffer, RTX repairing it, three simulcast layers each paired with its repair stream). |
 | `pkg/sfu/downtrack.go` | `sfu/downtrack.rs` | 8 / 11 | Its tests are upstream's integration test over pion's virtual network; the eight that exercise the down track itself run on a bound context of the test's own with a recording writer and a fake receiver, their expected bytes and counts taken from a run of the original. Not ported yet: two that need the stream allocator (with it), and one that tests pion's virtual network. Two tests added. Each lock guards what it guards upstream. The down track holds its receiver strongly and its listeners and transceiver weakly. `close` blocks the calling thread up to a second, as upstream. The SDES item with the transceiver's mid is not written (`rtc-rtcp` has no such item type). One assertion on allocations left out. `DownTrackStreamAllocatorListener` of `interfaces.go` came with it. |
 | `pkg/sfu/forwarder.go` | `sfu/forwarder.rs` | 34 / 34 | Every subtest and table case. A selector is swapped by taking the old one out of its field (a null selector stands in until the new one is assigned). `GetTranslationParams` returns the parameters together with the error, as the original does. The 400 random pairs of one subtest are written out from a run of Go's generator. |
 | `pkg/sfu/playoutdelay.go` | `sfu/playoutdelay.rs` | 1 / 1 | |
@@ -145,6 +148,14 @@ Clients that cannot use UDP are therefore not served yet (an open question of th
   the TURN credential). The port logs a message with `Debug`, in full. The lines concerned
   are at debug level ("handling signal request", "sent signal response", a participant's
   init). To be settled for the whole crate before it serves real users.
+- **Simulcast announced by SSRCs instead of rids.** A publisher whose description lists
+  its layers as `a=ssrc-group:SIM` without rids gets one track in `rtc` (the last SSRC
+  listed); its other layers reach the sink and wait in buffers nobody binds. pion places
+  them with LiveKit's `unhandlesimulcast` interceptor. LiveKit's SDKs and the browsers
+  tested announce rids. Pinned by a test of the sink.
+- **A client that nominates another candidate pair without an ICE restart is not
+  followed.** `rtc`'s ICE agent selects a pair only while it has none; pion's follows a
+  later nomination. The server keeps sending to the old address until ICE times out.
 - **The mid in a sender's SDES.** The down track's source description carries the CNAME
   only; the original adds an item with the transceiver's mid (type 15), which `rtc-rtcp`
   0.21 cannot write and reads as the end of the list.
@@ -289,6 +300,17 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `receiver_base.go`: in `SetCodecWithState` the reason "codec suspended" is overwritten by
+  the fall-through, so buffers are always cleared with "codec invalid". A detected restart
+  waits for the forwarders of all layers while only the detecting buffer wakes its reader,
+  so an idle simulcast layer holds the restart until its next packet. On a WebRTC receiver,
+  the RED receivers and `ReceiverRestart` hand out the embedded base, so calls through a
+  RED receiver skip the outer type's overrides. `ErrDownTrackAlreadyExist` is never
+  returned.
+- `interceptor/unhandlesimulcast.go`: the value of the repaired-rid extension is assigned
+  to `rid`, and `rsid` stays empty. mtu `rttfromxr.go`: LiveKit's RTCP reader reads
+  nothing, so upstream the interceptor's read side never runs and only its once-a-second
+  receiver reference time report is live.
 - `buffer/buffer.go`: `Write` always reports 0 bytes written; `Close` calls `onClose` on
   every call; the FEC decoder is fed media packets under their padding-adjusted sequence
   numbers while the FEC masks are in the publisher's numbering (it affects only the
