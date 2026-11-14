@@ -269,10 +269,11 @@ struct Peer {
 impl Peer {
     /// A server's connection: ICE lite, and the DTLS server when it answers.
     fn server_on(node: &Node) -> Peer {
-        let setting_engine = SettingEngineBuilder::new()
-            .with_lite(true)
-            .with_answering_dtls_role(DtlsRole::Server)
-            .build();
+        let setting_engine = SettingEngine {
+            lite: true,
+            answering_dtls_role: DtlsRole::Server,
+            ..Default::default()
+        };
         Peer::new(node, setting_engine)
     }
 
@@ -284,17 +285,22 @@ impl Peer {
     fn client() -> Peer {
         Peer::new(
             &Node::new(NodeConfig::default()).unwrap(),
-            SettingEngineBuilder::new().build(),
+            SettingEngine::default(),
         )
     }
 
     fn new(node: &Node, setting_engine: SettingEngine) -> Peer {
+        Peer::with_servers(node, setting_engine, Vec::new())
+    }
+
+    fn with_servers(node: &Node, setting_engine: SettingEngine, servers: Vec<IceServer>) -> Peer {
         let sink = Arc::new(Recorder::default());
         let pc = PeerConnection::new(
             node,
             Configuration {
                 media_engine: media_engine(),
                 setting_engine,
+                ice_servers: servers,
                 packet_sink: Some(sink.clone()),
                 ..Default::default()
             },
@@ -343,6 +349,9 @@ fn negotiate_with(
     assert_eq!(offer.r#type, SdpType::Offer);
     offerer.set_local_description(offer).unwrap();
     assert_eq!(offerer.signaling_state(), SignalingState::HaveLocalOffer);
+    // Nothing is waited for where LiveKit waits for pion's `GatheringCompletePromise`: when
+    // the local description is set, the candidates are in it.
+    assert_eq!(offerer.ice_gathering_state(), IceGatheringState::Complete);
     answerer
         .set_remote_description(offerer.local_description().unwrap())
         .unwrap();
@@ -1558,4 +1567,356 @@ async fn test_simulcast_layers_are_tracks() {
 
     client.pc.close().unwrap();
     server.pc.close().unwrap();
+}
+
+/// What a connection told about its ICE transport, in the order it was told.
+#[derive(Clone, Debug, PartialEq)]
+enum IceEvent {
+    State(IceConnectionState),
+    Pair(Box<IceCandidatePair>),
+}
+
+fn ice_events(peer: &Peer) -> Arc<Mutex<Vec<IceEvent>>> {
+    let events = Arc::new(Mutex::new(Vec::new()));
+    peer.pc.on_ice_connection_state_change({
+        let events = events.clone();
+        move |state| events.lock().push(IceEvent::State(state))
+    });
+    peer.pc.on_selected_candidate_pair_change({
+        let events = events.clone();
+        let pc = peer.pc.clone();
+        move |pair| {
+            // Nothing of the connection is locked: the callback asks it for the pair.
+            assert_eq!(pc.get_selected_candidate_pair().as_ref(), Some(&pair));
+            events.lock().push(IceEvent::Pair(Box::new(pair)));
+        }
+    });
+    events
+}
+
+fn pairs_of(events: &Mutex<Vec<IceEvent>>) -> Vec<IceCandidatePair> {
+    events
+        .lock()
+        .iter()
+        .filter_map(|e| match e {
+            IceEvent::Pair(pair) => Some((**pair).clone()),
+            IceEvent::State(_) => None,
+        })
+        .collect()
+}
+
+/// The selected candidate pair: told once when the connection comes up, after the state that
+/// came with it, told again after an ICE restart, and to be asked for in between.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_selected_candidate_pair() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let (at_server, at_client) = (ice_events(&server), ice_events(&client));
+    let channel = client.pc.create_data_channel("data", None).unwrap();
+    let log = ChannelLog::watch(&channel);
+    assert_eq!(server.pc.get_selected_candidate_pair(), None);
+    assert_eq!(client.pc.get_selected_candidate_pair(), None);
+
+    negotiate(&client.pc, &server.pc);
+    connected(&client, &server).await;
+    eventually_async(
+        || pairs_of(&at_server).len() == 1 && pairs_of(&at_client).len() == 1,
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // Each side has its own node's address and the other's.
+    let ports = (
+        server.node.local_addr().port(),
+        client.node.local_addr().port(),
+    );
+    let pair = pairs_of(&at_server)[0].clone();
+    assert_eq!(
+        (pair.local().address.as_str(), pair.local().port),
+        ("127.0.0.1", ports.0)
+    );
+    assert_eq!(
+        (pair.remote().address.as_str(), pair.remote().port),
+        ("127.0.0.1", ports.1)
+    );
+    assert_eq!(pair.local().typ, IceCandidateType::Host);
+    assert_eq!(pair.local().protocol, IceProtocol::Udp);
+    assert_eq!(server.pc.get_selected_candidate_pair(), Some(pair));
+    let pair = pairs_of(&at_client)[0].clone();
+    assert_eq!((pair.local().port, pair.remote().port), (ports.1, ports.0));
+    assert_eq!(client.pc.get_selected_candidate_pair(), Some(pair));
+
+    // The pair was told after the state it came with.
+    for events in [&at_server, &at_client] {
+        let events = events.lock();
+        let at = events
+            .iter()
+            .position(|e| matches!(e, IceEvent::Pair(_)))
+            .unwrap();
+        assert!(
+            events[..at].contains(&IceEvent::State(IceConnectionState::Connected)),
+            "{events:?}"
+        );
+    }
+
+    // Traffic changes nothing: the pair is told when it changes, not when it is looked at.
+    eventually_async(|| log.is_open(), WAIT, TICK).await;
+    for _ in 0..20 {
+        channel.send(&[1; 100]).unwrap();
+    }
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert_eq!(pairs_of(&at_server).len(), 1);
+    assert_eq!(pairs_of(&at_client).len(), 1);
+
+    // An ICE restart drops the pair, and the one that is selected then is told, though its
+    // addresses are the same.
+    negotiate_with(
+        &client.pc,
+        &server.pc,
+        Some(OfferOptions { ice_restart: true }),
+    );
+    eventually_async(
+        || pairs_of(&at_server).len() == 2 && pairs_of(&at_client).len() == 2,
+        WAIT,
+        TICK,
+    )
+    .await;
+    let pair = pairs_of(&at_server)[1].clone();
+    assert_eq!((pair.local().port, pair.remote().port), ports);
+    assert_eq!(server.pc.get_selected_candidate_pair(), Some(pair));
+    assert!(
+        at_server
+            .lock()
+            .contains(&IceEvent::State(IceConnectionState::Checking))
+    );
+
+    // A closed connection has no pair, and tells none.
+    server.pc.close().unwrap();
+    assert_eq!(server.pc.get_selected_candidate_pair(), None);
+    client.pc.close().unwrap();
+    eventually_async(|| server.node.connection_count() == 0, WAIT, TICK).await;
+    assert_eq!(pairs_of(&at_server).len(), 2);
+}
+
+/// What a send on a data channel fails with when the channel is not open yet and when it was
+/// closed, and more than one listener for the low threshold of a channel.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_data_channel_send_errors_and_listeners() {
+    let server = Peer::server();
+    let client = Peer::client();
+    let at_server = Arc::new(Mutex::new(Vec::new()));
+    server.pc.on_data_channel({
+        let at_server = at_server.clone();
+        move |channel| at_server.lock().push(channel)
+    });
+
+    let channel = client.pc.create_data_channel("data", None).unwrap();
+    let other = client.pc.create_data_channel("other", None).unwrap();
+    // The handler, and two that listen beside it.
+    let log = ChannelLog::watch(&channel);
+    let listeners = [Arc::new(AtomicUsize::new(0)), Arc::new(AtomicUsize::new(0))];
+    for listener in &listeners {
+        let listener = listener.clone();
+        channel.add_buffered_amount_low_listener(move || {
+            listener.fetch_add(1, Ordering::SeqCst);
+        });
+    }
+
+    // Not open yet: pion's `Send` says a closed pipe.
+    assert_eq!(channel.send(b"too early"), Err(Error::ClosedPipe));
+    assert_eq!(channel.send_text("too early"), Err(Error::ClosedPipe));
+
+    negotiate(&client.pc, &server.pc);
+    connected(&client, &server).await;
+    eventually_async(
+        || {
+            log.is_open()
+                && other.ready_state() == DataChannelState::Open
+                && at_server.lock().len() == 2
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // More than goes out at once: when it has drained, the handler and both listeners were
+    // told, each as often as the others.
+    channel.set_buffered_amount_low_threshold(16 * 1024);
+    for _ in 0..64 {
+        channel.send(&[7u8; 4096]).unwrap();
+    }
+    eventually_async(|| channel.buffered_amount() == 0, WAIT, TICK).await;
+    eventually_async(
+        || {
+            let low = log.low.load(Ordering::SeqCst);
+            low >= 1 && listeners.iter().all(|l| l.load(Ordering::SeqCst) == low)
+        },
+        WAIT,
+        TICK,
+    )
+    .await;
+
+    // Closed by this side: from then on the stream is closed, at once and for good.
+    channel.close().unwrap();
+    assert_eq!(channel.send(b"too late"), Err(Error::StreamClosed));
+    assert_eq!(channel.send_text("too late"), Err(Error::StreamClosed));
+    // And for the other side, once it has been told.
+    let remote = at_server
+        .lock()
+        .iter()
+        .find(|c| c.label() == "data")
+        .cloned()
+        .unwrap();
+    eventually_async(
+        || remote.ready_state() == DataChannelState::Closed,
+        WAIT,
+        TICK,
+    )
+    .await;
+    assert_eq!(remote.send(b"too late"), Err(Error::StreamClosed));
+    eventually_async(|| log.closed.load(Ordering::SeqCst) == 1, WAIT, TICK).await;
+    assert_eq!(channel.send(b"too late"), Err(Error::StreamClosed));
+    // A listener that is added to a closed channel is not kept.
+    channel.add_buffered_amount_low_listener(|| panic!("the channel is closed"));
+
+    // The other channel goes on, until its connection is closed.
+    other.send(b"still here").unwrap();
+    client.pc.close().unwrap();
+    assert_eq!(other.send(b"too late"), Err(Error::StreamClosed));
+    server.pc.close().unwrap();
+}
+
+/// Two connections of one node with settings of their own: one as the node is set up (ICE
+/// lite, the node's addresses), and one that is a full ICE agent, advertises an address of
+/// its own and was given ICE servers, as LiveKit changes its copy of the setting engine for
+/// some clients.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn test_settings_per_connection() {
+    // pion's setters that do more than set a field.
+    let mut settings = SettingEngine::default();
+    assert!(settings.set_answering_dtls_role(DtlsRole::Auto).is_err());
+    settings.set_answering_dtls_role(DtlsRole::Server).unwrap();
+    settings.set_ice_timeouts(
+        crate::go::time::Duration::from_secs(4),
+        crate::go::time::Duration::from_secs(6),
+        crate::go::time::Duration::from_secs(1),
+    );
+    assert_eq!(
+        settings,
+        SettingEngine {
+            answering_dtls_role: DtlsRole::Server,
+            ice_disconnected_timeout: Some(crate::go::time::Duration::from_secs(4)),
+            ice_failed_timeout: Some(crate::go::time::Duration::from_secs(6)),
+            ice_keepalive_interval: Some(crate::go::time::Duration::from_secs(1)),
+            ..Default::default()
+        }
+    );
+
+    // The node advertises two addresses. Its socket is at the second one only, and what
+    // arrives there is told to `rtc` as having arrived at the first.
+    let unused: std::net::IpAddr = "127.0.0.9".parse().unwrap();
+    let own: std::net::IpAddr = "127.0.0.1".parse().unwrap();
+    let node = Node::new(NodeConfig {
+        nat_1to1_ips: vec![unused, own],
+        ..Default::default()
+    })
+    .unwrap();
+    let port = node.local_addr().port();
+    assert_eq!(
+        node.candidates_for(&["::1".parse().unwrap(), own]),
+        vec![SocketAddr::new(own, port)]
+    );
+
+    // As the node is set up.
+    let plain = Peer::server_on(&node);
+    // A copy of those settings, changed for one connection.
+    let servers = vec![IceServer {
+        urls: vec!["stun:stun.example.org:3478".to_string()],
+        ..Default::default()
+    }];
+    let changed = Peer::with_servers(
+        &node,
+        SettingEngine {
+            lite: false,
+            host_candidate_ips: Some(vec![own]),
+            ..settings.clone()
+        },
+        servers.clone(),
+    );
+    assert!(plain.pc.ice_servers().is_empty());
+    assert_eq!(changed.pc.ice_servers(), servers);
+    // A server whose URL cannot be read is refused when the connection is made.
+    assert!(
+        PeerConnection::new(
+            &node,
+            Configuration {
+                ice_servers: vec![IceServer {
+                    urls: vec!["nonsense".to_string()],
+                    ..Default::default()
+                }],
+                ..Default::default()
+            }
+        )
+        .is_err()
+    );
+
+    let clients = [Peer::client(), Peer::client()];
+    let channels = [
+        clients[0].pc.create_data_channel("data", None).unwrap(),
+        clients[1].pc.create_data_channel("data", None).unwrap(),
+    ];
+    let logs = [
+        ChannelLog::watch(&channels[0]),
+        ChannelLog::watch(&channels[1]),
+    ];
+    let _echo = [echo_incoming(&plain), echo_incoming(&changed)];
+    negotiate(&clients[0].pc, &plain.pc);
+    negotiate(&clients[1].pc, &changed.pc);
+
+    // What each tells its client.
+    let candidate = |ip: std::net::IpAddr| format!(" {ip} {port} typ host");
+    let sdp = plain.pc.local_description().unwrap().sdp;
+    assert!(sdp.contains("a=ice-lite"), "{sdp}");
+    assert!(sdp.contains(&candidate(unused)), "{sdp}");
+    assert!(sdp.contains(&candidate(own)), "{sdp}");
+    let sdp = changed.pc.local_description().unwrap().sdp;
+    assert!(!sdp.contains("a=ice-lite"), "{sdp}");
+    assert!(!sdp.contains(&candidate(unused)), "{sdp}");
+    assert!(sdp.contains(&candidate(own)), "{sdp}");
+    assert!(
+        sdp.lines()
+            .filter(|line| line.starts_with("a=candidate"))
+            .all(|line| line.contains(&candidate(own))),
+        "{sdp}"
+    );
+
+    // Both come up, and both carry data.
+    connected(&clients[0], &plain).await;
+    connected(&clients[1], &changed).await;
+    eventually_async(|| logs.iter().all(|l| l.is_open()), WAIT, TICK).await;
+    for (i, channel) in channels.iter().enumerate() {
+        channel.send(&[i as u8; 10]).unwrap();
+    }
+    eventually_async(
+        || logs.iter().all(|l| l.messages.lock().len() == 1),
+        WAIT,
+        TICK,
+    )
+    .await;
+    for (i, log) in logs.iter().enumerate() {
+        assert_eq!(&log.messages.lock()[0].data[..], &[i as u8; 10]);
+    }
+    // The connection with an address of its own is at that address.
+    let pair = changed.pc.get_selected_candidate_pair().unwrap();
+    assert_eq!(
+        (pair.local().address.as_str(), pair.local().port),
+        ("127.0.0.1", port)
+    );
+    assert_eq!(node.stats().datagrams_without_route, 0);
+
+    for peer in [&plain, &changed].into_iter().chain(&clients) {
+        peer.pc.close().unwrap();
+    }
+    eventually_async(|| node.connection_count() == 0, WAIT, TICK).await;
 }

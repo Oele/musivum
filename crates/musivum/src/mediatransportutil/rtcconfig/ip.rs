@@ -19,12 +19,13 @@ use std::io;
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, ToSocketAddrs, UdpSocket};
 use std::time::Instant;
 
-use rtc::stun::message::{BINDING_REQUEST, Getter, Message, TransactionId};
-use rtc::stun::xoraddr::XorMappedAddress;
 use tokio_util::sync::CancellationToken;
 
 use crate::go::time::Duration;
 use crate::protocol::logger;
+use crate::webrtc::stun;
+use crate::webrtc::stun::message::{BINDING_REQUEST, Getter, Message, TransactionId};
+use crate::webrtc::stun::xoraddr::XorMappedAddress;
 use crate::{debugw, infow, warnw};
 
 use super::config::parse_ip;
@@ -301,7 +302,7 @@ fn find_external_ip(
     let conn = dial(network, stun_server, local_addr)?;
     conn.set_read_timeout(Some(POLL_INTERVAL.to_std()))?;
 
-    let stun_err = |err: rtc::shared::error::Error| Error::Stun(err.to_string());
+    let stun_err = |err: stun::Error| Error::Stun(err.to_string());
     let mut message = Message::new();
     message
         .build(&[Box::new(TransactionId::new()), Box::new(BINDING_REQUEST)])

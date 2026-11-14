@@ -5,9 +5,11 @@
 // (`crate::webrtc::peerconnection`) where the original is written against pion. What that
 // changes:
 // - `WebRTCConfig.SettingEngine` is a `SettingEngineConfig`: the settings the original makes
-//   on pion's engine, as data. `rtc`'s engine can be neither read nor changed once it is
-//   built, and LiveKit changes its copy for every connection; `builder` and `build` make the
-//   layer's engine from it, with the settings `rtc` has.
+//   on pion's engine, as data, which LiveKit copies and changes for every connection.
+//   `build` makes the layer's engine from it, with the settings the layer has, and
+//   `host_candidate_ips` works out the addresses a connection made from a changed copy
+//   advertises (the layer gathers nothing, so the filters and the rewrite rules are applied
+//   here).
 // - `WebRTCConfig.UDPMux` is `node_config`: what the node's one socket is made from. No
 //   socket is bound here; `Node::new` does that. The addresses the node advertises are
 //   worked out here once (`node_config_for`), as pion's agent works them out for every
@@ -18,7 +20,8 @@
 //   livekit/ice v4.4.0-warp.3, MIT) for the rules this package makes, so an address in a
 //   rule that is none is refused here and not when the first connection gathers.
 // - `WebRTCConfig.Configuration` is `ice_servers`, the one thing the original sets in it
-//   besides the SDP semantics, which are always unified plan in `rtc`.
+//   besides the SDP semantics, which are always unified plan in `rtc`. They go into the
+//   layer's `Configuration.ice_servers`.
 // - `WebRTCConfig.TCPMuxListener` is not there: no listener is opened.
 // - What the layer cannot do yet is said in the log when the option is set (`not_applied`):
 //   see the table in the description of `new_webrtc_config`.
@@ -35,11 +38,10 @@ use std::sync::mpsc;
 use std::time::Instant;
 
 use rand::RngExt;
-use rtc::peer_connection::configuration::setting_engine::SctpMaxMessageSize;
 
 use crate::go::time::Duration;
 use crate::protocol::logger;
-use crate::webrtc::peerconnection::{IceServer, NodeConfig, SettingEngine, SettingEngineBuilder};
+use crate::webrtc::peerconnection::{IceServer, NodeConfig, SettingEngine};
 use crate::{infow, warnw};
 
 use super::config::{DEFAULT_UDP_BUFFER_SIZE, parse_ip};
@@ -48,12 +50,12 @@ use super::{
     DEFAULT_STUN_SERVERS, Error, InterfacesConfig, IpsConfig, RtcConfig, get_local_ip_addresses,
 };
 
-/// pion's `MulticastDNSMode`, as `rtc` has it.
-pub use rtc::ice::mdns::MulticastDnsMode;
-/// pion's `NetworkType`, as `rtc` has it.
-pub use rtc::ice::network_type::NetworkType;
-/// pion's `ICECandidateType`, as `rtc` has it.
-pub use rtc::peer_connection::transport::RTCIceCandidateType as IceCandidateType;
+/// pion's `MulticastDNSMode`, as the connection layer has it.
+pub use crate::webrtc::ice::MulticastDnsMode;
+/// pion's `ICECandidateType`, as the connection layer has it.
+pub use crate::webrtc::peerconnection::IceCandidateType;
+/// pion's `NetworkType`, as the connection layer has it.
+pub use crate::webrtc::peerconnection::NetworkType;
 
 /// Go's `func(string) bool` on the name of an interface: whether it is to be used.
 pub type InterfaceFilter = Arc<dyn Fn(&str) -> bool + Send + Sync>;
@@ -62,8 +64,8 @@ pub type IpFilter = Arc<dyn Fn(IpAddr) -> bool + Send + Sync>;
 
 #[derive(Clone)]
 pub struct WebRtcConfig {
-    /// `Configuration.ICEServers` of the original. The layer takes none: its connections
-    /// gather nothing.
+    /// `Configuration.ICEServers` of the original. A connection of the layer is given them
+    /// (`Configuration.ice_servers`) and gathers nothing from them.
     pub ice_servers: Vec<IceServer>,
     pub setting_engine: SettingEngineConfig,
     /// What the node's socket is made from (`Node::new`): it stands where `UDPMux` did.
@@ -125,38 +127,41 @@ impl SettingEngineConfig {
         Ok(())
     }
 
-    /// The builder of the layer's `SettingEngine` with what `rtc` has of these settings: ICE
-    /// lite, the mDNS mode, the waits before a candidate pair is accepted, the largest SCTP
-    /// message, and of the network types the ones over UDP (the node has no other socket).
-    /// The caller goes on from there with the settings of its own.
-    pub fn builder(&self) -> SettingEngineBuilder {
-        let wait = |d: Duration| (d > Duration::ZERO).then(|| d.to_std());
-        let mut builder = SettingEngineBuilder::new()
-            .with_multicast_dns_mode(self.ice_multicast_dns_mode)
-            .with_network_types(
-                self.network_types
-                    .iter()
-                    .copied()
-                    .filter(|t| matches!(t, NetworkType::Udp4 | NetworkType::Udp6))
-                    .collect(),
-            )
-            .with_host_acceptance_min_wait(wait(self.host_acceptance_min_wait))
-            .with_srflx_acceptance_min_wait(wait(self.srflx_acceptance_min_wait))
-            .with_prflx_acceptance_min_wait(wait(self.prflx_acceptance_min_wait))
-            .with_relay_acceptance_min_wait(wait(self.relay_acceptance_min_wait))
-            .with_include_loopback_candidate(self.include_loopback_candidate)
-            .with_lite(self.lite);
-        if self.sctp_max_message_size > 0 {
-            builder = builder.with_sctp_max_message_size(SctpMaxMessageSize::Bounded(
-                self.sctp_max_message_size,
-            ));
+    /// The layer's `SettingEngine` with what the layer has of these settings: ICE lite, the
+    /// mDNS mode, the waits before a candidate pair is accepted, the largest SCTP message,
+    /// and of the network types the ones over UDP (the node has no other socket). The caller
+    /// goes on from there with the settings of its own (the layer's engine is data too).
+    ///
+    /// A connection made with it advertises the node's addresses. For a copy of these
+    /// settings whose filters or rewrite rules were changed for one connection, the addresses
+    /// are those of `host_candidate_ips`, to be put into the engine's field of that name.
+    pub fn build(&self) -> SettingEngine {
+        let wait = |d: Duration| (d > Duration::ZERO).then_some(d);
+        SettingEngine {
+            lite: self.lite,
+            host_acceptance_min_wait: wait(self.host_acceptance_min_wait),
+            srflx_acceptance_min_wait: wait(self.srflx_acceptance_min_wait),
+            prflx_acceptance_min_wait: wait(self.prflx_acceptance_min_wait),
+            relay_acceptance_min_wait: wait(self.relay_acceptance_min_wait),
+            ice_multicast_dns_mode: self.ice_multicast_dns_mode,
+            network_types: self
+                .network_types
+                .iter()
+                .copied()
+                .filter(|t| matches!(t, NetworkType::Udp4 | NetworkType::Udp6))
+                .collect(),
+            sctp_max_message_size: self.sctp_max_message_size,
+            ..Default::default()
         }
-        builder
     }
 
-    /// The layer's `SettingEngine` with these settings.
-    pub fn build(&self) -> SettingEngine {
-        self.builder().build()
+    /// The addresses a connection made from these settings gives as host candidates: what
+    /// pion's agent makes of the addresses of the UDP mux with this engine's filters and
+    /// rewrite rules. For the settings `new_webrtc_config` made they are the node's
+    /// (`node_config.nat_1to1_ips`, which has the IPv4 ones). It asks the system for its
+    /// interfaces.
+    pub fn host_candidate_ips(&self) -> Result<Vec<IpAddr>, Error> {
+        host_candidate_ips_of(self, self.include_loopback_candidate)
     }
 }
 
@@ -207,12 +212,12 @@ fn not_applied(option: &str, value: &dyn fmt::Debug, reason: &str) {
 /// | `require_ipv4` | in `validate` only, as in the original |
 /// | `interfaces`, `ips` | which local addresses are advertised and asked about; logged: the socket itself listens on all addresses |
 /// | `enable_loopback_candidate` | loopback addresses are advertised too |
-/// | `use_ice_lite` | `setting_engine.lite`, to `rtc` |
+/// | `use_ice_lite` | `setting_engine.lite`, to the layer |
 /// | `use_mdns` | off: `rtc` is told to drop mDNS candidates, and `use_mdns` is there for the server to drop them from what it signals; on: logged, the node gives the answer to an mDNS query to no connection |
 /// | `stun_servers` as the ICE servers of a server that is not ICE lite and has no address set | kept (`ice_servers`) and logged: the connections gather no server reflexive candidates |
 /// | `batch_io` | logged: the node writes every datagram at once |
 /// | `sctp_min_cwnd`, `sctp_fast_rtx_wnd`, `sctp_cwnd_ca_step` | kept and logged: `rtc` has no such settings |
-/// | `host_acceptance_min_wait` and the three like it | to `rtc` |
+/// | `host_acceptance_min_wait` and the three like it | to the layer |
 /// | (no option) the buffers of 16 MiB on the socket | logged: the node's socket has the system's |
 /// | (no option) IPv6 | logged when there are such addresses: the node's socket is IPv4 |
 #[cfg_attr(not(unix), allow(unused_variables))]
@@ -440,14 +445,7 @@ fn node_config_for(
     port: u16,
     include_loopback: bool,
 ) -> Result<NodeConfig, Error> {
-    let local_ips = local_interfaces(
-        &interfaces()?,
-        s.interface_filter.as_ref(),
-        s.ip_filter.as_ref(),
-        &[NetworkType::Udp4, NetworkType::Udp6],
-        include_loopback,
-    );
-    let candidates = host_candidate_ips(&local_ips, &s.ice_address_rewrite_rules)?;
+    let candidates = host_candidate_ips_of(s, include_loopback)?;
     let (v4, v6): (Vec<IpAddr>, Vec<IpAddr>) = candidates.into_iter().partition(IpAddr::is_ipv4);
     if !v6.is_empty() {
         not_applied(
@@ -468,6 +466,21 @@ fn node_config_for(
         nat_1to1_ips: v4,
         logger: logger::get_logger(),
     })
+}
+
+/// The host candidates of a UDP mux made with these settings, of both families.
+fn host_candidate_ips_of(
+    s: &SettingEngineConfig,
+    include_loopback: bool,
+) -> Result<Vec<IpAddr>, Error> {
+    let local_ips = local_interfaces(
+        &interfaces()?,
+        s.interface_filter.as_ref(),
+        s.ip_filter.as_ref(),
+        &[NetworkType::Udp4, NetworkType::Udp6],
+        include_loopback,
+    );
+    host_candidate_ips(&local_ips, &s.ice_address_rewrite_rules)
 }
 
 // localInterfaces of pkg/transport/ip.go: the addresses `CreateUDPMuxesFromPorts` listens on.

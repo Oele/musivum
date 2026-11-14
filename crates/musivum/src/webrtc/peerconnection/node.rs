@@ -235,6 +235,24 @@ impl Node {
             .collect()
     }
 
+    /// What a connection that advertises these addresses in the place of the node's own
+    /// tells a client to send to: each address with the port of the socket that can be
+    /// reached at it. An address of a family the node has no socket for is left out.
+    pub(crate) fn candidates_for(&self, ips: &[IpAddr]) -> Vec<SocketAddr> {
+        let mut candidates = Vec::new();
+        for listener in &self.inner.listeners {
+            for ip in ips {
+                let candidate = SocketAddr::new(ip.to_canonical(), listener.local_addr.port());
+                if candidate.is_ipv4() == listener.local_addr.is_ipv4()
+                    && !candidates.contains(&candidate)
+                {
+                    candidates.push(candidate);
+                }
+            }
+        }
+        candidates
+    }
+
     /// How many connections of this node are alive: made and not yet closed and wound up.
     pub fn connection_count(&self) -> usize {
         self.inner.connections.load(Ordering::SeqCst)
@@ -384,11 +402,17 @@ impl Drop for ConnectionGuard {
 
 impl NodeInner {
     fn listener_for(&self, transport: &TransportContext) -> &Listener {
+        let local = transport.local_addr;
         self.listeners
             .iter()
-            .find(|l| {
-                l.protocol == transport.transport_protocol
-                    && l.candidates.contains(&transport.local_addr)
+            .find(|l| l.protocol == transport.transport_protocol && l.candidates.contains(&local))
+            // A connection with addresses of its own: they have the port of their socket.
+            .or_else(|| {
+                self.listeners.iter().find(|l| {
+                    l.protocol == transport.transport_protocol
+                        && l.local_addr.port() == local.port()
+                        && l.local_addr.is_ipv4() == local.is_ipv4()
+                })
             })
             .unwrap_or(&self.listeners[0])
     }

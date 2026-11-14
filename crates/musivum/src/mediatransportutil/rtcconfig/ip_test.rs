@@ -9,11 +9,10 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::thread::JoinHandle;
 use std::time::Instant;
 
-use rtc::stun::message::{BINDING_ERROR, BINDING_SUCCESS, Message, TransactionId};
-use rtc::stun::xoraddr::XorMappedAddress;
-
 use super::super::{InterfacesConfig, IpsConfig, interface_filter_from_conf, ip_filter_from_conf};
 use super::*;
+use crate::webrtc::stun::message::{BINDING_ERROR, BINDING_SUCCESS, Message, TransactionId};
+use crate::webrtc::stun::xoraddr::XorMappedAddress;
 
 /// A STUN server of the test's own: on the loopback interface, on a port of the system's
 /// choosing. It answers as the test says.

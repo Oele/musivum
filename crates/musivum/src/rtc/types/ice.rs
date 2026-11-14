@@ -1,10 +1,10 @@
 // Ported from LiveKit, pkg/rtc/types/ice.go at v1.13.11.
 // Copyright 2023 LiveKit, Inc. Licensed under the Apache License, Version 2.0.
 // Changes: translated from Go to Rust; the candidates are those of the WebRTC library musivum
-// stands on: pion's `webrtc.ICECandidate` is the connection layer's `IceCandidate`, and its
-// `ice.Candidate`, `ice.UnmarshalCandidate`, `webrtc.ICECandidatePair` and the types of a
-// candidate's fields are `rtc`'s, named from that crate here because the layer does not
-// export them yet. A candidate line is parsed by `rtc`, which is stricter than pion in some
+// stands on, under the names the connection layer gives them: pion's `webrtc.ICECandidate`,
+// `webrtc.ICECandidatePair` and the types of a candidate's fields are in
+// `webrtc::peerconnection`, its `ice.Candidate` and `ice.UnmarshalCandidate` in
+// `webrtc::ice`. A candidate line is parsed by `rtc`, which is stricter than pion in some
 // places and laxer in others (the test file lists them). `ICEConnectionType` is an enum, its
 // order the original's, without `ReporterType()`: musivum does not have the reporting of
 // `observability/roomobs`. The candidates of the lists are values, not pointers:
@@ -16,16 +16,14 @@
 use std::fmt;
 
 use parking_lot::Mutex;
-use rtc::ice::candidate as ice;
-use rtc::peer_connection::transport::{
-    RTCIceCandidatePair as IceCandidatePair, RTCIceCandidateType as IceCandidateType,
-    RTCIceProtocol as IceProtocol,
-};
 
 use crate::errorw;
 use crate::protocol::livekit;
 use crate::protocol::logger::Logger;
-use crate::webrtc::peerconnection::{IceCandidate, IceCandidateInit};
+use crate::webrtc::ice;
+use crate::webrtc::peerconnection::{
+    IceCandidate, IceCandidateInit, IceCandidatePair, IceCandidateType, IceProtocol,
+};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum IceConnectionType {
@@ -343,7 +341,7 @@ impl IceConnectionDetailsInner {
 enum Error {
     // `ice.UnmarshalCandidate`
     #[error("{0}")]
-    Ice(#[from] rtc::shared::error::Error),
+    Ice(#[from] ice::Error),
     #[error("unknown ice candidate type: {0}")]
     UnknownIceCandidateType(ice::CandidateType),
     // `webrtc.NewICEProtocol`

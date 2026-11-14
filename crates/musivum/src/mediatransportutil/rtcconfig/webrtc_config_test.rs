@@ -497,8 +497,14 @@ fn test_new_webrtc_config_development() {
     assert_eq!(Duration::ZERO, s.host_acceptance_min_wait);
     assert!(s.include_loopback_candidate);
     assert!(!s.lite);
-    // What `rtc`'s engine lets be read of what was built from it.
-    assert_eq!(MulticastDnsMode::Disabled, s.build().multicast_dns().mode);
+    // The layer's engine that is built from it, and the addresses of a connection made
+    // from these settings: the node's.
+    let engine = s.build();
+    assert_eq!(MulticastDnsMode::Disabled, engine.ice_multicast_dns_mode);
+    assert_eq!(65535, engine.sctp_max_message_size);
+    assert!(!engine.lite);
+    assert_eq!(None, engine.host_candidate_ips);
+    assert_eq!(ips(&["127.0.0.1"]), s.host_candidate_ips().unwrap());
 
     // Not ICE lite and no address set by hand: the STUN servers of the original as ICE
     // servers.
@@ -567,7 +573,8 @@ fn test_new_webrtc_config_options() {
     let ip_filter = s.ip_filter.as_ref().unwrap();
     assert!(ip_filter("127.0.0.1".parse().unwrap()) && !ip_filter("192.0.2.10".parse().unwrap()));
     assert_eq!(MulticastDnsMode::QueryOnly, s.ice_multicast_dns_mode);
-    assert_eq!(MulticastDnsMode::QueryOnly, s.build().multicast_dns().mode);
+    let engine = s.build();
+    assert_eq!(MulticastDnsMode::QueryOnly, engine.ice_multicast_dns_mode);
     assert_eq!(
         vec![IceAddressRewriteRule {
             external: strings(&["203.0.113.5", "2001:db8::5"]),
@@ -597,6 +604,32 @@ fn test_new_webrtc_config_options() {
         ]
     );
     assert!(s.lite);
+
+    // The layer's engine has the settings the layer has. There is no socket for TCP: those
+    // types are not given to it.
+    assert_eq!(
+        vec![NetworkType::Udp4, NetworkType::Udp6],
+        engine.network_types
+    );
+    assert_eq!(
+        [100, 200, 300, 400].map(|ms| Some(Duration::from_millis(ms))),
+        [
+            engine.host_acceptance_min_wait,
+            engine.srflx_acceptance_min_wait,
+            engine.prflx_acceptance_min_wait,
+            engine.relay_acceptance_min_wait
+        ]
+    );
+    assert!(engine.lite);
+    // A copy that is changed for one connection, as LiveKit changes its copy of pion's
+    // engine: the addresses of that connection are worked out from the copy.
+    assert_eq!(ips(&["203.0.113.5"]), s.host_candidate_ips().unwrap());
+    let mut copy = s.clone();
+    set_nat_1to1_address_rewrite_rules(&mut copy, &strings(&["203.0.113.5"]), true).unwrap();
+    assert_eq!(
+        ips(&["127.0.0.1", "203.0.113.5"]),
+        copy.host_candidate_ips().unwrap()
+    );
 
     // The local address is advertised with the one set by hand.
     rtc_conf.advertise_internal_ip = true;

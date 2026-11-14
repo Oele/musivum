@@ -7,7 +7,7 @@ use bytes::{Bytes, BytesMut};
 use parking_lot::Mutex;
 use rtc::data_channel::{RTCDataChannel, RTCDataChannelId};
 
-use super::{DataChannelState, Delivery, Inner};
+use super::{Core, DataChannelState, Delivery, Inner};
 use crate::webrtc::Error;
 
 /// pion's `DataChannelInit`: what a data channel is created with.
@@ -49,7 +49,8 @@ pub struct DataChannelMessage {
     pub data: Bytes,
 }
 
-type Handler = Option<Arc<dyn Fn() + Send + Sync>>;
+type Listener = Arc<dyn Fn() + Send + Sync>;
+type Handler = Option<Listener>;
 
 struct State {
     // The SCTP stream, once the channel has one.
@@ -60,6 +61,8 @@ struct State {
     on_open: Handler,
     on_message: Option<Arc<dyn Fn(DataChannelMessage) + Send + Sync>>,
     on_buffered_amount_low: Handler,
+    // Those that listen for the low threshold beside the handler.
+    buffered_amount_low_listeners: Vec<Listener>,
     on_close: Handler,
 }
 
@@ -96,6 +99,7 @@ impl DataChannel {
                 on_open: None,
                 on_message: None,
                 on_buffered_amount_low: None,
+                buffered_amount_low_listeners: Vec::new(),
                 on_close: None,
             }),
         }
@@ -155,9 +159,18 @@ impl DataChannel {
     }
 
     pub(crate) fn tell_buffered_amount_low(&self) {
-        let handler = self.state.lock().on_buffered_amount_low.clone();
+        let (handler, listeners) = {
+            let state = self.state.lock();
+            (
+                state.on_buffered_amount_low.clone(),
+                state.buffered_amount_low_listeners.clone(),
+            )
+        };
         if let Some(handler) = handler {
             handler();
+        }
+        for listener in listeners {
+            listener();
         }
     }
 
@@ -168,6 +181,7 @@ impl DataChannel {
             state.on_open = None;
             state.on_message = None;
             state.on_buffered_amount_low = None;
+            state.buffered_amount_low_listeners.clear();
             state.on_close.take()
         };
         if let Some(handler) = handler {
@@ -342,6 +356,22 @@ impl DataChannel {
         }
     }
 
+    /// Adds a listener for the low threshold beside the handler of
+    /// [`on_buffered_amount_low`](Self::on_buffered_amount_low): it is called after the
+    /// handler, the listeners in the order they were added, until the channel is closed. So a
+    /// writer that waits for the channel to drain does not take the handler away from the
+    /// application. pion has the one handler only.
+    ///
+    /// The threshold itself is one for the channel
+    /// ([`set_buffered_amount_low_threshold`](Self::set_buffered_amount_low_threshold)):
+    /// whoever sets it sets it for all that listen.
+    pub fn add_buffered_amount_low_listener(&self, f: impl Fn() + Send + Sync + 'static) {
+        let mut state = self.state.lock();
+        if !state.closed {
+            state.buffered_amount_low_listeners.push(Arc::new(f));
+        }
+    }
+
     /// OnClose sets an event handler which is invoked when
     /// the underlying data transport has been closed.
     pub fn on_close(&self, f: impl Fn() + Send + Sync + 'static) {
@@ -352,29 +382,43 @@ impl DataChannel {
     }
 
     /// Send sends the binary message to the DataChannel peer.
+    ///
+    /// It fails with [`Error::StreamClosed`] on a channel that was closed (by this side, by
+    /// the other, or with its connection), which is what a write to pion's detached channel
+    /// fails with, and with [`Error::ClosedPipe`] on a channel that is not open yet, as
+    /// pion's `Send` does. LiveKit takes both to mean that the channel is of no use.
     pub fn send(&self, data: &[u8]) -> Result<(), Error> {
-        let pc = self.pc.upgrade().ok_or(Error::ClosedPipe)?;
+        let pc = self.pc.upgrade().ok_or(Error::StreamClosed)?;
         pc.act(|_, core, _| {
-            if core.closed {
-                return Err(Error::ClosedPipe);
-            }
-            let mut channel = core.rtc.data_channel(self.id).ok_or(Error::ClosedPipe)?;
+            let mut channel = self.sendable(core)?;
             channel.send(Instant::now(), BytesMut::from(data))?;
             Ok(())
         })
     }
 
     /// SendText sends the text message to the DataChannel peer.
+    ///
+    /// It fails as [`send`](Self::send) does.
     pub fn send_text(&self, s: &str) -> Result<(), Error> {
-        let pc = self.pc.upgrade().ok_or(Error::ClosedPipe)?;
+        let pc = self.pc.upgrade().ok_or(Error::StreamClosed)?;
         pc.act(|_, core, _| {
-            if core.closed {
-                return Err(Error::ClosedPipe);
-            }
-            let mut channel = core.rtc.data_channel(self.id).ok_or(Error::ClosedPipe)?;
+            let mut channel = self.sendable(core)?;
             channel.send_text(Instant::now(), s)?;
             Ok(())
         })
+    }
+
+    /// `rtc`'s channel, if it can still be sent on. `rtc` itself takes a message for a
+    /// channel that is closing, and knows nothing of a channel once it is closed.
+    fn sendable<'a>(&self, core: &'a mut Core) -> Result<RTCDataChannel<'a>, Error> {
+        if core.closed || self.state.lock().closed {
+            return Err(Error::StreamClosed);
+        }
+        let channel = core.rtc.data_channel(self.id).ok_or(Error::StreamClosed)?;
+        match channel.ready_state() {
+            DataChannelState::Closing | DataChannelState::Closed => Err(Error::StreamClosed),
+            _ => Ok(channel),
+        }
     }
 
     /// Close Closes the DataChannel. It may be called regardless of whether

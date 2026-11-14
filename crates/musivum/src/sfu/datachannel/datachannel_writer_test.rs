@@ -344,3 +344,180 @@ fn the_errors_have_the_texts_of_the_original() {
         Error::Channel(webrtc::Error::ClosedPipe).to_string()
     );
 }
+
+// New for musivum: the writer on channels of the connection layer, between two connections of
+// this process on the loopback interface. Without the wait every write is with the channel
+// at once and piles up there; with it a write goes to the channel only when what went before
+// has drained to the threshold, which the channel tells the writer beside its own handler;
+// and a write to a channel that was closed fails with pion/sctp's "stream closed", which is
+// what upstream's transport acts on.
+#[test]
+fn test_data_channel_writer_over_a_connection() {
+    use std::collections::HashMap;
+
+    use bytes::Bytes;
+
+    use crate::testutils::eventually;
+    use crate::webrtc::peerconnection::{
+        Configuration, DataChannel, DataChannelInit, DataChannelState, DtlsRole, Node, NodeConfig,
+        PeerConnection, SettingEngine,
+    };
+
+    const WAIT: std::time::Duration = std::time::Duration::from_secs(10);
+    const TICK: std::time::Duration = std::time::Duration::from_millis(2);
+    const SIZE: usize = 4096;
+    const COUNT: usize = 64;
+
+    // A server as musivum is run, and a client on a socket of its own.
+    let server = PeerConnection::new(
+        &Node::new(NodeConfig::default()).unwrap(),
+        Configuration {
+            setting_engine: SettingEngine {
+                lite: true,
+                answering_dtls_role: DtlsRole::Server,
+                ..Default::default()
+            },
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let client = PeerConnection::new(
+        &Node::new(NodeConfig::default()).unwrap(),
+        Configuration::default(),
+    )
+    .unwrap();
+
+    // What arrives at the client, by the label of the channel.
+    let received: Arc<Mutex<HashMap<String, Vec<Bytes>>>> = Arc::default();
+    let incoming: Arc<Mutex<Vec<Arc<DataChannel>>>> = Arc::default();
+    client.on_data_channel({
+        let received = received.clone();
+        let incoming = incoming.clone();
+        move |channel| {
+            let label = channel.label().to_string();
+            let received = received.clone();
+            channel.on_message(move |message| {
+                received
+                    .lock()
+                    .entry(label.clone())
+                    .or_default()
+                    .push(message.data);
+            });
+            incoming.lock().push(channel);
+        }
+    });
+    let count = |label: &str| received.lock().get(label).map_or(0, Vec::len);
+
+    // LiveKit's channels, made by the server before its first offer.
+    let reliable = server.create_data_channel("_reliable", None).unwrap();
+    let lossy = server
+        .create_data_channel(
+            "_lossy",
+            Some(DataChannelInit {
+                ordered: Some(false),
+                max_retransmits: Some(0),
+                ..Default::default()
+            }),
+        )
+        .unwrap();
+    // The application's own handler for the low threshold of the reliable channel.
+    let told = Arc::new(atomic::Int64::default());
+    reliable.on_buffered_amount_low({
+        let told = told.clone();
+        move || {
+            told.add(1);
+        }
+    });
+
+    let offer = server.create_offer(None).unwrap();
+    server.set_local_description(offer).unwrap();
+    client
+        .set_remote_description(server.local_description().unwrap())
+        .unwrap();
+    let answer = client.create_answer().unwrap();
+    client.set_local_description(answer).unwrap();
+    server
+        .set_remote_description(client.local_description().unwrap())
+        .unwrap();
+    eventually(
+        || {
+            reliable.ready_state() == DataChannelState::Open
+                && lossy.ready_state() == DataChannelState::Open
+                && incoming.lock().len() == 2
+        },
+        WAIT,
+        TICK,
+    );
+
+    let message = |i: usize| vec![i as u8; SIZE];
+
+    // Without the wait: every write is taken at once, and what cannot go out yet is the
+    // channel's to keep.
+    let w = DataChannelWriter::new_reliable(reliable.clone(), None, 0);
+    let mut most_buffered = 0;
+    for i in 0..COUNT {
+        assert_eq!(Ok(SIZE), w.write(&message(i)));
+        most_buffered = most_buffered.max(reliable.buffered_amount());
+    }
+    assert!(most_buffered > 2 * SIZE as u64, "{most_buffered}");
+    eventually(|| count("_reliable") == COUNT, WAIT, TICK);
+    eventually(|| reliable.buffered_amount() == 0, WAIT, TICK);
+    // The writer did not touch the channel's threshold or its handler.
+    assert_eq!(0, reliable.buffered_amount_low_threshold());
+
+    // An unreliable writer on the lossy channel, also without the wait.
+    let lossy_writer = DataChannelWriter::new_unreliable(lossy.clone(), None, Duration::ZERO, 0);
+    for i in 0..10 {
+        assert_eq!(Ok(100), lossy_writer.write(&[i as u8; 100]));
+    }
+    eventually(|| count("_lossy") == 10, WAIT, TICK);
+
+    // With the wait, for a buffered amount of 0: a write goes to the channel when all that
+    // went before has left it, so there is never more than one message there. The writer is
+    // told when that is so: a write that was not told waits for its 50 ms and looks again,
+    // which on a busy machine may happen to a few and not to most.
+    let w = DataChannelWriter::new_reliable(reliable.clone(), Some(0), 8000);
+    let mut not_told = 0;
+    for i in COUNT..2 * COUNT {
+        let t0 = time::now();
+        assert_eq!(Ok(SIZE), w.write(&message(i)));
+        if time::since(t0) >= SINGLE_WRITE_TIMEOUT {
+            not_told += 1;
+        }
+        let buffered = reliable.buffered_amount();
+        assert!(buffered <= SIZE as u64, "{buffered}");
+    }
+    assert!(not_told < COUNT / 2, "{not_told}");
+    eventually(|| count("_reliable") == 2 * COUNT, WAIT, TICK);
+    // All of it arrived, in the order it was written.
+    {
+        let received = received.lock();
+        for (i, data) in received["_reliable"].iter().enumerate() {
+            assert_eq!(&message(i)[..], &data[..], "message {i}");
+        }
+        let mut firsts: Vec<u8> = received["_lossy"].iter().map(|data| data[0]).collect();
+        firsts.sort();
+        assert_eq!((0..10).collect::<Vec<u8>>(), firsts);
+    }
+    // The channel told its own handler too: the writer listens beside it.
+    eventually(|| told.load() >= 1, WAIT, TICK);
+
+    // A writer that was closed has closed its channel: a write fails with what the channel
+    // says, at once.
+    assert_eq!(Ok(()), w.close());
+    let t0 = time::now();
+    assert_eq!(
+        Err(Error::Channel(webrtc::Error::StreamClosed)),
+        w.write(&message(0))
+    );
+    assert!(time::since(t0) < SINGLE_WRITE_TIMEOUT);
+    assert_eq!("stream closed", webrtc::Error::StreamClosed.to_string());
+
+    // And so does a write to a channel whose connection was closed.
+    server.close().unwrap();
+    assert_eq!(
+        Err(Error::Channel(webrtc::Error::StreamClosed)),
+        lossy_writer.write(&message(0))
+    );
+    client.close().unwrap();
+}

@@ -9,8 +9,9 @@
 // `RTPTransceiver` are traits with those methods, so that a test can stand in for the peer
 // connection (`webrtc::peerconnection` has the real ones). Left out because nothing calls
 // them: `TrackLocalWriter.Write`, `TrackLocalContext.ID`, `.RTCPReader` and
-// `.SSRCForwardErrorCorrection`, `StreamInfo.ID` and `.Attributes`. Of the errors only the
-// four that LiveKit's code names are here, and `Other` for what the library underneath says.
+// `.SSRCForwardErrorCorrection`, `StreamInfo.ID` and `.Attributes`. Of the errors only those
+// that LiveKit's code names are here (one of them, `ErrStreamClosed`, is pion/sctp's, from
+// stream.go at v1.12.0), and `Other` for what the library underneath says.
 // `PacketSink` is new: it stands where pion has its buffer factory.
 
 //! The seam between the ported media code and the peer connection: what `pkg/sfu` takes from
@@ -34,8 +35,9 @@ use super::{
 use super::{rtcp, rtp};
 use crate::go::time::Time;
 
-/// The errors of pion's `webrtc` package that LiveKit's code tells apart, and Go's
-/// `io.ErrClosedPipe`, which a write to a connection that is gone (or not up yet) returns.
+/// The errors of pion's `webrtc` package that LiveKit's code tells apart, Go's
+/// `io.ErrClosedPipe`, which a write to a connection that is gone (or not up yet) returns,
+/// and pion/sctp's `ErrStreamClosed`, which a write to a data channel that was closed returns.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum Error {
     /// ErrConnectionClosed indicates an operation executed after connection
@@ -51,6 +53,10 @@ pub enum Error {
     /// Go's `io.ErrClosedPipe`.
     #[error("io: read/write on closed pipe")]
     ClosedPipe,
+    /// ErrStreamClosed is returned when a write is attempted on a closed stream: a data
+    /// channel that was closed, by either side.
+    #[error("stream closed")]
+    StreamClosed,
     /// What the WebRTC library said, as text.
     #[error("{0}")]
     Other(String),

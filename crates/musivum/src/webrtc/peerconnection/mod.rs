@@ -27,7 +27,10 @@
 //!
 //! - A connection has to be closed ([`PeerConnection::close`]); dropping the last handle
 //!   closes it too, unless a callback holds a handle.
-//! - Gathering is over at once: the candidates are the node's addresses.
+//! - Gathering is over at once: the candidates are the node's addresses, or the addresses
+//!   the connection was given in their place ([`SettingEngine::host_candidate_ips`]). ICE
+//!   servers are taken ([`Configuration::ice_servers`]) and nothing is asked of them: a
+//!   connection has no server reflexive and no relayed candidates of its own.
 //! - `on_track` comes when the first packet of a stream has arrived (and after that packet
 //!   has gone to the sink), never from the description alone.
 //! - Received media is not read from a track: it comes out at the sink, as it does for
@@ -46,17 +49,24 @@
 //! - Of a data channel the other side opened, how often or how long it retransmits is not
 //!   told.
 //! - The states of the connection are told as events only, and the ICE transport is reached
-//!   through a sender, a receiver or the SCTP transport only. This layer follows the states;
-//!   the selected candidate pair is in [`PeerConnection::get_stats`] (with a round-trip
-//!   time only where the ICE agent sends checks of its own, which an ICE-lite one does not).
+//!   through a sender, a receiver or the SCTP transport only. This layer follows the states.
+//! - That the selected candidate pair changed is an event inside `rtc` only. The layer asks
+//!   for the pair where it can have changed and tells when it has
+//!   ([`PeerConnection::on_selected_candidate_pair_change`], which says how). The numbers of
+//!   the pair are in [`PeerConnection::get_stats`] (a round-trip time only where the ICE
+//!   agent sends checks of its own, which an ICE-lite one does not).
+//! - An ICE agent selects a pair once and keeps it until an ICE restart or a failure; pion's
+//!   moves to a better pair that is nominated later.
 
 mod convert;
 mod datachannel;
 mod media;
 mod node;
+mod settings;
 mod tap;
 
 use std::collections::{HashMap, VecDeque};
+use std::net::SocketAddr;
 use std::sync::{Arc, Weak};
 use std::time::Instant;
 
@@ -70,7 +80,7 @@ use rtc::peer_connection::message::{RTCMessage, TaggedRTCMessage};
 use rtc::peer_connection::transport::{CandidateConfig, CandidateHostConfig};
 use rtc::peer_connection::{RTCPeerConnection, RTCPeerConnectionBuilder};
 use rtc::rtp_transceiver::rtp_sender::RTCRtpHeaderExtensionCapability;
-use rtc::rtp_transceiver::{RTCRtpSenderId, RTCRtpTransceiverInit};
+use rtc::rtp_transceiver::{RTCRtpReceiverId, RTCRtpSenderId, RTCRtpTransceiverInit};
 use rtc::sansio::Protocol;
 use rtc::shared::{TaggedBytesMut, TransportContext};
 use rtc::statistics::StatsSelector;
@@ -92,22 +102,16 @@ use self::tap::{Captured, Inbox, Tap};
 pub use self::datachannel::{DataChannel, DataChannelInit, DataChannelMessage};
 pub use self::media::{RtpReceiver, RtpSender, RtpTransceiver, RtpTransceiverInit, TrackRemote};
 pub use self::node::{Node, NodeConfig, NodeStats};
-
-/// pion's `MediaEngine`: the codecs and header extensions a connection offers and accepts.
-/// It is `rtc`'s, which has pion's shape; [`register_codec`] and
-/// [`register_header_extension`] fill it from musivum's descriptions.
-pub use rtc::peer_connection::configuration::media_engine::MediaEngine;
-/// pion's `SettingEngine`, `rtc`'s: ICE lite (`with_lite`), fixed ICE credentials
-/// (`with_ice_credentials`), the DTLS role when answering (`with_answering_dtls_role`), the
-/// timeouts. It is made with [`SettingEngineBuilder`].
-pub use rtc::peer_connection::configuration::setting_engine::{
-    SettingEngine, SettingEngineBuilder,
-};
+pub use self::settings::SettingEngine;
 
 /// pion's `DataChannelState`.
 pub use rtc::data_channel::RTCDataChannelState as DataChannelState;
 /// pion's `OfferOptions`: `ice_restart`.
 pub use rtc::peer_connection::configuration::RTCOfferOptions as OfferOptions;
+/// pion's `MediaEngine`: the codecs and header extensions a connection offers and accepts.
+/// It is `rtc`'s, which has pion's shape; [`register_codec`] and
+/// [`register_header_extension`] fill it from musivum's descriptions.
+pub use rtc::peer_connection::configuration::media_engine::MediaEngine;
 /// pion's `SDPType`.
 pub use rtc::peer_connection::sdp::RTCSdpType as SdpType;
 /// pion's `ICEConnectionState`.
@@ -124,19 +128,46 @@ pub use rtc::peer_connection::transport::RTCDtlsRole as DtlsRole;
 pub use rtc::peer_connection::transport::RTCIceCandidate as IceCandidate;
 /// pion's `ICECandidateInit`.
 pub use rtc::peer_connection::transport::RTCIceCandidateInit as IceCandidateInit;
+/// pion's `ICECandidatePair`: `local()` and `remote()`.
+pub use rtc::peer_connection::transport::RTCIceCandidatePair as IceCandidatePair;
+/// pion's `ICECandidateType`.
+pub use rtc::peer_connection::transport::RTCIceCandidateType as IceCandidateType;
+/// pion's `ICEProtocol`.
+pub use rtc::peer_connection::transport::RTCIceProtocol as IceProtocol;
 /// pion's `ICEServer`; the credential is a string, and there is no type of credential.
 pub use rtc::peer_connection::transport::RTCIceServer as IceServer;
+/// pion's `ICETCPCandidateType`.
+pub use rtc::peer_connection::transport::RTCIceTcpCandidateType as IceTcpCandidateType;
 /// pion's `RTPTransceiverDirection`.
 pub use rtc::rtp_transceiver::RTCRtpTransceiverDirection as RtpTransceiverDirection;
-/// pion's `StatsReport`, as `rtc` has it.
+/// pion's `StatsReport`, as `rtc` has it: `transport()` names the selected candidate pair
+/// (`selected_candidate_pair_id`), `get(id)` gives its entry.
 pub use rtc::statistics::report::RTCStatsReport as StatsReport;
+/// One entry of a [`StatsReport`]: pion's `Stats`, an enum where pion has an interface.
+pub use rtc::statistics::report::RTCStatsReportEntry as StatsReportEntry;
+/// pion's `ICECandidateStats`.
+pub use rtc::statistics::stats::ice_candidate::RTCIceCandidateStats as IceCandidateStats;
+/// pion's `ICECandidatePairStats`.
+pub use rtc::statistics::stats::ice_candidate_pair::RTCIceCandidatePairStats as IceCandidatePairStats;
+
+/// pion's `ice.MulticastDNSMode`, which its `SettingEngine` takes.
+pub use crate::webrtc::ice::MulticastDnsMode;
+/// pion's `NetworkType`. It is the ICE library's, which pion's `webrtc` package has a copy
+/// of.
+pub use crate::webrtc::ice::NetworkType;
 
 /// What a connection is made from: pion's `webrtc.NewAPI(WithMediaEngine, WithSettingEngine)`
 /// and `Configuration` in one. A certificate is made for each connection.
 #[derive(Default)]
 pub struct Configuration {
     pub media_engine: MediaEngine,
+    /// The settings of this connection. LiveKit copies its engine for every connection and
+    /// changes the copy; this is that copy.
     pub setting_engine: SettingEngine,
+    /// pion's `Configuration.ICEServers`. The URLs are checked when the connection is made
+    /// and kept ([`PeerConnection::ice_servers`]). Nothing is gathered from them: the
+    /// connection's candidates are host candidates on the node's socket.
+    pub ice_servers: Vec<IceServer>,
     /// Where received packets go. It can also be set later with
     /// [`PeerConnection::set_packet_sink`], but what arrives before is lost.
     pub packet_sink: Option<Arc<dyn PacketSink>>,
@@ -189,6 +220,7 @@ type TrackHandler = Option<Arc<dyn Fn(Arc<TrackRemote>, Arc<RtpReceiver>) + Send
 struct Handlers {
     ice_candidate: Handler<Option<IceCandidate>>,
     ice_connection_state: Handler<IceConnectionState>,
+    selected_candidate_pair: Handler<IceCandidatePair>,
     ice_gathering_state: Handler<IceGatheringState>,
     connection_state: Handler<PeerConnectionState>,
     signaling_state: Handler<SignalingState>,
@@ -213,6 +245,7 @@ pub(crate) enum Delivery {
     UnbindRemoteStream(StreamInfo),
     IceCandidate(Option<IceCandidate>),
     IceConnectionState(IceConnectionState),
+    SelectedCandidatePair(IceCandidatePair),
     IceGatheringState(IceGatheringState),
     ConnectionState(PeerConnectionState),
     SignalingState(SignalingState),
@@ -249,7 +282,12 @@ pub(crate) struct Core {
     ice_gathering_state: IceGatheringState,
     connection_state: PeerConnectionState,
 
-    // The node's candidates, once they were given to `rtc`.
+    // The candidate pair that was told last, none after a restart or a failure; and whether
+    // something happened since that can have changed it (see `note_selected_pair`).
+    selected_pair: Option<IceCandidatePair>,
+    selected_pair_in_doubt: bool,
+
+    // The connection's candidates, once they were given to `rtc`.
     local_candidates: Vec<IceCandidate>,
     candidates_added: bool,
     local_ufrag: String,
@@ -277,6 +315,8 @@ pub(crate) struct Inner {
     node: Node,
     pub(crate) logger: Logger,
     pub(crate) this: Weak<Inner>,
+    // The addresses this connection advertises: the node's, or its own.
+    host_candidates: Vec<SocketAddr>,
     core: Mutex<Core>,
     // Filled with the connection's mutex held, emptied by the connection's task.
     pending: Mutex<VecDeque<Delivery>>,
@@ -311,12 +351,30 @@ impl PeerConnection {
         // None of the library's interceptors: retransmission, feedback and reports are the
         // ported code's. Only the tap, closest to the wire.
         let registry = Registry::new().with(Slot::Custom(100), Tap::new(inbox.clone()));
+        // `rtc` reads the URLs of the servers here and refuses those it cannot read.
         let rtc = RTCPeerConnectionBuilder::new()
-            .with_configuration(RTCConfigurationBuilder::new().build())
-            .with_setting_engine(config.setting_engine)
+            .with_configuration(
+                RTCConfigurationBuilder::new()
+                    .with_ice_servers(config.ice_servers)
+                    .build(),
+            )
+            .with_setting_engine(config.setting_engine.to_rtc())
             .with_media_engine(config.media_engine)
             .with_interceptor_registry(registry)
             .build(Instant::now())?;
+
+        let host_candidates = match &config.setting_engine.host_candidate_ips {
+            Some(ips) => {
+                let candidates = node.candidates_for(ips);
+                if candidates.len() < ips.len() {
+                    warnw!(config.logger, "not every address of the connection can be advertised", nil,
+                        "addresses" => ips,
+                        "candidates" => candidates);
+                }
+                candidates
+            }
+            None => node.candidates(),
+        };
 
         let (id, datagrams, guard) = node.register();
         let inner = Arc::new_cyclic(|this| Inner {
@@ -324,6 +382,7 @@ impl PeerConnection {
             node: node.clone(),
             logger: config.logger,
             this: this.clone(),
+            host_candidates,
             core: Mutex::new(Core {
                 rtc,
                 inbox,
@@ -333,6 +392,8 @@ impl PeerConnection {
                 ice_connection_state: IceConnectionState::New,
                 ice_gathering_state: IceGatheringState::New,
                 connection_state: PeerConnectionState::New,
+                selected_pair: None,
+                selected_pair_in_doubt: false,
                 local_candidates: Vec::new(),
                 candidates_added: false,
                 local_ufrag: String::new(),
@@ -526,6 +587,23 @@ impl PeerConnection {
         self.inner().read(|core| core.connection_state)
     }
 
+    /// pion's `ICETransport.GetSelectedCandidatePair`: the pair of candidates the ICE agent
+    /// sends on, `None` while it has none (before it connects, after a restart or a failure
+    /// until it has connected again, and when the connection is closed).
+    ///
+    /// The local candidate of a connection on a node that advertises several addresses is the
+    /// first of them, whichever the client sent to: the node has one socket for them all.
+    pub fn get_selected_candidate_pair(&self) -> Option<IceCandidatePair> {
+        self.inner()
+            .read(|core| selected_candidate_pair(core).flatten())
+    }
+
+    /// pion's `GetConfiguration().ICEServers`: the servers the connection was made with.
+    pub fn ice_servers(&self) -> Vec<IceServer> {
+        self.inner()
+            .read(|core| core.rtc.get_configuration().ice_servers().to_vec())
+    }
+
     /// Close ends the PeerConnection.
     ///
     /// It does not wait: the last events (the closed states, `unbind` of the tracks) come
@@ -554,6 +632,23 @@ impl PeerConnection {
         f: impl Fn(IceConnectionState) + Send + Sync + 'static,
     ) {
         self.inner().handlers.lock().ice_connection_state = Some(Arc::new(f));
+    }
+
+    /// pion's `ICETransport.OnSelectedCandidatePairChange`: sets an event handler which is
+    /// invoked when the ICE agent has selected a candidate pair, the first time and after
+    /// every ICE restart or failure it has come back from. Like every event it comes from
+    /// the connection's task, after the ICE connection state that came with it.
+    ///
+    /// `rtc` tells the change inside itself only, so the layer asks: the pair is read and
+    /// compared with the one told last after every STUN message that was read (a pair is
+    /// selected by a check or by the answer to one, never by anything else), and after every
+    /// change of the ICE connection state (which is how a pair is dropped: by a restart, by a
+    /// failure that a timer brings, by closing). Media and timers cost one test of a flag.
+    pub fn on_selected_candidate_pair_change(
+        &self,
+        f: impl Fn(IceCandidatePair) + Send + Sync + 'static,
+    ) {
+        self.inner().handlers.lock().selected_candidate_pair = Some(Arc::new(f));
     }
 
     /// OnICEGatheringStateChange sets an event handler which is invoked when the
@@ -815,8 +910,32 @@ impl Inner {
                 break;
             }
         }
+        if core.selected_pair_in_doubt {
+            self.note_selected_pair(core);
+        }
         if !core.out.is_empty() {
             self.pending.lock().extend(core.out.drain(..));
+        }
+    }
+
+    /// Looks whether the ICE agent has another candidate pair than the one that was told
+    /// last, and has the new one told. It is called when something happened that can have
+    /// changed the pair; see [`PeerConnection::on_selected_candidate_pair_change`].
+    fn note_selected_pair(&self, core: &mut Core) {
+        // Without a way to the ICE transport (nothing negotiated yet) the question stays
+        // open until the next turn.
+        let Some(pair) = selected_candidate_pair(core) else {
+            return;
+        };
+        core.selected_pair_in_doubt = false;
+        if pair == core.selected_pair {
+            return;
+        }
+        core.selected_pair = pair.clone();
+        // A pair that was dropped is not told, as with pion: the state says it.
+        if let Some(pair) = pair {
+            debugw!(self.logger, "selected candidate pair", "pair" => pair.to_string());
+            core.out.push(Delivery::SelectedCandidatePair(pair));
         }
     }
 
@@ -861,6 +980,9 @@ impl Inner {
             RTCPeerConnectionEvent::OnIceConnectionStateChangeEvent(state) => {
                 core.ice_connection_state = state;
                 core.out.push(Delivery::IceConnectionState(state));
+                // A pair was selected (connected), or dropped (a restart goes back to
+                // checking, a failure and closing say so).
+                core.selected_pair_in_doubt = true;
             }
             RTCPeerConnectionEvent::OnIceGatheringStateChangeEvent(state) => {
                 // `rtc` goes back to gathering with every local description; that is only
@@ -1028,7 +1150,7 @@ impl Inner {
             core.ice_gathering_state = IceGatheringState::Gathering;
             core.out
                 .push(Delivery::IceGatheringState(IceGatheringState::Gathering));
-            for addr in self.node.candidates() {
+            for addr in &self.host_candidates {
                 let candidate = CandidateHostConfig {
                     base_config: CandidateConfig {
                         network: "udp".to_owned(),
@@ -1135,10 +1257,15 @@ impl Inner {
         }
         for datagram in datagrams.drain(..) {
             let at = datagram.at;
+            // STUN, as against DTLS and RTP (RFC 7983): the only thing that makes the ICE
+            // agent select a candidate pair.
+            if datagram.data.first().is_some_and(|first| *first < 4) {
+                core.selected_pair_in_doubt = true;
+            }
             let res = core.rtc.handle_read(TaggedBytesMut {
                 now: Instant::now(),
                 transport: TransportContext {
-                    local_addr: datagram.local,
+                    local_addr: self.local_addr_of(&datagram),
                     peer_addr: datagram.from,
                     ecn: None,
                     transport_protocol: datagram.protocol,
@@ -1158,6 +1285,20 @@ impl Inner {
             self.drain(&mut core, Time::now());
         }
         Some(core.rtc.poll_timeout())
+    }
+
+    /// The address `rtc` is told a datagram arrived at. Its ICE agent takes a datagram only
+    /// at an address that is a candidate of the connection, so for a connection with
+    /// addresses of its own it is the first of those on the socket the datagram came in on.
+    fn local_addr_of(&self, datagram: &Datagram) -> SocketAddr {
+        if self.host_candidates.contains(&datagram.local) {
+            return datagram.local;
+        }
+        self.host_candidates
+            .iter()
+            .find(|c| c.port() == datagram.local.port() && c.is_ipv4() == datagram.local.is_ipv4())
+            .copied()
+            .unwrap_or(datagram.local)
     }
 
     /// Tells what there is to tell. Only the connection's task calls this, so it is one at a
@@ -1207,6 +1348,12 @@ impl Inner {
                 let handler = self.handlers.lock().ice_connection_state.clone();
                 if let Some(handler) = handler {
                     handler(state);
+                }
+            }
+            Delivery::SelectedCandidatePair(pair) => {
+                let handler = self.handlers.lock().selected_candidate_pair.clone();
+                if let Some(handler) = handler {
+                    handler(pair);
                 }
             }
             Delivery::IceGatheringState(state) => {
@@ -1331,6 +1478,33 @@ async fn run(inner: Arc<Inner>, mut queue: mpsc::Receiver<Datagram>, guard: Conn
     // know the connection.
     drop(guard);
     inner.forget();
+}
+
+/// The candidate pair the ICE agent has selected. The outer `None`: there is no telling,
+/// because `rtc` gives its ICE transport only through a sender or a receiver whose media
+/// section was negotiated, or through the SCTP transport once the descriptions have one
+/// (`pc.sctp()?.transport().ice_transport()`). A connection that runs ICE has one of them.
+fn selected_candidate_pair(core: &mut Core) -> Option<Option<IceCandidatePair>> {
+    if let Some(sctp) = core.rtc.sctp() {
+        return Some(
+            sctp.transport()
+                .ice_transport()
+                .get_selected_candidate_pair(),
+        );
+    }
+    for index in 0..core.transceivers.len() {
+        if let Some(sender) = core.rtc.rtp_sender(RTCRtpSenderId::from(index))
+            && let Some(transport) = sender.transport()
+        {
+            return Some(transport.ice_transport().get_selected_candidate_pair());
+        }
+        if let Some(receiver) = core.rtc.rtp_receiver(RTCRtpReceiverId::from(index))
+            && let Some(transport) = receiver.transport()
+        {
+            return Some(transport.ice_transport().get_selected_candidate_pair());
+        }
+    }
+    None
 }
 
 /// The ICE user name of a description (the first, which with BUNDLE is the only one).

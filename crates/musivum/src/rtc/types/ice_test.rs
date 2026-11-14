@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::testutils::capture_log;
-use rtc::peer_connection::transport::RTCIceTcpCandidateType;
+use crate::webrtc::peerconnection::IceTcpCandidateType;
 
 const HOST_UDP: &str = "candidate:1467250027 1 udp 2122260223 192.168.1.10 46243 typ host generation 0 ufrag EsAw network-id 1";
 const SRFLX: &str = "candidate:842163049 1 udp 1686052607 203.0.113.7 46243 typ srflx raddr 192.168.1.10 rport 46243 generation 0 ufrag EsAw network-id 1";
@@ -64,11 +64,11 @@ fn pair(local: &IceCandidate, remote: IceCandidate) -> IceCandidatePair {
 }
 
 // pion's `TCPType.String()`.
-fn tcp_type(t: RTCIceTcpCandidateType) -> &'static str {
+fn tcp_type(t: IceTcpCandidateType) -> &'static str {
     match t {
-        RTCIceTcpCandidateType::Active => "active",
-        RTCIceTcpCandidateType::Passive => "passive",
-        RTCIceTcpCandidateType::SimultaneousOpen => "so",
+        IceTcpCandidateType::Active => "active",
+        IceTcpCandidateType::Passive => "passive",
+        IceTcpCandidateType::SimultaneousOpen => "so",
         _ => "",
     }
 }

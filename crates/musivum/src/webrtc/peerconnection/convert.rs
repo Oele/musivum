@@ -27,6 +27,12 @@ impl From<rtc::shared::error::Error> for Error {
             rtc::shared::error::Error::ErrConnectionClosed => Error::ConnectionClosed,
             rtc::shared::error::Error::ErrCodecNotFound => Error::CodecNotFound,
             rtc::shared::error::Error::ErrUnsupportedCodec => Error::UnsupportedCodec,
+            // A data channel that is gone, as pion/sctp says it of its stream; and one that
+            // is not open yet, as pion's `DataChannel.Send` says it (`io.ErrClosedPipe`).
+            rtc::shared::error::Error::ErrDataChannelClosed
+            | rtc::shared::error::Error::ErrStreamClosed => Error::StreamClosed,
+            rtc::shared::error::Error::ErrDataChannelNotOpen
+            | rtc::shared::error::Error::ErrClosedPipe => Error::ClosedPipe,
             other => Error::Other(other.to_string()),
         }
     }

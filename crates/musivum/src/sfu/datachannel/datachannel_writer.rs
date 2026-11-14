@@ -28,7 +28,8 @@
 // - pion looks at the queue of the whole SCTP association (a write on one channel waits for
 //   what another channel has pending) and at "sent once"; here it is the channel's own bytes
 //   and "acknowledged", against a fixed threshold.
-// - The writer takes the channel's low-threshold callback and its threshold for itself.
+// - The writer sets the channel's low threshold for itself. On a channel of the layer it
+//   listens for it beside the channel's own callback, which stays the application's.
 // - `Write` gives a count or an error: the original's count is 0 with every error.
 // - The errors are the package's `Error`; the two `ErrX` carry the numbers the original
 //   puts in the text it wraps them in.
@@ -355,7 +356,7 @@ impl RawDataChannel for webrtc::peerconnection::DataChannel {
     }
 
     fn on_buffered_amount_low(&self, f: Box<dyn Fn() + Send + Sync>) {
-        webrtc::peerconnection::DataChannel::on_buffered_amount_low(self, f);
+        webrtc::peerconnection::DataChannel::add_buffered_amount_low_listener(self, f);
     }
 
     fn close(&self) -> Result<(), webrtc::Error> {
