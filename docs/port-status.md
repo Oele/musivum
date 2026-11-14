@@ -526,6 +526,16 @@ after the fix asaroton received the same 14 webhooks as from LiveKit, and its de
 events went out 2 ms after a participant closed). Also as with LiveKit: a three-way browser
 call (the tiles drop to 360p with three and return to 720p when one leaves), and Element X
 26.10.1 on Android in a call with Element Web (video both ways, the hang-up seen at once).
+Then, each against LiveKit on the same configuration: a relay-only call (Chrome kept off
+direct UDP, ICE over TCP off, TURN over TLS on a name of the lab's own CA): both peers on
+relay over UDP and TLS, two 720p videos each for the whole call, as with LiveKit; the relay
+policy refused the machine's container and VPN addresses and took only the one in
+`allow_restricted_peer_cidrs`. A call over ICE over TCP alone (no UDP, the TURN name not
+resolvable): both peers on host candidates over TCP, video both ways. A call of 30 minutes
+with two browsers: every video at 18.8 to 20.1 fps in every 15 s interval (the fake camera
+sends 20), no stall; musivum's memory 41 MB at the start and 47 MB at the end, 62 s of CPU
+in the 30 minutes; no warnings or panics. Not tested there: Safari and iOS, Element X
+through TURN, more than three participants, federation, more than one machine.
 
 ## On a degraded network
 
