@@ -7,8 +7,9 @@
 //! - [`rtc`], from LiveKit's `pkg/rtc`: rooms, participants, tracks and subscriptions.
 //! - [`mediatransportutil`], from `livekit/mediatransportutil`.
 //! - [`protocol`], from `livekit/protocol`.
-//! - [`telemetry`]: the counters of LiveKit's `pkg/telemetry/prometheus` that the ported code
-//!   reports to, without Prometheus.
+//! - [`telemetry`], from LiveKit's `pkg/telemetry`: the interface the ported code reports
+//!   what happens through (with nothing behind it yet), and the counters of its `prometheus`
+//!   package, without Prometheus.
 //! - [`webrtc`]: the packet types and small descriptions that LiveKit takes from pion.
 //! - [`go`]: stand-ins for what the ported code uses of Go's standard library.
 

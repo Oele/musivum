@@ -61,6 +61,7 @@ Paths in musivum are under `crates/musivum/src/`. "mtu" is `livekit/mediatranspo
 | `pkg/sfu/sequencer.go`, `rtxbudget.go` | `sfu/sequencer.rs`, `rtxbudget.rs` | 7 / 7 | Methods on a nil budget take `Option<&RtxBudget>`. Both carry `allow(dead_code)` until the down track uses them. |
 | `pkg/sfu/forwardstats.go` | `sfu/forwardstats.rs` | 14 / 14 | Two tests added. One benchmark left out. |
 | `pkg/sfu/errors.go` | `sfu/errors.rs` | none upstream | The package's errors; empty upstream at the pin, the four values of the munger are defined in `downtrack.go` there. |
+| `pkg/telemetry/telemetryservice.go` (the interface), `analyticsservice.go` (interface and null service), `StatsKey`, `ReferenceGuard`, `CondenseStat` | `telemetry/` (same names) | none in scope | The 37 calls `pkg/rtc` reports through, as a trait with a fake and a null service; nothing is behind it yet (the implementation, the stats workers and their three test files are not ported). `context.Context` is dropped from every method; an `error` argument is its text. `RoomProjectReporter` is left out (it returns a type of the protocol's observability package). Five tests added. |
 | `pkg/telemetry/prometheus` (two functions of `packets.go`) | `telemetry/prometheus/` | | Written new: counters, gauges and histograms without a Prometheus dependency, readable by tests and by a later endpoint. Its module comment says how a function is added. |
 | `pkg/sfu/flexfec/decoder.go` | `sfu/flexfec/decoder.rs` | 19 / 19 | The lookup of media packets is handed to `decode_fec` with every packet instead of to the constructor (it reads the buffer's state under the buffer's lock). Three benchmarks left out. `reference_test.rs` compares decoder and encoder with 241 lines of the original's output, all three masks included. |
 | pion/interceptor `pkg/flexfec/flexfec_encoder_03.go`, `flexfec_coverage.go`, `flexfec_encoder.go`, `util/` | `webrtc/interceptor/flexfec/` (tests only) | 11 / 11 | The FlexFEC-03 encoder, for the decoder's tests. pion's own decoder, its interceptor and their tests are not ported. |
@@ -282,6 +283,14 @@ What looked wrong or fragile upstream and was ported as it is:
 - `buffer/fps.go`: three comparisons ignore wrap-around of the frame number or timestamp, so
   a layer is not measured across a wrap until the window resets. `videolayerselector`:
   `DDForwarder.Forward` marshals without the `recover()` the selector has.
+- `forwardstats.go`, the sample buffer: a producer reserves a slot, stores the value and
+  then publishes the slot's number, without a lock. A producer that is held up between
+  reserving and publishing for longer than the other producers need to go once round its
+  shard publishes an old number over a newer one; the reader then takes the slot for "not
+  published yet" and waits at it until it is lapped again, and what was waiting behind it
+  is neither read nor counted as dropped. Seen once as a failure of
+  `TestForwardSampleBufferConcurrent` (ported as it is) at a load average of 44; the cause
+  is from reading the code, which is the original's line for line.
 - `forwarder.go`: three log lines log `"targetLayer"` with the current layer;
   `GetNextHigherTransition` takes the write lock though it only reads; a state with more
   than three sender reports panics in `SeedState`. `TestForwarderGetTranslationParamsMuted`
