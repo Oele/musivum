@@ -34,22 +34,12 @@ it: `livekit/mediatransportutil` (about 2,800 lines and 2,200 of tests) and part
 
 LiveKit is written against pion, the WebRTC library for Go (connection setup, DTLS, SRTP,
 RTP and RTCP, data channels: far more code than LiveKit itself). That is not ported. musivum
-stands on a WebRTC library for Rust. The candidates:
-
-- **str0m** (MIT or Apache-2.0): built for servers of this kind, without I/O of its own, one
-  owner per connection. Its shape differs from pion's, so the ported logic meets it through
-  an adapter.
-- **rtc** (webrtc-rs, MIT or Apache-2.0): the protocol core of webrtc-rs since its 0.20,
-  without I/O of its own, with pion's vocabulary (peer connection, transceivers,
-  interceptors).
-- **webrtc** (webrtc-rs): the asynchronous interface over `rtc`; its 0.17 line, the direct
-  port of pion, is in maintenance.
-
-To be decided by a small experiment: the same slice of `pkg/sfu` wired to each. The survey
-gave the main criterion: LiveKit does retransmission, feedback, bandwidth estimation, pacing
-and probing itself, so the library has to hand over RTP and RTCP as they are and stay out of
-those. After that: how much of the original structure survives, and what each lacks (TCP and
-TURN candidates, simulcast and SVC, data channels, ICE lite and restarts).
+stands on **`rtc`**, the protocol core of webrtc-rs (MIT or Apache-2.0): no I/O of its own,
+pion's vocabulary (peer connection, transceivers, interceptors), and, what decided it, it
+hands over RTP and RTCP as they are and leaves retransmission, feedback, bandwidth estimation
+and pacing to LiveKit's ported code. str0m, the other candidate, does those itself.
+`docs/webrtc-library.md` has the experiment that was run, what `rtc` lacks (one field in its
+RTP packet, carried as a patch in `third_party/rtc-rtp`) and what was not tested.
 
 ## Order of work
 
@@ -60,8 +50,8 @@ TURN candidates, simulcast and SVC, data channels, ICE lite and restarts).
    what it stands on in `mediatransportutil` and `protocol`, then statistics and bandwidth
    estimation, the buffer, layer selection, and last the forwarder, the receiver and the
    down track. It needs no network and its tests say when it is right.
-3. **The WebRTC library**, chosen by the experiment above, and the wiring to it: the peer
-   connection (`pkg/rtc/transport.go`) and the logic of `pkg/rtc`.
+3. **The WebRTC library** (chosen: `rtc`) and the wiring to it: the peer connection
+   (`pkg/rtc/transport.go`) and the logic of `pkg/rtc`.
 4. **Signalling**: the WebSocket endpoint and the messages a call needs.
 5. **A first call**: two browsers with LiveKit's JavaScript SDK, then Element Call.
 6. **Rooms, the API and webhooks** that a homeserver needs; building it into asaroton behind
@@ -86,8 +76,8 @@ port the changed tests, move the pin. Ported files stay close to their originals
 
 ## Open questions
 
-- Which WebRTC library (above).
-- Clients without UDP: LiveKit offers TCP and an embedded TURN server over TLS. What the
-  chosen library offers decides how much of that has to be built.
+- Clients without UDP: LiveKit offers TCP and an embedded TURN server over TLS. `rtc` has
+  ICE over TCP; a TURN server would have to be found or built.
+- Proposing the padding size field to webrtc-rs, so that `third_party/rtc-rtp` can go.
 - Whether the server binary should accept LiveKit's own configuration file, so that it can
   be swapped in for `livekit-server` without changes.

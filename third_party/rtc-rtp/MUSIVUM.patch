@@ -1,0 +1,69 @@
+diff -ru a/src/header.rs b/src/header.rs
+--- a/src/header.rs
++++ b/src/header.rs
+@@ -105,6 +105,10 @@
+     pub extensions: Vec<Extension>,
+     /// Padding bytes appended to the extension block so it ends on a 32-bit boundary.
+     pub extensions_padding: usize,
++    /// musivum's patch: how many padding octets follow the payload when `padding` is set, as
++    /// `Header.PaddingSize` of pion/rtp. Filled in when a packet is unmarshalled. When
++    /// marshalling, zero keeps this crate's behaviour (pad to a multiple of four octets).
++    pub padding_size: u8,
+ }
+ 
+ impl Unmarshal for Header {
+@@ -267,6 +271,7 @@
+             extension_profile,
+             extensions,
+             extensions_padding,
++            padding_size: 0,
+         })
+     }
+ }
+diff -ru a/src/packet/mod.rs b/src/packet/mod.rs
+--- a/src/packet/mod.rs
++++ b/src/packet/mod.rs
+@@ -43,13 +43,14 @@
+         Self: Sized,
+         B: Buf,
+     {
+-        let header = Header::unmarshal(raw_packet)?;
++        let mut header = Header::unmarshal(raw_packet)?;
+         let payload_len = raw_packet.remaining();
+         let payload = raw_packet.copy_to_bytes(payload_len);
+         if header.padding {
+             if payload_len > 0 {
+                 let padding_len = payload[payload_len - 1] as usize;
+                 if padding_len <= payload_len {
++                    header.padding_size = padding_len as u8;
+                     Ok(Packet {
+                         header,
+                         payload: payload.slice(..payload_len - padding_len),
+@@ -71,8 +72,12 @@
+     fn marshal_size(&self) -> usize {
+         let payload_len = self.payload.len();
+         let padding_len = if self.header.padding {
+-            let padding_len = get_padding(payload_len);
+-            if padding_len == 0 { 4 } else { padding_len }
++            if self.header.padding_size != 0 {
++                self.header.padding_size as usize
++            } else {
++                let padding_len = get_padding(payload_len);
++                if padding_len == 0 { 4 } else { padding_len }
++            }
+         } else {
+             0
+         };
+@@ -91,7 +96,11 @@
+         buf = &mut buf[n..];
+         buf.put(&*self.payload);
+         let padding_len = if self.header.padding {
+-            let mut padding_len = get_padding(self.payload.len());
++            let mut padding_len = if self.header.padding_size != 0 {
++                self.header.padding_size as usize
++            } else {
++                get_padding(self.payload.len())
++            };
+             if padding_len == 0 {
+                 padding_len = 4;
+             }

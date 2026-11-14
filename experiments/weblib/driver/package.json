@@ -1,0 +1,8 @@
+{
+  "name": "musivum-weblib-experiment-driver",
+  "private": true,
+  "license": "Apache-2.0",
+  "dependencies": {
+    "puppeteer-core": "^24.0.0"
+  }
+}

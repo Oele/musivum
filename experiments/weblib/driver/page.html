@@ -1,0 +1,73 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>musivum: WebRTC library experiment</title>
+<body>
+<script>
+async function post(path, body) {
+  const res = await fetch(path, {method: 'POST', headers: {'content-type': 'application/json'}, body: JSON.stringify(body)});
+  if (!res.ok) throw new Error(path + ': ' + res.status + ' ' + await res.text());
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
+}
+
+// Publishes the fake camera with three simulcast layers, the fake microphone, and opens a
+// data channel that loses rather than waits.
+window.publish = async () => {
+  const stream = await navigator.mediaDevices.getUserMedia({video: {width: 1280, height: 720, frameRate: 30}, audio: true});
+  const pc = new RTCPeerConnection();
+  pc.addTransceiver(stream.getVideoTracks()[0], {
+    direction: 'sendonly', streams: [stream],
+    sendEncodings: [
+      {rid: 'q', scaleResolutionDownBy: 4, maxBitrate: 150000},
+      {rid: 'h', scaleResolutionDownBy: 2, maxBitrate: 500000},
+      {rid: 'f', maxBitrate: 1700000},
+    ],
+  });
+  pc.addTransceiver(stream.getAudioTracks()[0], {direction: 'sendonly', streams: [stream]});
+  const dc = pc.createDataChannel('_lossy', {ordered: false, maxRetransmits: 0});
+  window.pubDcEcho = [];
+  dc.onmessage = e => window.pubDcEcho.push(e.data);
+  window.pubDc = dc;
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  const answer = await post('/publish', {sdp: offer.sdp});
+  await pc.setRemoteDescription({type: 'answer', sdp: answer.sdp});
+  window.pubPc = pc;
+  window.pubOffer = offer.sdp;
+  window.pubAnswer = answer.sdp;
+};
+
+// Receives on a connection the server offers, as LiveKit's subscriber connection is.
+window.subscribe = async () => {
+  const pc = new RTCPeerConnection();
+  pc.ontrack = e => {
+    const el = document.createElement(e.track.kind === 'video' ? 'video' : 'audio');
+    el.autoplay = true; el.muted = true; el.playsInline = true;
+    el.srcObject = new MediaStream([e.track]);
+    document.body.appendChild(el);
+  };
+  window.subDcEcho = [];
+  pc.ondatachannel = e => {
+    window.subDc = e.channel;
+    e.channel.onmessage = m => window.subDcEcho.push(m.data);
+  };
+  const offer = await post('/subscribe-offer', {});
+  await pc.setRemoteDescription({type: 'offer', sdp: offer.sdp});
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await post('/subscribe-answer', {sdp: answer.sdp, id: offer.id});
+  window.subPc = pc;
+  window.subOffer = offer.sdp;
+  window.subAnswer = answer.sdp;
+};
+
+window.rtcStats = async pc => {
+  const out = [];
+  (await pc.getStats()).forEach(s => {
+    if (['inbound-rtp', 'outbound-rtp', 'remote-inbound-rtp', 'transport'].includes(s.type) ||
+        (s.type === 'candidate-pair' && s.nominated)) out.push(s);
+  });
+  return out;
+};
+</script>
+</body>

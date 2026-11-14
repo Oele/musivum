@@ -1,0 +1,15 @@
+# The experiment that chooses the WebRTC library (docs/PORTING.md, step 3). A workspace of its
+# own, so that what it pulls in stays out of musivum's.
+[workspace]
+resolver = "3"
+members = ["rtc-forwarder"]
+
+[workspace.package]
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# rtc's RTP packet with one field more, the padding size that pion's has: see
+# docs/webrtc-library.md.
+[patch.crates-io]
+rtc-rtp = { path = "../../third_party/rtc-rtp" }
