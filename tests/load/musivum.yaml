@@ -1,0 +1,18 @@
+# musivum for the load test: reference-livekit.yaml's configuration, with the same ports, for
+# target/release/musivum-server.
+port: 39560
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 39561
+  udp_port: 39562
+  use_external_ip: false
+  node_ip: 127.0.0.1
+  enable_loopback_candidate: true
+  ips:
+    includes:
+      - 127.0.0.1/32
+keys:
+  loadtestkey: loadtestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info

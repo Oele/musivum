@@ -1,0 +1,20 @@
+# The reference server for the load test: LiveKit itself, at the version musivum is ported
+# from, on the loopback interface and on ports of its own (39560 to 39562). One UDP port for
+# all peer connections (LiveKit's UDP mux), the same as musivum.yaml. No TURN, no webhooks,
+# no Prometheus port.
+port: 39560
+bind_addresses:
+  - 127.0.0.1
+rtc:
+  tcp_port: 39561
+  udp_port: 39562
+  use_external_ip: false
+  node_ip: 127.0.0.1
+  enable_loopback_candidate: true
+  ips:
+    includes:
+      - 127.0.0.1/32
+keys:
+  loadtestkey: loadtestsecret-0123456789abcdef0123456789abcdef
+logging:
+  level: info
