@@ -1,0 +1,52 @@
+# Written for musivum: a configuration in which nearly every line is a mistake, to hold the
+# errors of reading it against LiveKit's (go-errors.txt is what LiveKit says to it).
+port: abc
+development: 5
+unknown_key: 1
+bind_addresses: 127.0.0.1
+keys: [a, b]
+rtc:
+  tcp_port: -1
+  packet_buffer_size: 99999999999999999999
+  pli_throttle:
+    low_quality: 500
+    mid_quality: fast
+    nope: 1
+  turn_servers:
+    host: x
+  congestion_control: yes
+  allow_tcp_fallback: maybe
+  interfaces: [en0]
+  batch_io:
+    batch_size: twelve
+room:
+  enabled_codecs:
+    - audio/opus
+    - mime: [1]
+    - mime: video/vp8
+      fmtp: x
+  empty_timeout: 4294967296
+  playout_delay:
+    min: 1
+    min: 2
+limit:
+  bytes_per_sec: a lot of bytes
+  num_tracks: 2147483648
+video:
+  stream_tracker_manager:
+    video:
+      bitrate_report_interval:
+        x: 1s
+        1: 5
+      packet_tracker:
+        0: oops
+logging:
+  component_levels: debug
+  jsno: true
+turn:
+  relay_range_start: 65536
+  bind_addresses:
+    - [a]
+    - {b: c}
+webhook:
+  urls: {a: b}

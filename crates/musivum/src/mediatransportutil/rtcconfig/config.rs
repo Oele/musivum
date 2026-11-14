@@ -446,7 +446,7 @@ fn deserialize_duration<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Du
 /// Go's `time.ParseDuration`: a possibly signed sequence of decimal numbers, each with an
 /// optional fraction and a unit ("ns", "us" or "µs", "ms", "s", "m", "h"), such as "300ms",
 /// "-1.5h" or "2h45m"; "0" needs no unit.
-pub(super) fn parse_duration(s: &str) -> Option<Duration> {
+pub(crate) fn parse_duration(s: &str) -> Option<Duration> {
     let (negative, mut rest) = match s.strip_prefix('-') {
         Some(rest) => (true, rest),
         None => (false, s.strip_prefix('+').unwrap_or(s)),

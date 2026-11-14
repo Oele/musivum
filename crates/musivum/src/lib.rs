@@ -17,6 +17,7 @@
 #![allow(deprecated)]
 
 pub mod clientconfiguration;
+pub mod config;
 pub mod go;
 pub mod mediatransportutil;
 pub mod protocol;
