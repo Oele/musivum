@@ -241,10 +241,16 @@ fixed: `rtc`'s controlled ICE agent kept the first nominated pair when the clien
 another (`third_party/rtc-ice`, `docs/webrtc-library.md` item 6; confirmed with a capture in
 asaroton's lab, where media now goes to the address the browser sends from), and DTLS sent a
 lost flight again only after a second (item 7; with 30% loss during set-up musivum did not
-connect where LiveKit did, and now connects in 0.9 s). The iPhone over the hotspot has not
-been tried again yet. Open: a call forced through musivum's own TURN on that path, with the
-relay reached by the router's hairpin, completed ICE and DTLS but no media came from the
-iPhone; not compared with LiveKit.
+connect where LiveKit did, and now connects in 0.9 s). A call forced through musivum's own TURN on that path (UDP
+and ICE over TCP blocked, the relay reached through the router's hairpin) sometimes got no
+media from the iPhone, where LiveKit's worked: the selected remote stayed the peer-reflexive
+address of the relay where LiveKit's became the relay candidate signalled at that address.
+With pion's replacement of a peer-reflexive candidate by a signalled one (`third_party/rtc-ice`)
+eight of nine joins worked; the ninth followed the iPhone losing every connection for about
+15 s (its signalling too), after which LiveKit's own rule (prefer TCP after a short ICE
+connection, and drop the UDP candidates, relays included) met a test that blocks TCP. The
+repeats also found that the 100 ms DTLS interval without pion's backoff gave a handshake
+0.8 s in all, too little over that path (`third_party/rtc-dtls`, item 7).
 Then, each against LiveKit on the same configuration: a relay-only call (Chrome kept off
 direct UDP, ICE over TCP off, TURN over TLS on a name of the lab's own CA): both peers on
 relay over UDP and TLS, two 720p videos each for the whole call, as with LiveKit; the relay
