@@ -2,11 +2,11 @@
 
 This directory is the crate `rtc-ice` 0.21.1 of webrtc-rs (https://github.com/webrtc-rs/rtc,
 MIT or Apache-2.0: the two licence files here are that repository's) as published on
-crates.io, with one change, `MUSIVUM.patch`. Of the published crate `src`, `examples` (which
+crates.io, with two changes, `MUSIVUM.patch`. Of the published crate `src`, `examples` (which
 its unchanged `Cargo.toml` names, so that `cargo test` runs here), the licences and the README
 are here.
 
-The change is in how a controlled agent (musivum's side of every peer connection a client
+The first change is in how a controlled agent (musivum's side of every peer connection a client
 opens, and of those it opens when the client answers as controlling) takes the controlling
 agent's nominations, `ControlledSelector::handle_binding_request` and
 `handle_success_response` in `src/agent/agent_selector.rs`. It now follows pion's controlled
@@ -40,10 +40,15 @@ first, peer-reflexive pair to a trickled one; a full agent that keeps a pair of 
 priority; a lite agent that follows every nomination without checks of its own; a check
 without nomination that leaves the selected pair. Each fails on the published crate.
 
-Not taken over from pion: the replacement of a peer-reflexive candidate by a signalled one at
-the same address (RFC 8838, Section 11.4, pion's `replaceRedundantPeerReflexiveCandidates`).
-Both stay; the pair found for an address is the first, so the peer-reflexive one goes on being
-used for that address, which sends to the same place.
+The second change: a candidate signalled at the transport address of a peer-reflexive one takes its place (RFC
+8838, Section 11.4; pion's `replaceRedundantPeerReflexiveCandidates`), in
+`Agent::trigger_request_connectivity_check` (`src/agent/mod.rs`): at the same index, so its
+pairs, the priorities they were made with (pion's `setPriorityOverride`) and the selection
+stay, with what was last sent to and received from it (`copyCandidateActivity`). The crate
+kept both, the peer-reflexive one first, so the selected pair went on having a
+peer-reflexive remote where pion's has the type that was signalled (a relay, say), and a
+check from that address found the peer-reflexive pair. Test:
+`a_signalled_candidate_takes_the_place_of_a_peer_reflexive_one`.
 
 It is used through `[patch.crates-io]`. To move to a newer rtc-ice: replace the sources with
 the new version's and apply `MUSIVUM.patch`. If the change is accepted upstream, this

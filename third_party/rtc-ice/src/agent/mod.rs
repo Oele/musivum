@@ -503,12 +503,26 @@ impl Agent {
     fn trigger_request_connectivity_check(&mut self, remote_candidates: Vec<Candidate>) {
         for c in remote_candidates {
             if !self.remote_candidates.iter().any(|cand| cand.equal(&c)) {
-                self.remote_candidates.push(c);
-                let remote_index = self.remote_candidates.len() - 1;
+                // musivum: RFC 8838 Section 11.4, as pion's `replaceRedundantPeerReflexiveCandidates`:
+                // a signalled candidate at the transport address of a peer-reflexive one takes
+                // its place, with its pairs, their priorities and the selection (the pairs
+                // keep the priorities they were made with, pion's `setPriorityOverride`).
+                let remote_index = match self.redundant_peer_reflexive(&c) {
+                    Some(index) => {
+                        self.replace_peer_reflexive(index, c);
+                        index
+                    }
+                    None => {
+                        self.remote_candidates.push(c);
+                        self.remote_candidates.len() - 1
+                    }
+                };
 
                 for local_index in 0..self.local_candidates.len() {
                     if self.local_candidates[local_index]
                         .can_pair_with(&self.remote_candidates[remote_index])
+                        // musivum: a candidate that took a peer-reflexive one's place has its pairs
+                        && self.find_pair(local_index, remote_index).is_none()
                     {
                         self.add_pair(local_index, remote_index);
                     }
@@ -517,6 +531,38 @@ impl Agent {
                 self.request_connectivity_check();
             }
         }
+    }
+
+    /// musivum: pion's `removeRedundantPrflxFromSet` for one candidate: the peer-reflexive
+    /// remote candidate at `c`'s transport address, when `c` is not peer-reflexive itself.
+    fn redundant_peer_reflexive(&self, c: &Candidate) -> Option<usize> {
+        if c.candidate_type() == CandidateType::PeerReflexive {
+            return None;
+        }
+        self.remote_candidates.iter().position(|existing| {
+            existing.candidate_type() == CandidateType::PeerReflexive
+                && existing.network_type() == c.network_type()
+                && existing.addr() == c.addr()
+        })
+    }
+
+    /// musivum: puts `c` in the place of the peer-reflexive remote candidate at `index`, with
+    /// what was last sent to and received from it (pion's `copyCandidateActivity`).
+    fn replace_peer_reflexive(&mut self, index: usize, mut c: Candidate) {
+        let old = &self.remote_candidates[index];
+        if c.last_received.is_none() {
+            c.last_received = old.last_received;
+        }
+        if c.last_sent.is_none() {
+            c.last_sent = old.last_sent;
+        }
+        debug!(
+            "[{}]: replacing peer-reflexive remote candidate {} with signalled {}",
+            self.get_name(),
+            old,
+            c
+        );
+        self.remote_candidates[index] = c;
     }
 
     /// Sets the credentials of the remote agent.

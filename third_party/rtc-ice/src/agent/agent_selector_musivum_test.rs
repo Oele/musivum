@@ -264,3 +264,39 @@ fn a_check_without_nomination_leaves_the_selected_pair() {
     );
     assert_eq!(Some(first), selected_remote(&a));
 }
+
+// musivum: RFC 8838 Section 11.4 (pion's replaceRedundantPeerReflexiveCandidates): a
+// candidate signalled at the address of a peer-reflexive one takes its place, keeping the
+// pair, its priority and the selection.
+#[test]
+fn a_signalled_candidate_takes_the_place_of_a_peer_reflexive_one() {
+    let mut a = controlled(false);
+    let at = addr("203.0.113.10:13210");
+    nominate(&mut a, at);
+    assert_eq!(Some(at), selected_remote(&a));
+    let (pairs, priority) = (
+        a.candidate_pairs.len(),
+        a.candidate_pairs[a.get_selected_pair().unwrap()].priority(),
+    );
+
+    a.add_remote_candidate(relay("203.0.113.10", 13210)).unwrap();
+    assert_eq!(1, a.remote_candidates.len(), "one candidate at the address");
+    assert_eq!(pairs, a.candidate_pairs.len(), "no pair more");
+    let (_, remote) = a.get_selected_candidate_pair().unwrap();
+    assert_eq!(CandidateType::Relay, remote.candidate_type(), "the signalled type");
+    assert_eq!(at, remote.addr());
+    assert_eq!(
+        priority,
+        a.candidate_pairs[a.get_selected_pair().unwrap()].priority(),
+        "the pair keeps its priority"
+    );
+    assert!(remote.last_received().is_some(), "and what was seen of it");
+
+    // A check from there finds the same pair.
+    a.write_outs.clear();
+    let mut m = check(&a, true);
+    a.handle_inbound(Instant::now(), &mut m, 0, at).unwrap();
+    assert_eq!(Some(at), selected_remote(&a));
+    assert_eq!(pairs, a.candidate_pairs.len());
+}
+

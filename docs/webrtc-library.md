@@ -136,7 +136,9 @@ hard-coded.
    on sending DTLS and media to the first. On loopback that still arrived; behind a phone's
    hotspot ICE connected and the connection never did (found in production, 2026-11-14).
    `third_party/rtc-ice` is `rtc-ice` 0.21.1 with pion's rules (`MUSIVUM.md`,
-   `MUSIVUM.patch`), used through `[patch.crates-io]`. Not proposed upstream yet.
+   `MUSIVUM.patch`), used through `[patch.crates-io]`, and with pion's replacement of a
+   peer-reflexive candidate by one signalled at its address (RFC 8838, 11.4), which `rtc`
+   did not do either. Not proposed upstream yet.
 7. **Its DTLS handshake waits a second before it sends a flight again.** `rtc` builds its
    DTLS configuration with the dtls crate's default (1 s, seven times at most) and has no
    setting for it; LiveKit sets pion's to 100 ms. With 30% loss while two browsers joined
