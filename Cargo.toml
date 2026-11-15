@@ -15,8 +15,10 @@ unsafe_code = "forbid"
 # rtc's RTP packet with one field more, the padding size that pion's has: see
 # docs/webrtc-library.md and third_party/rtc-rtp/MUSIVUM.md. rtc itself with a transceiver's codecs
 # as pion has them: third_party/rtc/MUSIVUM.md. rtc's ICE agent with a controlled side that follows
-# the nomination, as pion's does: third_party/rtc-ice/MUSIVUM.md.
+# the nomination, as pion's does: third_party/rtc-ice/MUSIVUM.md. rtc's DTLS with pion's
+# retransmission backoff: third_party/rtc-dtls/MUSIVUM.md.
 [patch.crates-io]
 rtc-rtp = { path = "third_party/rtc-rtp" }
 rtc = { path = "third_party/rtc" }
 rtc-ice = { path = "third_party/rtc-ice" }
+rtc-dtls = { path = "third_party/rtc-dtls" }

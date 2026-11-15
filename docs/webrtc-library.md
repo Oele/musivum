@@ -146,7 +146,11 @@ hard-coded.
    within the client's ten seconds after ICE. `third_party/rtc` has the setting
    (`SettingEngineBuilder::with_dtls_retransmission_interval`), the layer's engine
    `set_dtls_retransmission_interval`, and the transport sets LiveKit's 100 ms: set-up in
-   0.9 s under the same loss.
+   0.9 s under the same loss. But `rtc-dtls` kept the interval fixed, and gives a flight up
+   after seven retransmissions, where pion doubles the wait each time: at 100 ms a handshake
+   had 0.8 s in all, and an iPhone behind a TURN relay on a mobile network failed it in
+   production. `third_party/rtc-dtls` has pion's backoff (100, 200, 400 ms … to 60 s; the
+   seven cover 25.5 s).
 
 None of these changes the structure of the port.
 

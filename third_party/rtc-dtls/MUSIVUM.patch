@@ -1,0 +1,103 @@
+diff -ru a/src/endpoint.rs b/src/endpoint.rs
+--- a/src/endpoint.rs
++++ b/src/endpoint.rs
+@@ -1035,4 +1035,58 @@
+         );
+         Ok(())
+     }
++
++    /// musivum: a client with a short retransmission interval (LiveKit's 100 ms) whose server
++    /// answers only after two seconds still completes the handshake: the wait doubles with
++    /// every retransmission (pion's backoff). With a fixed interval its seven retransmissions
++    /// were spent after 0.8 s and the handshake failed.
++    #[cfg(feature = "crypto-ring")]
++    #[test]
++    fn a_short_retransmission_interval_backs_off_until_a_slow_server_answers() -> Result<()> {
++        let provider: Arc<dyn RTCCryptoProvider> = Arc::new(crypto::providers::RingProvider::new());
++        let suites = [CipherSuiteId::Tls_Ecdhe_Ecdsa_With_Aes_128_Gcm_Sha256];
++        let client_config = Arc::new(
++            ConfigBuilder::default()
++                .with_crypto_provider(provider.clone())
++                .with_cipher_suites(suites.to_vec())
++                .with_insecure_skip_verify(true)
++                .with_flight_interval(std::time::Duration::from_millis(100))
++                .build(true, None)?,
++        );
++        let server_config = config(provider, false, &suites)?;
++        let mut client = Endpoint::new(client_addr(), TransportProtocol::UDP, None);
++        let mut server = Endpoint::new(server_addr(), TransportProtocol::UDP, Some(server_config));
++        let start = Instant::now();
++        client.connect(start, server_addr(), client_config, None)?;
++
++        // Two seconds in which nothing the client sends arrives, and the waits it takes.
++        let mut waits = vec![];
++        let mut last = start;
++        while last.duration_since(start) < std::time::Duration::from_secs(2) {
++            while client.poll_transmit().is_some() {}
++            let deadline = client
++                .poll_timeout(&server_addr())
++                .expect("a client waiting for an answer arms a retransmit timer");
++            waits.push(deadline.duration_since(last).as_millis());
++            client.handle_timeout(server_addr(), deadline)?;
++            last = deadline;
++        }
++        assert_eq!(vec![100, 200, 400, 800, 1600], waits);
++
++        // Then the path works, and the handshake completes on both sides.
++        let (mut client_done, mut server_done) = (false, false);
++        for _ in 0..32 {
++            for event in transfer(&mut client, &mut server, client_addr())? {
++                server_done |= matches!(event, EndpointEvent::HandshakeComplete);
++            }
++            for event in transfer(&mut server, &mut client, server_addr())? {
++                client_done |= matches!(event, EndpointEvent::HandshakeComplete);
++            }
++            if client_done && server_done {
++                break;
++            }
++        }
++        assert!(client_done && server_done, "the handshake did not complete");
++        Ok(())
++    }
+ }
+diff -ru a/src/handshaker.rs b/src/handshaker.rs
+--- a/src/handshaker.rs
++++ b/src/handshaker.rs
+@@ -4,7 +4,7 @@
+ 
+ use log::*;
+ use std::fmt;
+-use std::time::Instant;
++use std::time::{Duration, Instant};
+ 
+ //use std::io::BufWriter;
+ 
+@@ -181,10 +181,27 @@
+         if self.current_flight.is_last_send_flight() || self.is_handshake_completed() {
+             Ok(HandshakeState::Finished)
+         } else {
+-            self.current_retransmit_timer = Some(now + self.handshake_config.retransmit_interval);
++            // musivum: the wait doubles with every time the flight was sent again (pion's
++            // backoff, see `retransmit_interval`)
++            self.current_retransmit_timer = Some(now + self.retransmit_interval());
+             Ok(HandshakeState::Waiting)
+         }
+     }
++
++    /// musivum: how long to wait for an answer to the flight before it is sent again, as pion's
++    /// handshaker (`handshaker.go`): the configured interval the first time, doubled at every
++    /// retransmission, to 60 seconds at most, and the configured one again with the next flight
++    /// (`prepare` sets the count back to zero). The crate waited the configured interval every
++    /// time, so with `maximum_retransmit_number` (7) a short interval gave the handshake little
++    /// time in all: 0.8 s at LiveKit's 100 ms, too little for a client behind a relay on a mobile
++    /// network. With the doubling the seven retransmissions cover 25.5 s at 100 ms.
++    pub(crate) fn retransmit_interval(&self) -> Duration {
++        let doublings = self.current_retransmit_count.min(16) as u32;
++        self.handshake_config
++            .retransmit_interval
++            .saturating_mul(1u32 << doublings)
++            .min(Duration::from_secs(60))
++    }
+     fn wait(&mut self) -> Result<HandshakeState> {
+         if self.handshake_rx.take().is_some() {
+             debug!(

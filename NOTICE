@@ -147,8 +147,9 @@ service. Twirp's notice:
     Twirp
     Copyright 2018 Twitch Interactive, Inc.  All Rights Reserved.
 
-third_party/rtc, third_party/rtc-ice and third_party/rtc-rtp are copies of the crates `rtc`,
-`rtc-ice` and `rtc-rtp` of webrtc-rs (https://github.com/webrtc-rs/rtc), under the MIT License
-or the Apache License, Version 2.0, with small changes of musivum's (their MUSIVUM.md and
-MUSIVUM.patch). Their licence files are in those directories. The change to rtc-ice follows
-pion/ice's controlled selector (MIT), as LiveKit builds it.
+third_party/rtc, third_party/rtc-dtls, third_party/rtc-ice and third_party/rtc-rtp are copies
+of the crates `rtc`, `rtc-dtls`, `rtc-ice` and `rtc-rtp` of webrtc-rs
+(https://github.com/webrtc-rs/rtc), under the MIT License or the Apache License, Version 2.0,
+with small changes of musivum's (their MUSIVUM.md and MUSIVUM.patch). Their licence files are
+in those directories. The change to rtc-ice follows pion/ice's controlled selector (MIT), as
+LiveKit builds it, and the one to rtc-dtls pion/dtls's retransmission backoff (MIT).
