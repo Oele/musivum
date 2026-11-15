@@ -293,8 +293,10 @@ set-up bob reached 720p at 20 fps 6.8 to 12.9 s after subscribing from musivum, 
 8.3 s from LiveKit (four runs each; on a clean set-up 1.8 and 1.7 s, the same), with both
 allocators "optimal" throughout, so the difference is upstream of them; and in one such
 run musivum sent bob's media to another of the browser's ports than the browser sent from
-(the subscriber connection, where musivum is the controlling side; in the 42 recorded runs
-on a clean set-up the two never differ, nor in LiveKit's runs). Smaller
+(in the 42 recorded runs on a clean set-up the two never differ, nor in LiveKit's runs). The
+browser has one peer connection, which it offers, so musivum is the controlled side and
+follows the browser's nominations by pion's rule, to a pair of higher priority only; a
+browser that nominates a pair of lower priority later is not followed, by LiveKit either. Smaller
 and consistent: under the 150 ms delay musivum keeps 11 fps where LiveKit drops to 7–10, but
 conceals more audio (434 against 327 ms) and has a 9 ms higher round trip; under loss its
 subscriber counts about 10% fewer lost packets.
