@@ -164,6 +164,35 @@ pub(crate) struct HostCandidate {
     pub(crate) listener: usize,
 }
 
+/// Every node of the process, for [`Node::totals`].
+static NODES: LazyLock<parking_lot::Mutex<Vec<Weak<NodeInner>>>> = LazyLock::new(Default::default);
+
+fn stats_of(i: &NodeInner) -> NodeStats {
+    NodeStats {
+        datagrams_received: i.datagrams_received.load(Ordering::Relaxed),
+        datagrams_without_route: i.datagrams_without_route.load(Ordering::Relaxed),
+        datagrams_queue_full: i.datagrams_queue_full.load(Ordering::Relaxed),
+        datagrams_sent: i.datagrams_sent.load(Ordering::Relaxed),
+        datagrams_not_sent: i.datagrams_not_sent.load(Ordering::Relaxed),
+        tcp_streams_opened: i.tcp_streams_opened.load(Ordering::Relaxed),
+        tcp_streams_closed: i.tcp_streams_closed.load(Ordering::Relaxed),
+        tcp_streams_refused: i.tcp_streams_refused.load(Ordering::Relaxed),
+    }
+}
+
+impl NodeStats {
+    fn add(&mut self, o: &NodeStats) {
+        self.datagrams_received += o.datagrams_received;
+        self.datagrams_without_route += o.datagrams_without_route;
+        self.datagrams_queue_full += o.datagrams_queue_full;
+        self.datagrams_sent += o.datagrams_sent;
+        self.datagrams_not_sent += o.datagrams_not_sent;
+        self.tcp_streams_opened += o.tcp_streams_opened;
+        self.tcp_streams_closed += o.tcp_streams_closed;
+        self.tcp_streams_refused += o.tcp_streams_refused;
+    }
+}
+
 /// A datagram on its way to a connection.
 pub(crate) struct Datagram {
     pub(crate) data: BytesMut,
@@ -479,6 +508,11 @@ impl Node {
             tcp_streams_closed: AtomicU64::new(0),
             tcp_streams_refused: AtomicU64::new(0),
         });
+        {
+            let mut nodes = NODES.lock();
+            nodes.retain(|node| node.strong_count() > 0);
+            nodes.push(Arc::downgrade(&inner));
+        }
         for (i, socket) in sockets.into_iter().enumerate() {
             let tasks = socket_tasks.clone();
             let receiving = receive(socket, i, Arc::downgrade(&inner), shutdown.clone());
@@ -595,17 +629,21 @@ impl Node {
     }
 
     pub fn stats(&self) -> NodeStats {
-        let i = &self.inner;
-        NodeStats {
-            datagrams_received: i.datagrams_received.load(Ordering::Relaxed),
-            datagrams_without_route: i.datagrams_without_route.load(Ordering::Relaxed),
-            datagrams_queue_full: i.datagrams_queue_full.load(Ordering::Relaxed),
-            datagrams_sent: i.datagrams_sent.load(Ordering::Relaxed),
-            datagrams_not_sent: i.datagrams_not_sent.load(Ordering::Relaxed),
-            tcp_streams_opened: i.tcp_streams_opened.load(Ordering::Relaxed),
-            tcp_streams_closed: i.tcp_streams_closed.load(Ordering::Relaxed),
-            tcp_streams_refused: i.tcp_streams_refused.load(Ordering::Relaxed),
-        }
+        stats_of(&self.inner)
+    }
+
+    /// The counters of every node of the process that is open, added up: for the metrics
+    /// (`telemetry::prometheus`, `musivum_node_*`). A node that is let go of leaves the sum.
+    pub fn totals() -> NodeStats {
+        let mut total = NodeStats::default();
+        NODES.lock().retain(|node| match node.upgrade() {
+            Some(inner) => {
+                total.add(&stats_of(&inner));
+                true
+            }
+            None => false,
+        });
+        total
     }
 
     /// Stops reading the socket and the TCP listener, closes the TCP streams and lets go of
@@ -1349,6 +1387,20 @@ mod tests {
             std::time::Duration::from_millis(5),
         )
         .await;
+    }
+
+    /// New: a node's counters are in the totals of every node (for the metrics), as long as
+    /// the node is open.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn a_datagram_for_nobody_is_in_the_totals() {
+        let node = Node::new(NodeConfig::default()).unwrap();
+        let before = Node::totals().datagrams_without_route;
+        let client = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+        client.send_to(b"\x80media", node.local_addr()).unwrap();
+        without_route(&node, 1).await;
+        assert!(Node::totals().datagrams_without_route > before);
+        assert!(Node::totals().datagrams_received >= node.stats().datagrams_received);
+        node.close();
     }
 
     /// The rules by which a datagram finds its connection: a binding request by the name in

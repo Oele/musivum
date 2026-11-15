@@ -55,6 +55,7 @@ mod node;
 mod packets;
 mod quality;
 mod rooms;
+mod transport;
 
 pub use collectors::*;
 pub use datapacket::*;
@@ -74,6 +75,8 @@ pub fn gather() -> Vec<MetricFamily> {
     datapacket::collect(&mut families);
     // the collectors of the protocol's webhook package, which upstream registers with these
     crate::protocol::webhook::collect(&mut families);
+    // musivum's own: the WebRTC layer's sockets
+    transport::collect(&mut families);
     families
 }
 
@@ -131,6 +134,8 @@ mod tests {
                 "livekit_datapacket_stream_bytes",
                 "livekit_webhook_dispatch_total",
                 "livekit_webhook_queue_length",
+                "musivum_node_datagrams_total",
+                "musivum_node_tcp_streams_total",
             ]
         );
         assert_eq!(families[3].label_names, ["direction"]);
