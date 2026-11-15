@@ -299,11 +299,12 @@ rate does not climb more slowly; 25 s were too short for either.
 The connection's set-up under loss (`setup-loss-30`: 30% of every packet lost, both ways,
 from before the two join until bob is subscribed): LiveKit connected in 0.6 to 1.0 s;
 musivum did not connect at all until its DTLS sent a lost flight again after 100 ms instead
-of a second (`docs/webrtc-library.md`, item 7), and since then in 0.9 s. Open: after such a
-set-up bob reached 720p at 20 fps 6.8 to 12.9 s after subscribing from musivum, 2.0 to
-8.3 s from LiveKit (four runs each; on a clean set-up 1.8 and 1.7 s, the same), with both
-allocators "optimal" throughout, so the difference is upstream of them; and in one such
-run musivum sent bob's media to another of the browser's ports than the browser sent from
+of a second (`docs/webrtc-library.md`, item 7), and since then in 0.9 s. After such a set-up
+bob reached 720p at 20 fps after 6.8 to 17.3 s from musivum (median 11.4) and 2.0 to 22.8 s
+from LiveKit (median 8.3), seven runs each, with both allocators "optimal" throughout: the
+ranges overlap almost entirely, and where the loss falls during the set-up decides it (on
+a clean set-up 1.8 and 1.7 s); the difference four runs each had suggested did not hold.
+In one such run musivum sent bob's media to another of the browser's ports than the browser sent from
 (in the 42 recorded runs on a clean set-up the two never differ, nor in LiveKit's runs). The
 browser has one peer connection, which it offers, so musivum is the controlled side and
 follows the browser's nominations by pion's rule, to a pair of higher priority only; a
