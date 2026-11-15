@@ -359,7 +359,13 @@ the send inline, 3.3 µs with its batch IO, where it is 300 too); here a write, 
 included, costs 4.4 µs, so waking threads for it cost more than it saved: with 100
 subscribers the serial fan-out takes 440 µs (LiveKit's parallel one 426) for 24% less CPU
 of the server than the parallel one, measured in turn. What is left, in the small rooms, is
-in the write of each packet: `rtc`'s sans-I/O pipeline
+in the WebRTC layer. Profiled in turn in calls of four (2026-11-15, 30 s each, LiveKit with
+its release binary's addresses mapped to Go functions): the kernel (one `sendto` per
+datagram, waiting and waking) is 41 and 43% of either server's time, the SFU code about the
+same; the difference is in the layer underneath, about 2,780 samples against pion's 1,700,
+spread over `rtc`'s handlers, each 0.3 to 0.6% (the SRTP context's hash lookup, the SCTP
+association asked on every packet, statistics, the moves from queue to queue), and in the
+write of each packet: `rtc`'s sans-I/O pipeline
 passes it through every handler with queues and copies (19 to 25% of musivum's CPU in b),
 where pion writes straight through; closing that means changing the connection layer or
 `rtc`. Not measured yet: latency and freezes under load, runs of minutes, joins and leaves
