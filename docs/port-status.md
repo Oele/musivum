@@ -250,7 +250,12 @@ eight of nine joins worked; the ninth followed the iPhone losing every connectio
 15 s (its signalling too), after which LiveKit's own rule (prefer TCP after a short ICE
 connection, and drop the UDP candidates, relays included) met a test that blocks TCP. The
 repeats also found that the 100 ms DTLS interval without pion's backoff gave a handshake
-0.8 s in all, too little over that path (`third_party/rtc-dtls`, item 7).
+0.8 s in all, too little over that path (`third_party/rtc-dtls`, item 7). With the server
+then advertising only its public address (`node_ip`, `advertise_internal_ip: false`,
+`ips.includes` the one LAN address; LAN clients come in through the router's hairpin) and
+the phones' power saving off: ten joins from the home network and five from the iPhone on
+its own mobile line over UDP, all active within about a second; the instability left over
+the phone's hotspot was the hotspot's own (drops on every connection at once).
 Then, each against LiveKit on the same configuration: a relay-only call (Chrome kept off
 direct UDP, ICE over TCP off, TURN over TLS on a name of the lab's own CA): both peers on
 relay over UDP and TLS, two 720p videos each for the whole call, as with LiveKit; the relay
