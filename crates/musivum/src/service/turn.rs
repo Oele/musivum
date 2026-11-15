@@ -10,7 +10,9 @@
 //   listener is `proxyproto.rs`, written after the specification with go-proxyproto's
 //   behaviour; `proxyProtocolPolicy` is its connection policy, an untrusted proxy being an
 //   `InvalidUpstream` error (go-proxyproto's `ErrInvalidUpstream`).
-// - pion's logger factory (`pionlogger`) is the server's logger.
+// - pion's logger factory (`pionlogger.NewLoggerFactory`) is the server's logger with the
+//   component that factory gives pion's scope "turn", `pion.turn`, so that `pion_level` (by
+//   default `error`) and `component_levels` govern it as in LiveKit.
 // - `getTURNAuthHandlerFunc` gives the handler as pion's `AuthHandler` (an `Arc` of a function).
 // - base62 is jxskiss/base62 as ported (`protocol/utils/base62.rs`).
 
@@ -104,7 +106,7 @@ pub fn new_turn_server(
     let mut server_config = ServerConfig {
         realm: LIVEKIT_REALM.to_string(),
         auth_handler,
-        logger_factory: Some(logger::get_logger()),
+        logger_factory: Some(logger::get_logger().with_component("pion.turn")),
         ..Default::default()
     };
 
