@@ -3,7 +3,10 @@
 # out/<target>.json.
 #
 #   ./run.sh reference     LiveKit itself (livekit-server, which has to be the pinned
-#                          version), started here with reference-livekit.yaml
+#                          version: $LIVEKIT_SERVER, else the one on the PATH, else
+#                          ~/.cache/musivum/gobin/livekit-server, LiveKit's release binary
+#                          for linux/amd64 checked against the release's checksums.txt),
+#                          started here with reference-livekit.yaml
 #   ./run.sh musivum       musivum (target/release/musivum-server, built here), started
 #                          with musivum.yaml, which has the same ports
 #
@@ -48,9 +51,10 @@ fi
 case "$TARGET" in
   reference)
     WANT=$(sed -n 's/^tag = "v\(.*\)"$/\1/p' ../../upstream.toml | head -n 1)
-    HAVE=$(livekit-server --version | awk '{print $NF}')
+    LIVEKIT_SERVER=${LIVEKIT_SERVER:-$(command -v livekit-server || echo "$HOME/.cache/musivum/gobin/livekit-server")}
+    HAVE=$("$LIVEKIT_SERVER" --version | awk '{print $NF}')
     [ "$WANT" = "$HAVE" ] || { echo "livekit-server is $HAVE, the pin is $WANT" >&2; exit 1; }
-    livekit-server --config "${NETEM:+../netem/}$CONF_REFERENCE" > out/reference-server.log 2>&1 &
+    "$LIVEKIT_SERVER" --config "${NETEM:+../netem/}$CONF_REFERENCE" > out/reference-server.log 2>&1 &
     URL=ws://127.0.0.1:$PORT
     ;;
   musivum)

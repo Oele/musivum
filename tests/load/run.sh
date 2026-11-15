@@ -4,7 +4,9 @@
 # results/<target>-<scenario>.json and prints a one-line summary; `python3 -I compare.py`
 # puts both targets side by side.
 #
-#   ./run.sh reference [a b c d]   LiveKit itself (livekit-server, the pinned version)
+#   ./run.sh reference [a b c d]   LiveKit itself (livekit-server, the pinned version:
+#                                  $LIVEKIT_SERVER, else the one on the PATH, else
+#                                  ~/.cache/musivum/gobin/livekit-server)
 #   ./run.sh musivum [a b c d]     target/release/musivum-server, built here
 #
 # Without scenarios it runs a, b and c; d (100 subscribers) is asked for by name.
@@ -29,9 +31,9 @@ unset LIVEKIT_URL LIVEKIT_API_KEY LIVEKIT_API_SECRET
 case "$TARGET" in
   reference)
     WANT=$(sed -n 's/^tag = "v\(.*\)"$/\1/p' ../../upstream.toml | head -n 1)
-    HAVE=$(livekit-server --version | awk '{print $NF}')
+    SERVER=${LIVEKIT_SERVER:-$(command -v livekit-server || echo "$HOME/.cache/musivum/gobin/livekit-server")}
+    HAVE=$("$SERVER" --version | awk '{print $NF}')
     [ "$WANT" = "$HAVE" ] || { echo "livekit-server is $HAVE, the pin is $WANT" >&2; exit 1; }
-    SERVER=$(command -v livekit-server)
     CONFIG=reference-livekit.yaml
     ;;
   musivum)
