@@ -56,6 +56,7 @@ pub fn get_node_sysload(node: &livekit::Node) -> f32 {
 }
 
 // TODO: check remote node configured limit, instead of this node's config
+#[allow(clippy::needless_bool)] // the returns as the original has them
 pub fn limits_reached(limit_config: &LimitConfig, node_stats: Option<&livekit::NodeStats>) -> bool {
     let Some(node_stats) = node_stats else {
         return false;

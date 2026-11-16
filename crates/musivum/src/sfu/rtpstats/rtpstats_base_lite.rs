@@ -463,6 +463,7 @@ impl RtpStatsBaseLite {
         Ok(elapsed_seconds)
     }
 
+    #[allow(clippy::needless_range_loop)] // the loops as the original has them
     pub(super) fn to_proto(
         &self,
         packets_expected: u64,

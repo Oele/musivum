@@ -94,6 +94,7 @@ impl<'a> DependencyDescriptorWriter<'a> {
         Ok(())
     }
 
+    #[allow(clippy::needless_range_loop)] // the loops as the original has them
     pub(super) fn find_best_template(&mut self) -> Result<(), Error> {
         let structure = self.structure();
         let frame_dependencies = self.frame_dependencies();
@@ -477,6 +478,7 @@ impl<'a> DependencyDescriptorWriter<'a> {
         value_size_bits
     }
 
+    #[allow(clippy::needless_bool)] // the returns as the original has them
     fn should_write_active_decode_targets_bitmask(&self) -> bool {
         let Some(active_decode_targets_bitmask) = self.descriptor.active_decode_targets_bitmask
         else {

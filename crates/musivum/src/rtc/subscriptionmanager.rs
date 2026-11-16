@@ -629,6 +629,7 @@ impl SubscriptionManager {
         (Some(sub.clone()), sub.set_desired(desired))
     }
 
+    #[allow(clippy::needless_bool)] // the returns as the original has them
     fn can_reconcile(&self) -> bool {
         // held weakly, see the header: a participant that is gone is one that is closed
         let Some(p) = self.params.participant.upgrade() else {

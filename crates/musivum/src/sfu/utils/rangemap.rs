@@ -114,6 +114,7 @@ pub struct RangeMap<RT: RangeType, VT: ValueType> {
 }
 
 impl<RT: RangeType, VT: ValueType> fmt::Debug for RangeMap<RT, VT> {
+    #[allow(clippy::needless_range_loop)] // the loops as the original has them
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut e = f.debug_struct("RangeMap");
         e.field("numRanges", &self.ranges.len());

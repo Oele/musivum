@@ -213,6 +213,7 @@ impl<T: TrendDetectorNumber> fmt::Debug for TrendDetector<T> {
 }
 
 impl<T: TrendDetectorNumber> TrendDetector<T> {
+    #[allow(clippy::needless_range_loop)] // the loops as the original has them
     fn prune(&mut self) {
         // prune based on a few rules
 
